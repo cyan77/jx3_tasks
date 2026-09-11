@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Release artifacts are uploaded to GitHub Releases, not stored in source control.
+/outputs/
+
 # Symbolication related
 app.*.symbols
 
