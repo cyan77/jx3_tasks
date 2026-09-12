@@ -368,7 +368,9 @@ class AppState extends ChangeNotifier {
       occupation: occupation,
       color: colors[store.characters.length % colors.length],
     );
-    // Replace the collection so this also works with immutable seed data\n    // supplied by tests or import callers.\n    store.characters = [...store.characters, character];
+    // Replace the collection so this also works with immutable seed data
+    // supplied by tests or import callers.
+    store.characters = [...store.characters, character];
     selectedGameId = character.gameId;
     selectedCharacterId = character.id;
     await _saveDataChange();
