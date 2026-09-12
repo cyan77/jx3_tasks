@@ -23,7 +23,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.47.4"
           cache: true
 
       - name: Install dependencies
@@ -50,6 +50,7 @@ jobs:
         with:
           name: jx3_tasks-windows-x64
           path: jx3_tasks-windows-x64.zip
+          if-no-files-found: error
 
   build-android:
     runs-on: ubuntu-latest
@@ -67,7 +68,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.47.4"
           cache: true
 
       - name: Install dependencies
@@ -84,6 +85,7 @@ jobs:
         with:
           name: jx3_tasks-android
           path: jx3_tasks-android.apk
+          if-no-files-found: error
 
   publish-release:
     if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
