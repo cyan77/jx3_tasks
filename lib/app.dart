@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'data/local_store.dart';
 import 'state/app_state.dart';
@@ -70,14 +69,9 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       appState.checkAutoSync();
-    } else if (state == AppLifecycleState.paused) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
       unawaited(appState.backupBeforeExit());
     }
-  }
-
-  @override
-  Future<AppExitResponse> didRequestAppExit() async {
-    await appState.backupBeforeExit();
-    return AppExitResponse.exit;
   }
 }
