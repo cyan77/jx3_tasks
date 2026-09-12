@@ -41,6 +41,40 @@ class _TaskEditorState extends State<_TaskEditor> {
   DateTime? dueDate;
   int targetCount = 5;
   final Set<int> weeklyDays = {};
+  bool assignExisting = false;
+  String? existingTemplateId;
+
+  List<TaskRecord> get existingTasks {
+    final byTemplate = <String, TaskRecord>{};
+    for (final task in widget.state.tasks) {
+      byTemplate.putIfAbsent(task.templateId, () => task);
+    }
+    return byTemplate.values.where((task) {
+      final assignedIds = widget.state
+          .tasksForTemplate(task.templateId)
+          .map((item) => item.characterId)
+          .toSet();
+      return widget.state.characters
+          .any((character) => !assignedIds.contains(character.id));
+    }).toList();
+  }
+
+  TaskRecord? get existingTask => existingTasks
+      .where((task) => task.templateId == existingTemplateId)
+      .firstOrNull;
+
+  List<Character> get availableCharacters {
+    final task = existingTask;
+    if (!assignExisting) return widget.state.characters;
+    if (task == null) return const [];
+    final assignedIds = widget.state
+        .tasksForTemplate(task.templateId)
+        .map((item) => item.characterId)
+        .toSet();
+    return widget.state.characters
+        .where((character) => !assignedIds.contains(character.id))
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -55,38 +89,82 @@ class _TaskEditorState extends State<_TaskEditor> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Row(children: [
-                  const Expanded(
-                      child: Text('新建任务',
-                          style: TextStyle(
+                  Expanded(
+                      child: Text(assignExisting ? '分配已有任务' : '新建任务',
+                          style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w700))),
                   IconButton(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close, size: 20))
                 ]),
                 const SizedBox(height: 14),
-                TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                        labelText: '任务名称', hintText: '例如：大战、茶馆、门派周常')),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                        value: false,
+                        icon: Icon(Icons.add, size: 17),
+                        label: Text('新建任务')),
+                    ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.content_copy_outlined, size: 17),
+                        label: Text('分配已有任务')),
+                  ],
+                  selected: {assignExisting},
+                  onSelectionChanged: (value) =>
+                      _setAssignExisting(value.first),
+                ),
+                const SizedBox(height: 14),
+                if (assignExisting) ...[
+                  if (existingTasks.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.soft,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: const Text('没有可以继续分配的任务',
+                          style:
+                              TextStyle(fontSize: 12, color: AppTheme.muted)),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      value: existingTemplateId,
+                      decoration: const InputDecoration(labelText: '选择已有任务'),
+                      items: existingTasks
+                          .map((task) => DropdownMenuItem(
+                                value: task.templateId,
+                                child: Text(
+                                    '${task.title} · ${task.frequency.label}'),
+                              ))
+                          .toList(),
+                      onChanged: _selectExistingTask,
+                    ),
+                ] else
+                  TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                          labelText: '任务名称',
+                          hintText: '例如：大战、茶馆、门派周常')),
                 const SizedBox(height: 18),
                 const Text('关联角色',
                     style:
                         TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                if (widget.state.characters.isNotEmpty)
+                if (availableCharacters.isNotEmpty)
                   Wrap(spacing: 4, runSpacing: 0, children: [
                     _characterAction(
                         label: '全选', onPressed: _selectAllCharacters),
                     _characterAction(label: '全不选', onPressed: _clearCharacters),
                     _characterAction(label: '反选', onPressed: _invertCharacters),
                   ]),
-                if (widget.state.characters.isNotEmpty)
+                if (availableCharacters.isNotEmpty)
                   const SizedBox(height: 4),
                 Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: widget.state.characters
+                    children: availableCharacters
                         .map((character) => FilterChip(
                             label: Text(character.name),
                             selected: selected.contains(character.id),
@@ -96,8 +174,18 @@ class _TaskEditorState extends State<_TaskEditor> {
                                       : selected.remove(character.id);
                                 })))
                         .toList()),
-                const SizedBox(height: 18),
-                DropdownButtonFormField<TaskFrequency>(
+                if (assignExisting && existingTask != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    '将沿用：${existingTask!.frequency.label}'
+                    '${existingTask!.dueDate == null ? '' : ' · ${dueLabel(existingTask!.dueDate)}'}'
+                    '${existingTask!.isCountTask ? ' · 目标 ${existingTask!.targetCount} 次' : ''}',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.muted),
+                  ),
+                ],
+                if (!assignExisting) ...[
+                  const SizedBox(height: 18),
+                  DropdownButtonFormField<TaskFrequency>(
                     value: frequency,
                     decoration: const InputDecoration(labelText: '周期'),
                     items: TaskFrequency.values
@@ -107,8 +195,8 @@ class _TaskEditorState extends State<_TaskEditor> {
                     onChanged: (value) {
                       if (value != null) setState(() => frequency = value);
                     }),
-                if (frequency == TaskFrequency.weeklyCount ||
-                    frequency == TaskFrequency.monthlyCount) ...[
+                  if (frequency == TaskFrequency.weeklyCount ||
+                      frequency == TaskFrequency.monthlyCount) ...[
                   const SizedBox(height: 12),
                   Row(children: [
                     const Text('目标次数', style: TextStyle(fontSize: 13)),
@@ -147,9 +235,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                       }),
                     ),
                   ],
-                ],
-                const SizedBox(height: 12),
-                ListTile(
+                  ],
+                  const SizedBox(height: 12),
+                  ListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   leading: const Icon(Icons.event_outlined,
@@ -161,16 +249,20 @@ class _TaskEditorState extends State<_TaskEditor> {
                   trailing: TextButton(
                       onPressed: _pickDate,
                       child: Text(dueDate == null ? '选择' : '修改')),
-                ),
-                TextField(
+                  ),
+                  TextField(
                     controller: noteController,
                     maxLines: 2,
                     decoration: const InputDecoration(labelText: '备注（可选）')),
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                        onPressed: _save, child: const Text('创建任务')))
+                        onPressed: assignExisting && existingTask == null
+                            ? null
+                            : _save,
+                        child: Text(assignExisting ? '分配任务' : '创建任务')))
               ]))));
 
   Widget _characterAction({
@@ -189,7 +281,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     setState(() {
       selected
         ..clear()
-        ..addAll(widget.state.characters.map((character) => character.id));
+        ..addAll(availableCharacters.map((character) => character.id));
     });
   }
 
@@ -198,7 +290,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   void _invertCharacters() {
     setState(() {
       final characterIds =
-          widget.state.characters.map((character) => character.id).toSet();
+          availableCharacters.map((character) => character.id).toSet();
       final inverted = characterIds.difference(selected);
       selected
         ..clear()
@@ -216,8 +308,15 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   Future<void> _save() async {
-    if (titleController.text.trim().isEmpty || selected.isEmpty) return;
-    await widget.state.addTask(
+    if (selected.isEmpty) return;
+    if (assignExisting) {
+      final task = existingTask;
+      if (task == null) return;
+      await widget.state.assignExistingTask(
+          source: task, characterIds: Set.of(selected));
+    } else {
+      if (titleController.text.trim().isEmpty) return;
+      await widget.state.addTask(
         title: titleController.text.trim(),
         characterIds: selected.toList(),
         frequency: frequency,
@@ -225,7 +324,33 @@ class _TaskEditorState extends State<_TaskEditor> {
         targetCount: targetCount,
         weeklyDays: weeklyDays.toList()..sort(),
         note: noteController.text.trim());
+    }
     if (mounted) Navigator.pop(context);
+  }
+
+  void _setAssignExisting(bool value) {
+    setState(() {
+      assignExisting = value;
+      existingTemplateId = null;
+      selected.clear();
+      final selectedCharacterId = widget.state.selectedCharacterId;
+      if (!value && selectedCharacterId != null) {
+        selected.add(selectedCharacterId);
+      }
+    });
+  }
+
+  void _selectExistingTask(String? templateId) {
+    setState(() {
+      existingTemplateId = templateId;
+      selected.clear();
+      final selectedCharacterId = widget.state.selectedCharacterId;
+      if (selectedCharacterId != null &&
+          availableCharacters
+              .any((character) => character.id == selectedCharacterId)) {
+        selected.add(selectedCharacterId);
+      }
+    });
   }
 
   @override

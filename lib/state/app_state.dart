@@ -17,9 +17,16 @@ class AppState extends ChangeNotifier {
   final SyncSettingsStore syncSettingsStore = SyncSettingsStore();
   final WebDavSyncService webDavSyncService = WebDavSyncService();
   Timer? _autoSyncTimer;
+  Timer? _changeSyncTimer;
+  Completer<void>? _syncCompleter;
   SyncConfig? _syncConfig;
   DateTime? _lastSyncAt;
+  RemoteBackup? _newerRemoteBackup;
+  int _dataRevision = 0;
+  int _syncedRevision = 0;
   bool syncBusy = false;
+  bool restoreBusy = false;
+  bool backupCheckBusy = false;
   String? syncMessage;
   String? selectedGameId;
   String? selectedCharacterId;
@@ -32,6 +39,7 @@ class AppState extends ChangeNotifier {
   bool get isSyncConfigured => _syncConfig?.isValid ?? false;
   SyncConfig? get syncConfig => _syncConfig;
   DateTime? get lastSyncAt => _lastSyncAt;
+  RemoteBackup? get newerRemoteBackup => _newerRemoteBackup;
   List<Character> get characters => store.characters
       .where((item) => item.gameId == selectedGameId && !item.archived)
       .toList();
@@ -70,6 +78,9 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> tasksForCharacter(String characterId) =>
       tasks.where((task) => task.characterId == characterId).toList();
 
+  List<TaskRecord> tasksForTemplate(String templateId) =>
+      tasks.where((task) => task.templateId == templateId).toList();
+
   List<TaskRecord> get selectedTasks => selectedCharacterId == null
       ? const []
       : tasksForCharacter(selectedCharacterId!);
@@ -80,6 +91,7 @@ class AppState extends ChangeNotifier {
     _syncConfig = await syncSettingsStore.load();
     _lastSyncAt = await syncSettingsStore.loadLastSyncAt();
     _scheduleAutoSync();
+    _scheduleChangeSync();
     notifyListeners();
     await checkAutoSync();
   }
@@ -87,7 +99,27 @@ class AppState extends ChangeNotifier {
   Future<void> reloadSyncSettings() async {
     _syncConfig = await syncSettingsStore.load();
     _scheduleAutoSync();
+    _scheduleChangeSync();
     notifyListeners();
+    await checkForNewerBackup();
+  }
+
+  bool get _hasUnsyncedChanges => _dataRevision > _syncedRevision;
+
+  Future<void> _saveDataChange() async {
+    await store.save();
+    _dataRevision++;
+    notifyListeners();
+    _scheduleChangeSync();
+  }
+
+  void _scheduleChangeSync() {
+    _changeSyncTimer?.cancel();
+    if (!_hasUnsyncedChanges || !(_syncConfig?.isValid ?? false)) return;
+    _changeSyncTimer = Timer(
+      const Duration(seconds: 2),
+      () => syncNow(silent: true),
+    );
   }
 
   void _scheduleAutoSync() {
@@ -104,9 +136,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> checkAutoSync() async {
     final config = _syncConfig;
-    if (config == null || !config.isValid || config.autoSyncMinutes <= 0) {
-      return;
-    }
+    if (config == null || !config.isValid) return;
+    await checkForNewerBackup();
+    if (_newerRemoteBackup != null) return;
+    if (config.autoSyncMinutes <= 0) return;
     final due = _lastSyncAt == null ||
         DateTime.now().difference(_lastSyncAt!).inMinutes >=
             config.autoSyncMinutes;
@@ -114,7 +147,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> syncNow({bool silent = false}) async {
-    if (syncBusy) return false;
+    if (syncBusy || restoreBusy) return false;
     final config = _syncConfig ?? await syncSettingsStore.load();
     _syncConfig = config;
     if (!config.isValid) {
@@ -123,11 +156,17 @@ class AppState extends ChangeNotifier {
       return false;
     }
     syncBusy = true;
+    final revisionAtStart = _dataRevision;
+    _syncCompleter = Completer<void>();
     if (!silent) syncMessage = null;
     notifyListeners();
+    var syncSucceeded = false;
     try {
       final backup = await webDavSyncService.upload(config, exportBackup());
       _lastSyncAt = DateTime.now();
+      _syncedRevision = revisionAtStart;
+      _newerRemoteBackup = null;
+      syncSucceeded = true;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
       syncMessage = '已同步 · ${backup.name}';
       return true;
@@ -136,7 +175,74 @@ class AppState extends ChangeNotifier {
       return false;
     } finally {
       syncBusy = false;
+      _syncCompleter?.complete();
+      _syncCompleter = null;
       notifyListeners();
+      if (syncSucceeded) _scheduleChangeSync();
+    }
+  }
+
+  Future<void> checkForNewerBackup() async {
+    if (backupCheckBusy || syncBusy || restoreBusy) return;
+    final config = _syncConfig ?? await syncSettingsStore.load();
+    _syncConfig = config;
+    if (!config.isValid) {
+      _newerRemoteBackup = null;
+      return;
+    }
+    backupCheckBusy = true;
+    notifyListeners();
+    try {
+      final backups = await webDavSyncService.listBackups(config);
+      final latest = backups.firstOrNull;
+      final latestTime =
+          latest == null ? null : webDavSyncService.backupTime(latest);
+      _newerRemoteBackup = latest != null &&
+              (_lastSyncAt == null ||
+                  (latestTime != null && latestTime.isAfter(_lastSyncAt!)))
+          ? latest
+          : null;
+    } catch (_) {
+      // 首页检测失败不阻塞本地使用，用户仍可从同步页面手动刷新。
+    } finally {
+      backupCheckBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> restoreBackup(RemoteBackup backup) async {
+    if (restoreBusy || syncBusy) throw StateError('同步操作正在进行中');
+    final config = _syncConfig ?? await syncSettingsStore.load();
+    _syncConfig = config;
+    if (!config.isValid) throw StateError('尚未配置 WebDAV');
+    _changeSyncTimer?.cancel();
+    restoreBusy = true;
+    notifyListeners();
+    try {
+      final raw = await webDavSyncService.downloadBackup(config, backup);
+      await importBackup(raw);
+      _dataRevision = 0;
+      _syncedRevision = 0;
+      _lastSyncAt = webDavSyncService.backupTime(backup) ?? DateTime.now();
+      _newerRemoteBackup = null;
+      await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
+      syncMessage = '已恢复 · ${backup.name}';
+    } finally {
+      restoreBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> backupBeforeExit() async {
+    _changeSyncTimer?.cancel();
+    _syncConfig ??= await syncSettingsStore.load();
+    if (!(_syncConfig?.isValid ?? false)) return;
+    final activeSync = _syncCompleter;
+    if (activeSync != null) {
+      await activeSync.future;
+      if (_hasUnsyncedChanges) await syncNow(silent: true);
+    } else {
+      await syncNow(silent: true);
     }
   }
 
@@ -159,8 +265,34 @@ class AppState extends ChangeNotifier {
       completed.add(key);
     }
     store.tasks[index] = task.copyWith(completedDates: completed);
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
+  }
+
+  Future<void> setTaskCompletionForCharacters({
+    required String templateId,
+    required Set<String> characterIds,
+    required DateTime date,
+    required bool completed,
+  }) async {
+    if (characterIds.isEmpty) return;
+    final key = dateKey(date);
+    var changed = false;
+    for (var index = 0; index < store.tasks.length; index++) {
+      final task = store.tasks[index];
+      if (task.templateId != templateId ||
+          !characterIds.contains(task.characterId)) {
+        continue;
+      }
+      final completedDates = [...task.completedDates];
+      if (completed && !completedDates.contains(key)) {
+        completedDates.add(key);
+        changed = true;
+      } else if (!completed && completedDates.remove(key)) {
+        changed = true;
+      }
+      store.tasks[index] = task.copyWith(completedDates: completedDates);
+    }
+    if (changed) await _saveDataChange();
   }
 
   Future<void> addTask({
@@ -186,8 +318,37 @@ class AppState extends ChangeNotifier {
           weeklyDays: weeklyDays,
           note: note,
         )));
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
+  }
+
+  Future<void> assignExistingTask({
+    required TaskRecord source,
+    required Set<String> characterIds,
+  }) async {
+    if (characterIds.isEmpty) return;
+    final existingCharacterIds = store.tasks
+        .where((task) => task.templateId == source.templateId)
+        .map((task) => task.characterId)
+        .toSet();
+    final validCharacterIds = characters
+        .map((character) => character.id)
+        .where((id) =>
+            characterIds.contains(id) && !existingCharacterIds.contains(id))
+        .toList();
+    if (validCharacterIds.isEmpty) return;
+    store.tasks.addAll(validCharacterIds.map((characterId) => TaskRecord(
+          id: '${source.templateId}-$characterId',
+          templateId: source.templateId,
+          title: source.title,
+          characterId: characterId,
+          frequency: source.frequency,
+          createdAt: source.createdAt,
+          dueDate: source.dueDate,
+          targetCount: source.targetCount,
+          weeklyDays: [...source.weeklyDays],
+          note: source.note,
+        )));
+    await _saveDataChange();
   }
 
   Future<void> addCharacter({
@@ -208,9 +369,9 @@ class AppState extends ChangeNotifier {
       color: colors[store.characters.length % colors.length],
     );
     store.characters.add(character);
+    selectedGameId = character.gameId;
     selectedCharacterId = character.id;
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
   }
 
   Future<void> addGame(String name) async {
@@ -227,16 +388,14 @@ class AppState extends ChangeNotifier {
     store.games.add(game);
     selectedGameId = game.id;
     selectedCharacterId = null;
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
   }
 
   Future<void> updateGame(Game game, String name) async {
     final index = store.games.indexWhere((item) => item.id == game.id);
     if (index < 0) return;
     store.games[index] = game.copyWith(name: name);
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
   }
 
   Future<void> deleteGame(Game game) async {
@@ -253,8 +412,7 @@ class AppState extends ChangeNotifier {
       selectedGameId = games.firstOrNull?.id;
       selectedCharacterId = characters.firstOrNull?.id;
     }
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
   }
 
   Future<void> updateCharacter({
@@ -273,8 +431,10 @@ class AppState extends ChangeNotifier {
       name: name,
       occupation: occupation,
     );
-    await store.save();
-    notifyListeners();
+    if (selectedCharacterId == character.id) {
+      selectedGameId = gameId;
+    }
+    await _saveDataChange();
   }
 
   Future<void> deleteCharacter(Character character) async {
@@ -283,8 +443,7 @@ class AppState extends ChangeNotifier {
     if (selectedCharacterId == character.id) {
       selectedCharacterId = characters.firstOrNull?.id;
     }
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
   }
 
   Future<void> archiveCharacter(Character character) async {
@@ -294,13 +453,40 @@ class AppState extends ChangeNotifier {
     store.characters[index] = character.copyWith(archived: true);
     if (selectedCharacterId == character.id)
       selectedCharacterId = characters.firstOrNull?.id;
-    await store.save();
-    notifyListeners();
+    await _saveDataChange();
+  }
+
+  Future<void> archiveCharacters(Set<String> characterIds) async {
+    if (characterIds.isEmpty) return;
+    for (var index = 0; index < store.characters.length; index++) {
+      final character = store.characters[index];
+      if (characterIds.contains(character.id)) {
+        store.characters[index] = character.copyWith(archived: true);
+      }
+    }
+    if (selectedCharacterId != null &&
+        characterIds.contains(selectedCharacterId)) {
+      selectedCharacterId = characters.firstOrNull?.id;
+    }
+    await _saveDataChange();
+  }
+
+  Future<void> deleteCharacters(Set<String> characterIds) async {
+    if (characterIds.isEmpty) return;
+    store.characters
+        .removeWhere((character) => characterIds.contains(character.id));
+    store.tasks.removeWhere((task) => characterIds.contains(task.characterId));
+    if (selectedCharacterId != null &&
+        characterIds.contains(selectedCharacterId)) {
+      selectedCharacterId = characters.firstOrNull?.id;
+    }
+    await _saveDataChange();
   }
 
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _changeSyncTimer?.cancel();
     super.dispose();
   }
 

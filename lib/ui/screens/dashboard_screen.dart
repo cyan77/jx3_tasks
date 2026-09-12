@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/task_models.dart';
@@ -114,64 +115,100 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-class _CharacterStrip extends StatelessWidget {
+class _CharacterStrip extends StatefulWidget {
   const _CharacterStrip({required this.state});
   final AppState state;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 65,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: state.characters.length + 1,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            if (index == state.characters.length) {
-              return OutlinedButton.icon(
-                onPressed: () => showCharacterEditor(context, state),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('添加角色'),
-              );
-            }
-            final character = state.characters[index];
-            final selected = character.id == state.selectedCharacterId;
-            return InkWell(
-              onTap: () => state.selectCharacter(character.id),
-              borderRadius: BorderRadius.circular(7),
-              child: Container(
-                width: 112,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: selected ? const Color(0xffeef6f4) : AppTheme.soft,
-                  border: Border.all(
-                      color: selected ? AppTheme.accent : AppTheme.line),
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Row(
-                  children: [
-                    CharacterAvatar(character: character, size: 30),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(character.name,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(
-                              '${state.tasksForCharacter(character.id).length} 个任务',
-                              style: const TextStyle(
-                                  fontSize: 10, color: AppTheme.muted)),
-                        ],
+  State<_CharacterStrip> createState() => _CharacterStripState();
+}
+
+class _CharacterStripState extends State<_CharacterStrip> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+    final delta = event.scrollDelta.dx != 0
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) return;
+
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final position = _controller.position;
+      _controller.jumpTo(
+        (_controller.offset + delta)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        onPointerSignal: _handlePointerSignal,
+        child: SizedBox(
+          height: 65,
+          child: ListView.separated(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.state.characters.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              if (index == widget.state.characters.length) {
+                return OutlinedButton.icon(
+                  onPressed: () => showCharacterEditor(context, widget.state),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('添加角色'),
+                );
+              }
+              final character = widget.state.characters[index];
+              final selected =
+                  character.id == widget.state.selectedCharacterId;
+              return InkWell(
+                onTap: () => widget.state.selectCharacter(character.id),
+                borderRadius: BorderRadius.circular(7),
+                child: Container(
+                  width: 112,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: selected ? const Color(0xffeef6f4) : AppTheme.soft,
+                    border: Border.all(
+                        color: selected ? AppTheme.accent : AppTheme.line),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Row(
+                    children: [
+                      CharacterAvatar(character: character, size: 30),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(character.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            Text(
+                                '${widget.state.tasksForCharacter(character.id).length} 个任务',
+                                style: const TextStyle(
+                                    fontSize: 10, color: AppTheme.muted)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       );
 }
@@ -234,6 +271,8 @@ class _TaskList extends StatelessWidget {
           borderRadius: BorderRadius.circular(7)),
       child: Column(
         children: tasks.map((task) {
+          final linkedTasks = state.tasksForTemplate(task.templateId);
+          final canCompleteForMultipleCharacters = linkedTasks.length > 1;
           final count = task.countInRange(
               taskPeriodStart(task, date), taskPeriodEnd(task, date));
           final checked = task.isCountTask
@@ -255,13 +294,145 @@ class _TaskList extends StatelessWidget {
                     ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
                     : '${task.frequency.label}${task.dueDate == null ? '' : ' · ${dueLabel(task.dueDate)}'}',
                 style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
-            trailing: showPeriod && task.isCountTask
-                ? SizedBox(
-                    width: 64,
-                    child: ProgressLine(value: count / task.targetCount))
+            trailing: canCompleteForMultipleCharacters ||
+                    (showPeriod && task.isCountTask)
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (canCompleteForMultipleCharacters)
+                        IconButton(
+                          tooltip: '为多个角色完成',
+                          onPressed: () => _showMultiCharacterCompletion(
+                              context, state, task, date),
+                          icon: const Icon(Icons.group_outlined, size: 19),
+                        ),
+                      if (showPeriod && task.isCountTask)
+                        SizedBox(
+                          width: 64,
+                          child:
+                              ProgressLine(value: count / task.targetCount),
+                        ),
+                    ],
+                  )
                 : null,
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Future<void> _showMultiCharacterCompletion(
+    BuildContext context,
+    AppState state,
+    TaskRecord task,
+    DateTime date,
+  ) async {
+    final linkedTasks = state.tasksForTemplate(task.templateId);
+    final linkedCharacterIds =
+        linkedTasks.map((item) => item.characterId).toSet();
+    final linkedCharacters = state.characters
+        .where((character) => linkedCharacterIds.contains(character.id))
+        .toList();
+    final selectedIds = <String>{task.characterId};
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('多个角色完成 · ${task.title}'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('选择角色',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => setDialogState(() {
+                        if (selectedIds.length == linkedCharacters.length) {
+                          selectedIds.clear();
+                        } else {
+                          selectedIds
+                            ..clear()
+                            ..addAll(linkedCharacterIds);
+                        }
+                      }),
+                      child: Text(selectedIds.length == linkedCharacters.length
+                          ? '取消全选'
+                          : '全选'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 300),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: linkedCharacters
+                          .map((character) => CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                value: selectedIds.contains(character.id),
+                                secondary: CharacterAvatar(
+                                    character: character, size: 28),
+                                title: Text(character.name),
+                                subtitle: character.occupation.isEmpty
+                                    ? null
+                                    : Text(character.occupation),
+                                onChanged: (selected) => setDialogState(() {
+                                  if (selected == true) {
+                                    selectedIds.add(character.id);
+                                  } else {
+                                    selectedIds.remove(character.id);
+                                  }
+                                }),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            OutlinedButton(
+              onPressed: selectedIds.isEmpty
+                  ? null
+                  : () async {
+                      await state.setTaskCompletionForCharacters(
+                        templateId: task.templateId,
+                        characterIds: Set.of(selectedIds),
+                        date: date,
+                        completed: false,
+                      );
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    },
+              child: Text(task.isCountTask ? '取消今日记录' : '取消完成'),
+            ),
+            FilledButton(
+              onPressed: selectedIds.isEmpty
+                  ? null
+                  : () async {
+                      await state.setTaskCompletionForCharacters(
+                        templateId: task.templateId,
+                        characterIds: Set.of(selectedIds),
+                        date: date,
+                        completed: true,
+                      );
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    },
+              child: Text(task.isCountTask ? '记录今日一次' : '标记完成'),
+            ),
+          ],
+        ),
       ),
     );
   }

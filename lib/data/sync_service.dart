@@ -186,6 +186,9 @@ class WebDavSyncService {
     return utf8.decode(bytes);
   }
 
+  DateTime? backupTime(RemoteBackup backup) =>
+      backup.modifiedAt ?? _timeFromName(backup.name);
+
   Future<void> _removeOldBackups(Client client, SyncConfig config,
       {required int keep}) async {
     final backups = await listBackups(config);

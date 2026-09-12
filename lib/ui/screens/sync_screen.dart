@@ -149,8 +149,7 @@ class _SyncScreenState extends State<SyncScreen> {
     );
     if (!confirmed) return;
     await _run(() async {
-      final raw = await webDav.downloadBackup(_config, backup);
-      await widget.state.importBackup(raw);
+      await widget.state.restoreBackup(backup);
       _showFeedback('已从坚果云恢复');
     });
   }

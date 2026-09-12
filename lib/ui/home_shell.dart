@@ -157,6 +157,9 @@ class _GameBar extends StatelessWidget {
               child: DropdownButton<String>(
                 value: selected?.id,
                 isExpanded: true,
+                elevation: 0,
+                dropdownColor: Colors.white,
+                focusColor: Colors.transparent,
                 icon: const Icon(Icons.unfold_more, size: 18),
                 style: const TextStyle(
                     fontSize: 13,
@@ -187,9 +190,23 @@ class _GameBar extends StatelessWidget {
               ),
             ),
           ),
+          if (state.newerRemoteBackup != null)
+            IconButton(
+              tooltip: '发现更新的云端备份，点击恢复',
+              onPressed: state.restoreBusy || state.syncBusy
+                  ? null
+                  : () => _restoreNewerBackup(context),
+              icon: state.restoreBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restore, size: 20),
+            ),
           IconButton(
             tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
-            onPressed: () => _sync(context),
+            onPressed: state.restoreBusy ? null : () => _sync(context),
             icon: state.syncBusy
                 ? const SizedBox(
                     width: 18,
@@ -220,6 +237,43 @@ class _GameBar extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(state.syncMessage ?? (success ? '已同步' : '同步失败'))),
     );
+  }
+
+  Future<void> _restoreNewerBackup(BuildContext context) async {
+    final backup = state.newerRemoteBackup;
+    if (backup == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('恢复更新的云端备份？'),
+        content: Text(
+          '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。此操作不可自动合并。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('恢复'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await state.restoreBackup(backup);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已从云端备份恢复')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('恢复失败：$error')),
+      );
+    }
   }
 }
 

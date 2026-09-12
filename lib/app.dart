@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'data/local_store.dart';
@@ -33,6 +36,7 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
         title: 'JX3 Tasks',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        scrollBehavior: const _DesktopScrollBehavior(),
         home: HomeShell(state: state),
       ),
     );
@@ -46,6 +50,16 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
   }
 }
 
+class _DesktopScrollBehavior extends MaterialScrollBehavior {
+  const _DesktopScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        ...super.dragDevices,
+        PointerDeviceKind.mouse,
+      };
+}
+
 class _AppLifecycleObserver with WidgetsBindingObserver {
   _AppLifecycleObserver(this.appState);
 
@@ -55,6 +69,14 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       appState.checkAutoSync();
+    } else if (state == AppLifecycleState.paused) {
+      unawaited(appState.backupBeforeExit());
     }
+  }
+
+  @override
+  Future<AppExitResponse> didRequestAppExit() async {
+    await appState.backupBeforeExit();
+    return AppExitResponse.exit;
   }
 }
