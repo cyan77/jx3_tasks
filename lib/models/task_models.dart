@@ -108,6 +108,12 @@ class TaskSubtask {
 
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
 
+  int countInRange(DateTime start, DateTime end) => completedDates
+      .map(DateTime.tryParse)
+      .whereType<DateTime>()
+      .where((date) => !date.isBefore(start) && date.isBefore(end))
+      .length;
+
   TaskSubtask copyWith({
     String? title,
     List<String>? completedDates,
@@ -146,6 +152,7 @@ class TaskRecord {
     this.completedDates = const [],
     this.subtasks = const [],
     this.note = '',
+    this.inboxGameId,
   });
 
   final String id;
@@ -160,6 +167,7 @@ class TaskRecord {
   final List<String> completedDates;
   final List<TaskSubtask> subtasks;
   final String note;
+  final String? inboxGameId;
 
   bool get isInbox => characterId.isEmpty;
 
@@ -177,6 +185,7 @@ class TaskRecord {
     List<String>? completedDates,
     List<TaskSubtask>? subtasks,
     String? note,
+    String? inboxGameId,
   }) =>
       TaskRecord(
         id: id,
@@ -191,22 +200,67 @@ class TaskRecord {
         completedDates: completedDates ?? this.completedDates,
         subtasks: subtasks ?? this.subtasks,
         note: note ?? this.note,
+        inboxGameId: inboxGameId ?? this.inboxGameId,
       );
 
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
 
-  bool isCompletedOn(DateTime date) => frequency == TaskFrequency.once
-      ? completedDates.isNotEmpty
-      : isDoneOn(date);
+  bool isCompletedOn(DateTime date) => switch (frequency) {
+        TaskFrequency.once => completedDates.isNotEmpty,
+        TaskFrequency.daily => isDoneOn(date),
+        TaskFrequency.weekly =>
+          countInRange(startOfWeek(date), startOfWeek(date).add(const Duration(days: 7))) > 0,
+        TaskFrequency.monthly =>
+          countInRange(startOfMonth(date), DateTime(date.year, date.month + 1)) > 0,
+        TaskFrequency.weeklyCount =>
+          countInRange(startOfWeek(date), startOfWeek(date).add(const Duration(days: 7))) >= targetCount,
+        TaskFrequency.monthlyCount =>
+          countInRange(startOfMonth(date), DateTime(date.year, date.month + 1)) >= targetCount,
+      };
 
   bool isVisibleOn(DateTime date) => frequency != TaskFrequency.once ||
       completedDates.isEmpty ||
       isDoneOn(date);
 
   bool isSubtaskCompletedOn(TaskSubtask subtask, DateTime date) =>
-      frequency == TaskFrequency.once
-          ? subtask.completedDates.isNotEmpty
-          : subtask.isDoneOn(date);
+      switch (frequency) {
+        TaskFrequency.once => subtask.completedDates.isNotEmpty,
+        TaskFrequency.daily => subtask.isDoneOn(date),
+        TaskFrequency.weekly || TaskFrequency.weeklyCount =>
+          subtask.countInRange(
+                startOfWeek(date),
+                startOfWeek(date).add(const Duration(days: 7)),
+              ) >
+              0,
+        TaskFrequency.monthly || TaskFrequency.monthlyCount =>
+          subtask.countInRange(
+                startOfMonth(date),
+                DateTime(date.year, date.month + 1),
+              ) >
+              0,
+      };
+
+  bool isScheduledOn(DateTime date) {
+    final day = startOfDay(date);
+    if (day.isBefore(startOfDay(createdAt))) return false;
+    return switch (frequency) {
+      TaskFrequency.once => dueDate != null && dateKey(dueDate!) == dateKey(day),
+      TaskFrequency.daily => true,
+      TaskFrequency.weekly => weeklyDays.isEmpty
+          ? day.weekday == (dueDate?.weekday ?? createdAt.weekday)
+          : weeklyDays.contains(day.weekday),
+      TaskFrequency.monthly => day.day == _clampedMonthlyDay(day),
+      TaskFrequency.weeklyCount =>
+        weeklyDays.isEmpty || weeklyDays.contains(day.weekday),
+      TaskFrequency.monthlyCount => true,
+    };
+  }
+
+  int _clampedMonthlyDay(DateTime month) {
+    final anchorDay = dueDate?.day ?? createdAt.day;
+    final lastDay = DateTime(month.year, month.month + 1, 0).day;
+    return anchorDay > lastDay ? lastDay : anchorDay;
+  }
 
   int countInRange(DateTime start, DateTime end) => completedDates
       .map(DateTime.tryParse)
@@ -227,6 +281,7 @@ class TaskRecord {
         'completedDates': completedDates,
         'subtasks': subtasks.map((item) => item.toJson()).toList(),
         'note': note,
+        'inboxGameId': inboxGameId,
       };
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
@@ -249,6 +304,7 @@ class TaskRecord {
                 TaskSubtask.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
         note: json['note'] as String? ?? '',
+        inboxGameId: json['inboxGameId'] as String?,
       );
 }
 
@@ -267,11 +323,13 @@ DateTime startOfMonth(DateTime date) => DateTime(date.year, date.month);
 String twoDigits(int value) => value.toString().padLeft(2, '0');
 
 DateTime taskPeriodStart(TaskRecord task, DateTime date) =>
-    task.frequency == TaskFrequency.monthlyCount
+    task.frequency == TaskFrequency.monthly ||
+            task.frequency == TaskFrequency.monthlyCount
         ? startOfMonth(date)
         : startOfWeek(date);
 
 DateTime taskPeriodEnd(TaskRecord task, DateTime date) =>
-    task.frequency == TaskFrequency.monthlyCount
+    task.frequency == TaskFrequency.monthly ||
+            task.frequency == TaskFrequency.monthlyCount
         ? DateTime(date.year, date.month + 1)
         : startOfWeek(date).add(const Duration(days: 7));

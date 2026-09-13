@@ -21,17 +21,27 @@ class DashboardScreen extends StatelessWidget {
       ]);
     }
     final today = startOfDay(DateTime.now());
-    final tasks = state.selectedTasks
-        .where((task) => task.isVisibleOn(today))
-        .toList();
-    final doneToday = tasks.where((task) => task.isCompletedOn(today)).length;
-    final weekDone = tasks
-        .where((task) => task.isCountTask
-            ? task.countInRange(
-                    taskPeriodStart(task, today), taskPeriodEnd(task, today)) >=
-                task.targetCount
-            : task.isCompletedOn(today))
-        .length;
+    final allTasks = state.selectedTasks;
+    final todayTasks = allTasks.where((task) {
+      if (task.frequency == TaskFrequency.daily) return true;
+      if (task.frequency != TaskFrequency.once) return false;
+      if (!task.isVisibleOn(today)) return false;
+      return task.dueDate == null ||
+          !startOfDay(task.dueDate!).isAfter(today) ||
+          task.isDoneOn(today);
+    }).toList()
+      ..sort(_compareTasks);
+    final periodTasks = allTasks
+        .where((task) =>
+            task.frequency == TaskFrequency.weekly ||
+            task.frequency == TaskFrequency.monthly ||
+            task.isCountTask)
+        .toList()
+      ..sort(_compareTasks);
+    final doneToday =
+        todayTasks.where((task) => task.isCompletedOn(today)).length;
+    final periodDone =
+        periodTasks.where((task) => task.isCompletedOn(today)).length;
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 90),
       child: Center(
@@ -52,35 +62,53 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 18),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(children: [
-                  Expanded(
-                      child: _SummaryCard(
-                          label: '今日完成',
-                          value:
-                              '$doneToday / ${tasks.where((task) => !task.isCountTask).length}',
-                          progress:
-                              tasks.isEmpty ? 0 : doneToday / tasks.length)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: _SummaryCard(
-                          label: '本周进度',
-                          value: '$weekDone / ${tasks.length}',
-                          progress:
-                              tasks.isEmpty ? 0 : weekDone / tasks.length)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: _SummaryCard(
-                          label: '角色总任务',
-                          value: '${tasks.length}',
-                          progress: 1,
-                          showProgress: false))
-                ])),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final cards = [
+                    _SummaryCard(
+                        label: '今日完成',
+                        value: '$doneToday / ${todayTasks.length}',
+                        progress: todayTasks.isEmpty
+                            ? 0
+                            : doneToday / todayTasks.length),
+                    _SummaryCard(
+                        label: '周期进度',
+                        value: '$periodDone / ${periodTasks.length}',
+                        progress: periodTasks.isEmpty
+                            ? 0
+                            : periodDone / periodTasks.length),
+                    _SummaryCard(
+                        label: '角色总任务',
+                        value: '${allTasks.length}',
+                        progress: 1,
+                        showProgress: false),
+                  ];
+                  if (constraints.maxWidth < 520) {
+                    return Column(
+                      children: [
+                        for (var index = 0; index < cards.length; index++) ...[
+                          SizedBox(width: double.infinity, child: cards[index]),
+                          if (index < cards.length - 1)
+                            const SizedBox(height: 8),
+                        ],
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      for (var index = 0; index < cards.length; index++) ...[
+                        Expanded(child: cards[index]),
+                        if (index < cards.length - 1)
+                          const SizedBox(width: 10),
+                      ],
+                    ],
+                  );
+                })),
             const SizedBox(height: 26),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SectionTitle('今天',
                     trailing: Text(
-                        '$doneToday / ${tasks.where((task) => !task.isCountTask).length}',
+                        '$doneToday / ${todayTasks.length}',
                         style: const TextStyle(
                             fontSize: 12, color: AppTheme.muted)))),
             const SizedBox(height: 8),
@@ -88,13 +116,13 @@ class DashboardScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: _TaskList(
                     state: state,
-                    tasks: tasks.where((task) => !task.isCountTask).toList(),
+                    tasks: todayTasks,
                     date: today)),
             const SizedBox(height: 26),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SectionTitle('周期任务',
-                    trailing: Text('本周',
+                    trailing: Text('按当前周期',
                         style: const TextStyle(
                             fontSize: 12, color: AppTheme.muted)))),
             const SizedBox(height: 8),
@@ -102,12 +130,7 @@ class DashboardScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: _TaskList(
                     state: state,
-                    tasks: tasks
-                        .where((task) =>
-                            task.isCountTask ||
-                            task.frequency == TaskFrequency.weekly ||
-                            task.frequency == TaskFrequency.monthly)
-                        .toList(),
+                    tasks: periodTasks,
                     date: today,
                     showPeriod: true)),
           ]),
@@ -297,7 +320,7 @@ class _TaskList extends StatelessWidget {
                 subtitle: Text(
                     task.isCountTask
                         ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
-                        : '${task.frequency.label}${task.dueDate == null ? '' : ' · ${dueLabel(task.dueDate)}'}',
+                        : _taskMeta(task, date),
                     style:
                         const TextStyle(fontSize: 11, color: AppTheme.muted)),
                 trailing: Row(
@@ -498,6 +521,35 @@ class _TaskList extends StatelessWidget {
       ),
     );
   }
+}
+
+int _compareTasks(TaskRecord a, TaskRecord b) {
+  final aDone = a.isCompletedOn(DateTime.now());
+  final bDone = b.isCompletedOn(DateTime.now());
+  if (aDone != bDone) return aDone ? 1 : -1;
+  if (a.dueDate == null && b.dueDate != null) return 1;
+  if (a.dueDate != null && b.dueDate == null) return -1;
+  final dueComparison = a.dueDate?.compareTo(b.dueDate!) ?? 0;
+  return dueComparison != 0 ? dueComparison : a.title.compareTo(b.title);
+}
+
+String _taskMeta(TaskRecord task, DateTime date) {
+  final parts = <String>[task.frequency.label];
+  if ((task.frequency == TaskFrequency.weekly ||
+          task.frequency == TaskFrequency.weeklyCount) &&
+      task.weeklyDays.isNotEmpty) {
+    const labels = ['一', '二', '三', '四', '五', '六', '日'];
+    parts.add(task.weeklyDays.map((day) => '周${labels[day - 1]}').join('、'));
+  }
+  if (task.dueDate != null) {
+    final overdue = task.frequency == TaskFrequency.once &&
+        startOfDay(task.dueDate!).isBefore(startOfDay(date)) &&
+        !task.isCompletedOn(date);
+    parts.add(overdue
+        ? '${task.dueDate!.month}/${task.dueDate!.day} 已逾期'
+        : dueLabel(task.dueDate));
+  }
+  return parts.join(' · ');
 }
 
 class _EmptyState extends StatelessWidget {

@@ -66,9 +66,15 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
   final AppState appState;
 
   @override
+  Future<AppExitResponse> didRequestAppExit() async {
+    await appState.backupBeforeExit();
+    return AppExitResponse.exit;
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      appState.checkAutoSync();
+      appState.checkForNewerBackupWithRetry();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(appState.backupBeforeExit());

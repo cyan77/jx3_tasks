@@ -18,6 +18,7 @@ class AppState extends ChangeNotifier {
   final WebDavSyncService webDavSyncService = WebDavSyncService();
   Timer? _autoSyncTimer;
   Timer? _changeSyncTimer;
+  Timer? _backupCheckRetryTimer;
   Completer<void>? _syncCompleter;
   SyncConfig? _syncConfig;
   DateTime? _lastSyncAt;
@@ -52,8 +53,11 @@ class AppState extends ChangeNotifier {
         .where((task) => characterIds.contains(task.characterId))
         .toList();
   }
-  List<TaskRecord> get inboxTasks =>
-      store.tasks.where((task) => task.isInbox).toList();
+  List<TaskRecord> get inboxTasks => store.tasks
+      .where((task) =>
+          task.isInbox &&
+          task.inboxGameId == selectedGameId)
+      .toList();
 
   Character? get selectedCharacter =>
       characters.where((item) => item.id == selectedCharacterId).firstOrNull;
@@ -105,7 +109,7 @@ class AppState extends ChangeNotifier {
     _scheduleAutoSync();
     _scheduleChangeSync();
     notifyListeners();
-    await checkAutoSync();
+    await checkForNewerBackupWithRetry();
   }
 
   Future<void> reloadSyncSettings() async {
@@ -127,10 +131,18 @@ class AppState extends ChangeNotifier {
 
   void _scheduleChangeSync() {
     _changeSyncTimer?.cancel();
-    if (!_hasUnsyncedChanges || !(_syncConfig?.isValid ?? false)) return;
+    if (!_hasUnsyncedChanges ||
+        !(_syncConfig?.isValid ?? false) ||
+        _newerRemoteBackup != null) {
+      return;
+    }
     _changeSyncTimer = Timer(
       const Duration(seconds: 2),
-      () => syncNow(silent: true),
+      () {
+        if (_hasUnsyncedChanges && _newerRemoteBackup == null) {
+          unawaited(syncNow(silent: true));
+        }
+      },
     );
   }
 
@@ -146,11 +158,28 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  Future<void> checkForNewerBackupWithRetry() async {
+    final config = _syncConfig;
+    if (config == null || !config.isValid) return;
+    final checkSucceeded = await checkForNewerBackup();
+    if (checkSucceeded) {
+      _backupCheckRetryTimer?.cancel();
+      return;
+    }
+    _backupCheckRetryTimer?.cancel();
+    _backupCheckRetryTimer = Timer(
+      const Duration(seconds: 10),
+      () => checkForNewerBackup(),
+    );
+  }
+
   Future<void> checkAutoSync() async {
     final config = _syncConfig;
     if (config == null || !config.isValid) return;
-    await checkForNewerBackup();
+    final checkSucceeded = await checkForNewerBackup();
+    if (!checkSucceeded) return;
     if (_newerRemoteBackup != null) return;
+    if (!_hasUnsyncedChanges) return;
     if (config.autoSyncMinutes <= 0) return;
     final due = _lastSyncAt == null ||
         DateTime.now().difference(_lastSyncAt!).inMinutes >=
@@ -196,13 +225,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> checkForNewerBackup() async {
-    if (backupCheckBusy || syncBusy || restoreBusy) return;
+  Future<bool> checkForNewerBackup() async {
+    if (backupCheckBusy || syncBusy || restoreBusy) return false;
     final config = _syncConfig ?? await syncSettingsStore.load();
     _syncConfig = config;
     if (!config.isValid) {
       _newerRemoteBackup = null;
-      return;
+      return false;
     }
     backupCheckBusy = true;
     final syncGenerationAtStart = _successfulSyncGeneration;
@@ -222,8 +251,10 @@ class AppState extends ChangeNotifier {
             ? latest
             : null;
       }
+      return true;
     } catch (_) {
       // 首页检测失败不阻塞本地使用，用户仍可从同步页面手动刷新。
+      return false;
     } finally {
       backupCheckBusy = false;
       notifyListeners();
@@ -240,10 +271,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final raw = await webDavSyncService.downloadBackup(config, backup);
-      await importBackup(raw);
+      final safetyBackup =
+          await webDavSyncService.upload(config, exportBackup());
+      _lastUploadedBackupPath = safetyBackup.path;
+      await importBackup(raw, markAsLocalChange: false);
       _dataRevision = 0;
       _syncedRevision = 0;
-      _lastSyncAt = webDavSyncService.backupTime(backup) ?? DateTime.now();
+      _lastSyncAt = DateTime.now();
       _newerRemoteBackup = null;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
       syncMessage = '已恢复 · ${backup.name}';
@@ -260,16 +294,22 @@ class AppState extends ChangeNotifier {
     final activeSync = _syncCompleter;
     if (activeSync != null) {
       await activeSync.future;
-      if (_hasUnsyncedChanges) await syncNow(silent: true);
-    } else {
-      await syncNow(silent: true);
     }
+    if (_hasUnsyncedChanges) await syncNow(silent: true);
   }
 
-  Future<void> importBackup(String raw) async {
+  Future<void> importBackup(
+    String raw, {
+    bool markAsLocalChange = true,
+  }) async {
     await store.importJson(raw);
     selectedGameId = games.firstOrNull?.id;
     selectedCharacterId = characters.firstOrNull?.id;
+    if (markAsLocalChange) {
+      _dataRevision++;
+      _newerRemoteBackup = null;
+      _scheduleChangeSync();
+    }
     notifyListeners();
   }
 
@@ -285,8 +325,18 @@ class AppState extends ChangeNotifier {
       } else {
         completed.clear();
       }
-    } else if (completed.contains(key)) {
-      completed.remove(key);
+    } else if (task.isCountTask || task.frequency == TaskFrequency.daily) {
+      if (completed.contains(key)) {
+        completed.remove(key);
+      } else {
+        completed.add(key);
+      }
+    } else if (task.isCompletedOn(targetDate)) {
+      _removeDatesInRange(
+        completed,
+        taskPeriodStart(task, targetDate),
+        taskPeriodEnd(task, targetDate),
+      );
     } else {
       completed.add(key);
     }
@@ -299,7 +349,8 @@ class AppState extends ChangeNotifier {
     TaskSubtask subtask, {
     DateTime? date,
   }) async {
-    final key = dateKey(date ?? DateTime.now());
+    final targetDate = date ?? DateTime.now();
+    final key = dateKey(targetDate);
     final taskIndex = store.tasks.indexWhere((item) => item.id == task.id);
     if (taskIndex < 0) return;
     final subtasks = [...task.subtasks];
@@ -312,14 +363,47 @@ class AppState extends ChangeNotifier {
       } else {
         completedDates.clear();
       }
-    } else if (completedDates.contains(key)) {
-      completedDates.remove(key);
+    } else if (task.frequency == TaskFrequency.daily) {
+      if (completedDates.contains(key)) {
+        completedDates.remove(key);
+      } else {
+        completedDates.add(key);
+      }
+    } else if (task.isSubtaskCompletedOn(subtask, targetDate)) {
+      _removeDatesInRange(
+        completedDates,
+        taskPeriodStart(task, targetDate),
+        taskPeriodEnd(task, targetDate),
+      );
     } else {
       completedDates.add(key);
     }
     subtasks[subtaskIndex] =
         subtask.copyWith(completedDates: completedDates);
-    store.tasks[taskIndex] = task.copyWith(subtasks: subtasks);
+    var updatedTask = task.copyWith(subtasks: subtasks);
+    if (!task.isCountTask && subtasks.isNotEmpty) {
+      final allSubtasksCompleted = subtasks
+          .every((item) => updatedTask.isSubtaskCompletedOn(item, targetDate));
+      final parentDates = [...task.completedDates];
+      if (allSubtasksCompleted && !updatedTask.isCompletedOn(targetDate)) {
+        parentDates.add(key);
+      } else if (!allSubtasksCompleted &&
+          updatedTask.isCompletedOn(targetDate)) {
+        if (task.frequency == TaskFrequency.once) {
+          parentDates.clear();
+        } else if (task.frequency == TaskFrequency.daily) {
+          parentDates.remove(key);
+        } else {
+          _removeDatesInRange(
+            parentDates,
+            taskPeriodStart(task, targetDate),
+            taskPeriodEnd(task, targetDate),
+          );
+        }
+      }
+      updatedTask = updatedTask.copyWith(completedDates: parentDates);
+    }
+    store.tasks[taskIndex] = updatedTask;
     await _saveDataChange();
   }
 
@@ -347,13 +431,24 @@ class AppState extends ChangeNotifier {
           completedDates.clear();
           changed = true;
         }
-      } else {
+      } else if (task.isCountTask ||
+          task.frequency == TaskFrequency.daily) {
         if (completed && !completedDates.contains(key)) {
           completedDates.add(key);
           changed = true;
         } else if (!completed && completedDates.remove(key)) {
           changed = true;
         }
+      } else if (completed && !task.isCompletedOn(date)) {
+        completedDates.add(key);
+        changed = true;
+      } else if (!completed && task.isCompletedOn(date)) {
+        _removeDatesInRange(
+          completedDates,
+          taskPeriodStart(task, date),
+          taskPeriodEnd(task, date),
+        );
+        changed = true;
       }
       store.tasks[index] = task.copyWith(completedDates: completedDates);
     }
@@ -409,6 +504,7 @@ class AppState extends ChangeNotifier {
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
       note: note,
+      inboxGameId: selectedGameId,
     ));
     await _saveDataChange();
   }
@@ -586,6 +682,55 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> deleteTask(
+    TaskRecord source, {
+    bool allLinked = false,
+  }) async {
+    final before = store.tasks.length;
+    if (allLinked && !source.isInbox) {
+      store.tasks.removeWhere((task) => task.templateId == source.templateId);
+    } else {
+      store.tasks.removeWhere((task) => task.id == source.id);
+    }
+    if (store.tasks.length != before) await _saveDataChange();
+  }
+
+  Future<void> moveTaskToInbox(
+    TaskRecord source, {
+    bool allLinked = false,
+  }) async {
+    if (source.isInbox) return;
+    final exists = store.tasks.any((task) => task.id == source.id);
+    if (!exists) return;
+
+    if (allLinked) {
+      store.tasks.removeWhere((task) => task.templateId == source.templateId);
+    } else {
+      store.tasks.removeWhere((task) => task.id == source.id);
+    }
+
+    final now = DateTime.now();
+    final templateId = 'template-${now.microsecondsSinceEpoch}';
+    final sourceGameId = store.characters
+        .where((character) => character.id == source.characterId)
+        .firstOrNull
+        ?.gameId;
+    store.tasks.add(TaskRecord(
+      id: '$templateId-inbox',
+      templateId: templateId,
+      title: source.title,
+      characterId: '',
+      frequency: TaskFrequency.once,
+      createdAt: now,
+      subtasks: source.subtasks
+          .map((item) => TaskSubtask(id: item.id, title: item.title))
+          .toList(),
+      note: source.note,
+      inboxGameId: sourceGameId ?? selectedGameId,
+    ));
+    await _saveDataChange();
+  }
+
   List<TaskSubtask> _mergeSubtasks(
     List<TaskSubtask> existing,
     List<TaskSubtask> definitions,
@@ -599,6 +744,17 @@ class AppState extends ChangeNotifier {
                   [...?existingById[definition.id]?.completedDates],
             ))
         .toList();
+  }
+
+  void _removeDatesInRange(
+    List<String> dates,
+    DateTime start,
+    DateTime end,
+  ) {
+    dates.removeWhere((value) {
+      final date = DateTime.tryParse(value);
+      return date != null && !date.isBefore(start) && date.isBefore(end);
+    });
   }
 
   Future<void> addCharacter({
@@ -659,7 +815,8 @@ class AppState extends ChangeNotifier {
         .toSet();
     store.characters
         .removeWhere((character) => characterIds.contains(character.id));
-    store.tasks.removeWhere((task) => characterIds.contains(task.characterId));
+    store.tasks.removeWhere((task) =>
+        characterIds.contains(task.characterId) || task.inboxGameId == game.id);
     if (selectedGameId == game.id) {
       selectedGameId = games.firstOrNull?.id;
       selectedCharacterId = characters.firstOrNull?.id;
@@ -723,6 +880,27 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> restoreCharacter(Character character) async {
+    final index =
+        store.characters.indexWhere((item) => item.id == character.id);
+    if (index < 0 || !store.characters[index].archived) return;
+    store.characters[index] = character.copyWith(archived: false);
+    await _saveDataChange();
+  }
+
+  Future<void> restoreCharacters(Set<String> characterIds) async {
+    if (characterIds.isEmpty) return;
+    var changed = false;
+    for (var index = 0; index < store.characters.length; index++) {
+      final character = store.characters[index];
+      if (character.archived && characterIds.contains(character.id)) {
+        store.characters[index] = character.copyWith(archived: false);
+        changed = true;
+      }
+    }
+    if (changed) await _saveDataChange();
+  }
+
   Future<void> deleteCharacters(Set<String> characterIds) async {
     if (characterIds.isEmpty) return;
     store.characters
@@ -739,6 +917,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _autoSyncTimer?.cancel();
     _changeSyncTimer?.cancel();
+    _backupCheckRetryTimer?.cancel();
     super.dispose();
   }
 

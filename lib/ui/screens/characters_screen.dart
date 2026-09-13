@@ -112,6 +112,9 @@ class _CharactersScreenState extends State<CharactersScreen> {
                           selectedIds: _selectedIds,
                           onToggle: _toggleCharacter,
                         ),
+                      if (state.store.characters
+                          .any((character) => character.archived))
+                        _ArchivedCharactersSection(state: state),
                     ],
                   ),
                 ),
@@ -160,6 +163,64 @@ class _CharactersScreenState extends State<CharactersScreen> {
   }
 }
 
+class _ArchivedCharactersSection extends StatelessWidget {
+  const _ArchivedCharactersSection({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final characters = state.store.characters
+        .where((character) => character.archived)
+        .toList();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.soft,
+        border: Border.all(color: AppTheme.line),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('已归档角色',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+              Text('${characters.length} 个',
+                  style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final character in characters)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: CharacterAvatar(character: character, size: 30),
+              title: Text(character.name),
+              subtitle: Text(
+                state.games
+                        .where((game) => game.id == character.gameId)
+                        .firstOrNull
+                        ?.name ??
+                    '未知游戏',
+              ),
+              trailing: OutlinedButton.icon(
+                onPressed: () => state.restoreCharacter(character),
+                icon: const Icon(Icons.unarchive_outlined, size: 17),
+                label: const Text('恢复'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BatchToolbar extends StatelessWidget {
   const _BatchToolbar({
     required this.selectedCount,
@@ -184,22 +245,22 @@ class _BatchToolbar extends StatelessWidget {
           border: Border.all(color: AppTheme.line),
           borderRadius: BorderRadius.circular(7),
         ),
-        child: Row(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text('已选择 $selectedCount 个',
                 style: const TextStyle(fontSize: 12)),
-            const SizedBox(width: 8),
             TextButton(
               onPressed: onSelectAll,
               child: Text(allSelected ? '取消全选' : '全选'),
             ),
-            const Spacer(),
             OutlinedButton.icon(
               onPressed: onArchive,
               icon: const Icon(Icons.archive_outlined, size: 17),
               label: const Text('归档'),
             ),
-            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: onDelete,
               style: FilledButton.styleFrom(

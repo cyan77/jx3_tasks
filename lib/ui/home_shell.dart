@@ -46,6 +46,8 @@ class HomeShell extends StatelessWidget {
               ? null
               : NavigationBar(
                   selectedIndex: state.currentTab,
+                  labelBehavior:
+                      NavigationDestinationLabelBehavior.onlyShowSelected,
                   onDestinationSelected: state.setTab,
                   destinations: const [
                     NavigationDestination(
@@ -258,7 +260,7 @@ class _GameBar extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('恢复更新的云端备份？'),
         content: Text(
-          '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。此操作不可自动合并。',
+          '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。恢复前会先自动保存一份当前数据的云端安全备份。',
         ),
         actions: [
           TextButton(

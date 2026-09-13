@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -5,6 +6,7 @@ import 'package:jx3_tasks/data/local_store.dart';
 import 'package:jx3_tasks/data/sync_service.dart';
 import 'package:jx3_tasks/models/task_models.dart';
 import 'package:jx3_tasks/state/app_state.dart';
+import 'package:jx3_tasks/app.dart';
 
 void main() {
   test('date helpers return stable calendar boundaries', () {
@@ -278,5 +280,211 @@ void main() {
     expect(state.tasks.every((task) => task.dueDate == DateTime(2026, 9, 20)),
         isTrue);
     expect(state.tasks.every((task) => task.subtasks.length == 1), isTrue);
+  });
+
+  test('assigned tasks can move to inbox or be deleted as a group', () async {
+    SharedPreferences.setMockInitialValues({});
+    TaskRecord assigned(String id, String characterId) => TaskRecord(
+          id: id,
+          templateId: 'template-shared',
+          title: '共享任务',
+          characterId: characterId,
+          frequency: TaskFrequency.weekly,
+          createdAt: DateTime(2026, 9, 1),
+          completedDates: const ['2026-09-13'],
+          subtasks: const [
+            TaskSubtask(id: 'subtask-1', title: '保留子任务名称'),
+          ],
+          note: '保留备注',
+        );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号一',
+          name: '角色一',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '账号二',
+          name: '角色二',
+          occupation: '冰心',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [assigned('task-1', 'char-1'), assigned('task-2', 'char-2')];
+    final state = AppState(store);
+
+    await state.moveTaskToInbox(store.tasks.first, allLinked: false);
+
+    expect(state.inboxTasks, hasLength(1));
+    expect(state.tasks, hasLength(1));
+    expect(state.tasks.single.characterId, 'char-2');
+    expect(state.inboxTasks.single.frequency, TaskFrequency.once);
+    expect(state.inboxTasks.single.completedDates, isEmpty);
+    expect(state.inboxTasks.single.subtasks.single.title, '保留子任务名称');
+    expect(state.inboxTasks.single.note, '保留备注');
+
+    await state.deleteTask(state.tasks.single, allLinked: true);
+    expect(state.tasks, isEmpty);
+    expect(state.inboxTasks, hasLength(1));
+  });
+
+  test('weekly and monthly tasks keep completion for their period', () {
+    final weekly = TaskRecord(
+      id: 'weekly',
+      templateId: 'weekly',
+      title: '周任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weekly,
+      createdAt: DateTime(2026, 9, 1),
+      weeklyDays: const [2, 4],
+      completedDates: const ['2026-09-08'],
+    );
+    final monthly = TaskRecord(
+      id: 'monthly',
+      templateId: 'monthly',
+      title: '月任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.monthly,
+      createdAt: DateTime(2026, 9, 1),
+      completedDates: const ['2026-09-03'],
+    );
+
+    expect(weekly.isCompletedOn(DateTime(2026, 9, 10)), isTrue);
+    expect(weekly.isCompletedOn(DateTime(2026, 9, 15)), isFalse);
+    expect(weekly.isScheduledOn(DateTime(2026, 9, 10)), isTrue);
+    expect(weekly.isScheduledOn(DateTime(2026, 9, 11)), isFalse);
+    expect(monthly.isCompletedOn(DateTime(2026, 9, 28)), isTrue);
+    expect(monthly.isCompletedOn(DateTime(2026, 10, 1)), isFalse);
+
+    final weeklyCount = TaskRecord(
+      id: 'weekly-count',
+      templateId: 'weekly-count',
+      title: '周目标',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weeklyCount,
+      createdAt: DateTime(2026, 9, 1),
+      targetCount: 3,
+    );
+    final monthlyCount = TaskRecord(
+      id: 'monthly-count',
+      templateId: 'monthly-count',
+      title: '月目标',
+      characterId: 'char-1',
+      frequency: TaskFrequency.monthlyCount,
+      createdAt: DateTime(2026, 9, 1),
+      targetCount: 8,
+    );
+    expect(weeklyCount.isScheduledOn(DateTime(2026, 9, 10)), isTrue);
+    expect(monthlyCount.isScheduledOn(DateTime(2026, 9, 28)), isTrue);
+  });
+
+  test('finishing all binary subtasks completes their parent', () async {
+    SharedPreferences.setMockInitialValues({});
+    final task = TaskRecord(
+      id: 'task-subtasks',
+      templateId: 'task-subtasks',
+      title: '带子任务的周常',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weekly,
+      createdAt: DateTime(2026, 9, 1),
+      subtasks: const [
+        TaskSubtask(id: 'subtask-1', title: '步骤一'),
+        TaskSubtask(id: 'subtask-2', title: '步骤二'),
+      ],
+    );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [task];
+    final state = AppState(store);
+    final date = DateTime(2026, 9, 10);
+
+    await state.toggleSubtask(task, task.subtasks.first, date: date);
+    expect(store.tasks.single.isCompletedOn(date), isFalse);
+    await state.toggleSubtask(
+        store.tasks.single, store.tasks.single.subtasks.last,
+        date: date);
+    expect(store.tasks.single.isCompletedOn(date), isTrue);
+  });
+
+  test('inbox and archived characters respect game and can be restored',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final archived = const Character(
+      id: 'char-archived',
+      gameId: 'game-jx3',
+      account: '账号',
+      name: '归档角色',
+      occupation: '奶歌',
+      color: 0xff2f7d72,
+      archived: true,
+    );
+    final store = LocalStore()
+      ..games = const [
+        Game(id: 'game-jx3', name: '剑网3'),
+        Game(id: 'game-hsr', name: '崩坏：星穹铁道'),
+      ]
+      ..characters = [archived]
+      ..tasks = [
+        TaskRecord(
+          id: 'inbox-jx3',
+          templateId: 'inbox-jx3',
+          title: '剑网3 收集箱',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          inboxGameId: 'game-jx3',
+        ),
+        TaskRecord(
+          id: 'inbox-hsr',
+          templateId: 'inbox-hsr',
+          title: '崩铁收集箱',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          inboxGameId: 'game-hsr',
+        ),
+      ];
+    final state = AppState(store);
+
+    expect(state.inboxTasks.single.title, '剑网3 收集箱');
+    state.selectGame('game-hsr');
+    expect(state.inboxTasks.single.title, '崩铁收集箱');
+    await state.restoreCharacter(archived);
+    expect(store.characters.single.archived, isFalse);
+  });
+
+  testWidgets('home shell fits a narrow phone width', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+
+    await tester.pumpWidget(Jx3TasksApp(store: store));
+    await tester.pump();
+
+    expect(find.text('今日待办'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
