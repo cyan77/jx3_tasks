@@ -22,6 +22,8 @@ class AppState extends ChangeNotifier {
   SyncConfig? _syncConfig;
   DateTime? _lastSyncAt;
   RemoteBackup? _newerRemoteBackup;
+  String? _lastUploadedBackupPath;
+  int _successfulSyncGeneration = 0;
   int _dataRevision = 0;
   int _syncedRevision = 0;
   bool syncBusy = false;
@@ -165,6 +167,8 @@ class AppState extends ChangeNotifier {
       final backup = await webDavSyncService.upload(config, exportBackup());
       _lastSyncAt = DateTime.now();
       _syncedRevision = revisionAtStart;
+      _lastUploadedBackupPath = backup.path;
+      _successfulSyncGeneration++;
       _newerRemoteBackup = null;
       syncSucceeded = true;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
@@ -191,17 +195,23 @@ class AppState extends ChangeNotifier {
       return;
     }
     backupCheckBusy = true;
+    final syncGenerationAtStart = _successfulSyncGeneration;
     notifyListeners();
     try {
       final backups = await webDavSyncService.listBackups(config);
       final latest = backups.firstOrNull;
       final latestTime =
           latest == null ? null : webDavSyncService.backupTime(latest);
-      _newerRemoteBackup = latest != null &&
-              (_lastSyncAt == null ||
-                  (latestTime != null && latestTime.isAfter(_lastSyncAt!)))
-          ? latest
-          : null;
+      if (syncGenerationAtStart == _successfulSyncGeneration) {
+        final isOwnLatest =
+            latest != null && latest.path == _lastUploadedBackupPath;
+        _newerRemoteBackup = !isOwnLatest &&
+                latest != null &&
+                (_lastSyncAt == null ||
+                    (latestTime != null && latestTime.isAfter(_lastSyncAt!)))
+            ? latest
+            : null;
+      }
     } catch (_) {
       // 首页检测失败不阻塞本地使用，用户仍可从同步页面手动刷新。
     } finally {
