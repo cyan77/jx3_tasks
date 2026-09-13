@@ -95,6 +95,43 @@ class Character {
       );
 }
 
+class TaskSubtask {
+  const TaskSubtask({
+    required this.id,
+    required this.title,
+    this.completedDates = const [],
+  });
+
+  final String id;
+  final String title;
+  final List<String> completedDates;
+
+  bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
+
+  TaskSubtask copyWith({
+    String? title,
+    List<String>? completedDates,
+  }) =>
+      TaskSubtask(
+        id: id,
+        title: title ?? this.title,
+        completedDates: completedDates ?? this.completedDates,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'completedDates': completedDates,
+      };
+
+  factory TaskSubtask.fromJson(Map<String, dynamic> json) => TaskSubtask(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        completedDates:
+            List<String>.from(json['completedDates'] as List? ?? const []),
+      );
+}
+
 class TaskRecord {
   const TaskRecord({
     required this.id,
@@ -107,6 +144,7 @@ class TaskRecord {
     this.targetCount = 1,
     this.weeklyDays = const [],
     this.completedDates = const [],
+    this.subtasks = const [],
     this.note = '',
   });
 
@@ -120,6 +158,7 @@ class TaskRecord {
   final int targetCount;
   final List<int> weeklyDays;
   final List<String> completedDates;
+  final List<TaskSubtask> subtasks;
   final String note;
 
   bool get isCountTask =>
@@ -134,6 +173,7 @@ class TaskRecord {
     int? targetCount,
     List<int>? weeklyDays,
     List<String>? completedDates,
+    List<TaskSubtask>? subtasks,
     String? note,
   }) =>
       TaskRecord(
@@ -147,6 +187,7 @@ class TaskRecord {
         targetCount: targetCount ?? this.targetCount,
         weeklyDays: weeklyDays ?? this.weeklyDays,
         completedDates: completedDates ?? this.completedDates,
+        subtasks: subtasks ?? this.subtasks,
         note: note ?? this.note,
       );
 
@@ -169,6 +210,7 @@ class TaskRecord {
         'targetCount': targetCount,
         'weeklyDays': weeklyDays,
         'completedDates': completedDates,
+        'subtasks': subtasks.map((item) => item.toJson()).toList(),
         'note': note,
       };
 
@@ -187,6 +229,10 @@ class TaskRecord {
         weeklyDays: List<int>.from(json['weeklyDays'] as List? ?? const []),
         completedDates:
             List<String>.from(json['completedDates'] as List? ?? const []),
+        subtasks: (json['subtasks'] as List? ?? const [])
+            .map((item) =>
+                TaskSubtask.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList(),
         note: json['note'] as String? ?? '',
       );
 }

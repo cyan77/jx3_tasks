@@ -71,6 +71,13 @@ void main() {
       frequency: TaskFrequency.daily,
       createdAt: DateTime(2026, 9, 1),
       completedDates: [completed],
+      subtasks: [
+        TaskSubtask(
+          id: 'subtask-1',
+          title: '旧子任务',
+          completedDates: [completed],
+        ),
+      ],
     );
     final store = LocalStore()
       ..games = const [Game(id: 'game-jx3', name: '剑网3')]
@@ -103,6 +110,10 @@ void main() {
       dueDate: DateTime(2026, 10, 1),
       targetCount: 3,
       weeklyDays: [2, 4],
+      subtasks: const [
+        TaskSubtask(id: 'subtask-1', title: '同步后的子任务'),
+        TaskSubtask(id: 'subtask-2', title: '新增子任务'),
+      ],
       note: '周四前完成',
     );
 
@@ -113,5 +124,31 @@ void main() {
     expect(store.tasks.every((task) => task.targetCount == 3), isTrue);
     expect(store.tasks.first.completedDates, contains(completed));
     expect(store.tasks.last.completedDates, isEmpty);
+    expect(store.tasks.first.subtasks.first.completedDates, contains(completed));
+    expect(store.tasks.last.subtasks.first.completedDates, isEmpty);
+
+    final firstCharacterTask =
+        store.tasks.firstWhere((task) => task.characterId == 'char-1');
+    await state.updateTaskRecord(
+      source: firstCharacterTask,
+      title: '角色一专属十人本',
+      frequency: firstCharacterTask.frequency,
+      dueDate: firstCharacterTask.dueDate,
+      targetCount: firstCharacterTask.targetCount,
+      weeklyDays: firstCharacterTask.weeklyDays,
+      subtasks: const [
+        TaskSubtask(id: 'subtask-1', title: '角色一专属子任务'),
+      ],
+    );
+
+    expect(
+        store.tasks.firstWhere((task) => task.characterId == 'char-1').title,
+        '角色一专属十人本');
+    expect(
+        store.tasks.firstWhere((task) => task.characterId == 'char-2').title,
+        '十人本');
+    expect(
+        store.tasks.firstWhere((task) => task.characterId == 'char-2').subtasks,
+        hasLength(2));
   });
 }
