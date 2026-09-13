@@ -29,6 +29,52 @@ void main() {
     expect(task.isCountTask, isTrue);
   });
 
+  test('once task remains completed after its completion date', () async {
+    SharedPreferences.setMockInitialValues({});
+    final yesterday = DateTime(2026, 9, 12);
+    final today = DateTime(2026, 9, 13);
+    final task = TaskRecord(
+      id: 'once-1',
+      templateId: 'once-1',
+      title: '一次性任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.once,
+      createdAt: DateTime(2026, 9, 1),
+      completedDates: [dateKey(yesterday)],
+      subtasks: [
+        TaskSubtask(
+          id: 'subtask-1',
+          title: '一次性子任务',
+          completedDates: [dateKey(yesterday)],
+        ),
+      ],
+    );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [task];
+    final state = AppState(store);
+
+    expect(task.isCompletedOn(today), isTrue);
+    expect(task.isVisibleOn(today), isFalse);
+    expect(task.isSubtaskCompletedOn(task.subtasks.single, today), isTrue);
+
+    await state.toggleTask(task, date: today);
+    expect(store.tasks.single.completedDates, isEmpty);
+
+    await state.toggleTask(store.tasks.single, date: today);
+    expect(store.tasks.single.completedDates, [dateKey(today)]);
+  });
+
   test('backup filename time takes precedence over unreliable WebDAV mtime',
       () {
     final service = WebDavSyncService();

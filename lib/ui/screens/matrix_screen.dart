@@ -57,7 +57,7 @@ class MatrixScreen extends StatelessWidget {
                                                   taskPeriodEnd(
                                                       task, DateTime.now())) >=
                                               task.targetCount
-                                          : task.isDoneOn(DateTime.now()));
+                                          : task.isCompletedOn(DateTime.now()));
                                   return DataCell(task == null
                                       ? const Text('—',
                                           style:
