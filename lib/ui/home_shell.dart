@@ -4,6 +4,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/inbox_screen.dart';
 import 'screens/matrix_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/sync_screen.dart';
@@ -20,6 +21,7 @@ class HomeShell extends StatelessWidget {
       DashboardScreen(state: state),
       MatrixScreen(state: state),
       CalendarScreen(state: state),
+      InboxScreen(state: state),
       SettingsScreen(state: state),
     ];
     return LayoutBuilder(
@@ -58,6 +60,10 @@ class HomeShell extends StatelessWidget {
                         icon: Icon(Icons.event_available_outlined),
                         selectedIcon: Icon(Icons.event_available),
                         label: '日历'),
+                    NavigationDestination(
+                        icon: Icon(Icons.inbox_outlined),
+                        selectedIcon: Icon(Icons.inbox),
+                        label: '收集箱'),
                     NavigationDestination(
                         icon: Icon(Icons.settings_outlined),
                         selectedIcon: Icon(Icons.settings),
@@ -116,9 +122,14 @@ class _SideRail extends StatelessWidget {
                 index: 2,
                 state: state),
             _RailItem(
+                icon: Icons.inbox_outlined,
+                label: '收集箱',
+                index: 3,
+                state: state),
+            _RailItem(
                 icon: Icons.settings_outlined,
                 label: '设置',
-                index: 3,
+                index: 4,
                 state: state),
             const Spacer(),
             const Padding(
