@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.1.2 build 3
+# Release v0.1.3 build 4
 
 on:
   workflow_dispatch:
@@ -134,16 +134,13 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.2
+          tag_name: v0.1.3
           files: release-assets/*
           body: |
-            v0.1.2 任务编辑与收集箱更新
+            v0.1.3 一次性任务状态修复
 
-            - 新增收集箱，可先记录未分配角色、未设置周期和日期的任务
-            - 收集箱任务可在整理时批量分配角色，并设置周期、截止日期、目标次数、子任务和备注
-            - 已有任务支持编辑名称、频率、截止日期、目标次数、日期、子任务和备注
-            - 主任务新增子任务；编辑所有已分配角色时可同步子任务，单独编辑角色时互不影响
-            - 日历日期支持点击选择，时间线任务支持完成、子任务完成和编辑
-            - 修复本地自动同步刚上传后被误报为“云端有更新”的问题
-            - 收集箱、本地修改和完成记录继续支持 WebDAV 自动备份
+            - 修复一次性任务完成后第二天重新显示为未完成的问题
+            - 一次性任务完成状态现在永久保留，次日自动从“今日待办”隐藏
+            - 同步修复一次性子任务、批量角色完成、任务矩阵和日历中的完成状态
+            - 再次点击已完成的一次性任务可正确取消完成，不会重复写入新的日期
             - 提供 Windows、Android 和 macOS 客户端

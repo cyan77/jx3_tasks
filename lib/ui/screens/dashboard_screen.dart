@@ -20,15 +20,17 @@ class DashboardScreen extends StatelessWidget {
         _EmptyState(onAdd: () => showCharacterEditor(context, state))
       ]);
     }
-    final tasks = state.selectedTasks;
     final today = startOfDay(DateTime.now());
-    final doneToday = tasks.where((task) => task.isDoneOn(today)).length;
+    final tasks = state.selectedTasks
+        .where((task) => task.isVisibleOn(today))
+        .toList();
+    final doneToday = tasks.where((task) => task.isCompletedOn(today)).length;
     final weekDone = tasks
         .where((task) => task.isCountTask
             ? task.countInRange(
                     taskPeriodStart(task, today), taskPeriodEnd(task, today)) >=
                 task.targetCount
-            : task.isDoneOn(today))
+            : task.isCompletedOn(today))
         .length;
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 90),
@@ -277,7 +279,7 @@ class _TaskList extends StatelessWidget {
               taskPeriodStart(task, date), taskPeriodEnd(task, date));
           final checked = task.isCountTask
               ? count >= task.targetCount
-              : task.isDoneOn(date);
+              : task.isCompletedOn(date);
           return Column(
             children: [
               ListTile(
@@ -342,7 +344,8 @@ class _TaskList extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(46, 0, 13, 8),
                   child: Column(
                     children: task.subtasks.map((subtask) {
-                      final subtaskDone = subtask.isDoneOn(date);
+                      final subtaskDone =
+                          task.isSubtaskCompletedOn(subtask, date);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(

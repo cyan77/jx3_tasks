@@ -236,7 +236,7 @@ class _InteractiveTaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final linkedCount = state.tasksForTemplate(task.templateId).length;
-    final checked = task.isDoneOn(date);
+    final checked = task.isCompletedOn(date);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,

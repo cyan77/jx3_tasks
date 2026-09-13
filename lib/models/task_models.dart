@@ -195,6 +195,19 @@ class TaskRecord {
 
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
 
+  bool isCompletedOn(DateTime date) => frequency == TaskFrequency.once
+      ? completedDates.isNotEmpty
+      : isDoneOn(date);
+
+  bool isVisibleOn(DateTime date) => frequency != TaskFrequency.once ||
+      completedDates.isEmpty ||
+      isDoneOn(date);
+
+  bool isSubtaskCompletedOn(TaskSubtask subtask, DateTime date) =>
+      frequency == TaskFrequency.once
+          ? subtask.completedDates.isNotEmpty
+          : subtask.isDoneOn(date);
+
   int countInRange(DateTime start, DateTime end) => completedDates
       .map(DateTime.tryParse)
       .whereType<DateTime>()

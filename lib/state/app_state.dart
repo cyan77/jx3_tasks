@@ -279,7 +279,13 @@ class AppState extends ChangeNotifier {
     final index = store.tasks.indexWhere((item) => item.id == task.id);
     if (index < 0) return;
     final completed = [...task.completedDates];
-    if (completed.contains(key)) {
+    if (task.frequency == TaskFrequency.once) {
+      if (completed.isEmpty) {
+        completed.add(key);
+      } else {
+        completed.clear();
+      }
+    } else if (completed.contains(key)) {
       completed.remove(key);
     } else {
       completed.add(key);
@@ -300,7 +306,13 @@ class AppState extends ChangeNotifier {
     final subtaskIndex = subtasks.indexWhere((item) => item.id == subtask.id);
     if (subtaskIndex < 0) return;
     final completedDates = [...subtask.completedDates];
-    if (completedDates.contains(key)) {
+    if (task.frequency == TaskFrequency.once) {
+      if (completedDates.isEmpty) {
+        completedDates.add(key);
+      } else {
+        completedDates.clear();
+      }
+    } else if (completedDates.contains(key)) {
       completedDates.remove(key);
     } else {
       completedDates.add(key);
@@ -327,11 +339,21 @@ class AppState extends ChangeNotifier {
         continue;
       }
       final completedDates = [...task.completedDates];
-      if (completed && !completedDates.contains(key)) {
-        completedDates.add(key);
-        changed = true;
-      } else if (!completed && completedDates.remove(key)) {
-        changed = true;
+      if (task.frequency == TaskFrequency.once) {
+        if (completed && completedDates.isEmpty) {
+          completedDates.add(key);
+          changed = true;
+        } else if (!completed && completedDates.isNotEmpty) {
+          completedDates.clear();
+          changed = true;
+        }
+      } else {
+        if (completed && !completedDates.contains(key)) {
+          completedDates.add(key);
+          changed = true;
+        } else if (!completed && completedDates.remove(key)) {
+          changed = true;
+        }
       }
       store.tasks[index] = task.copyWith(completedDates: completedDates);
     }
@@ -724,7 +746,7 @@ class AppState extends ChangeNotifier {
           List<TaskRecord> source, DateTime start, DateTime end) =>
       source
           .where((task) =>
-              task.isDoneOn(start) || task.countInRange(start, end) > 0)
+              task.isCompletedOn(start) || task.countInRange(start, end) > 0)
           .length;
 
   int completionCount(TaskRecord task, DateTime start, DateTime end) =>
@@ -735,7 +757,7 @@ class AppState extends ChangeNotifier {
     final completed = source
         .where((task) => task.isCountTask
             ? completionCount(task, start, end) >= task.targetCount
-            : task.isDoneOn(start))
+            : task.isCompletedOn(start))
         .length;
     return completed / source.length;
   }
