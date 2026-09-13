@@ -294,27 +294,28 @@ class _TaskList extends StatelessWidget {
                     ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
                     : '${task.frequency.label}${task.dueDate == null ? '' : ' · ${dueLabel(task.dueDate)}'}',
                 style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
-            trailing: canCompleteForMultipleCharacters ||
-                    (showPeriod && task.isCountTask)
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (canCompleteForMultipleCharacters)
-                        IconButton(
-                          tooltip: '为多个角色完成',
-                          onPressed: () => _showMultiCharacterCompletion(
-                              context, state, task, date),
-                          icon: const Icon(Icons.group_outlined, size: 19),
-                        ),
-                      if (showPeriod && task.isCountTask)
-                        SizedBox(
-                          width: 64,
-                          child:
-                              ProgressLine(value: count / task.targetCount),
-                        ),
-                    ],
-                  )
-                : null,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: '编辑任务',
+                  onPressed: () => showTaskEditor(context, state, task: task),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                ),
+                if (canCompleteForMultipleCharacters)
+                  IconButton(
+                    tooltip: '为多个角色完成',
+                    onPressed: () => _showMultiCharacterCompletion(
+                        context, state, task, date),
+                    icon: const Icon(Icons.group_outlined, size: 19),
+                  ),
+                if (showPeriod && task.isCountTask)
+                  SizedBox(
+                    width: 64,
+                    child: ProgressLine(value: count / task.targetCount),
+                  ),
+              ],
+            ),
           );
         }).toList(),
       ),

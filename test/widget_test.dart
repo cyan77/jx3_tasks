@@ -58,4 +58,60 @@ void main() {
     expect(state.selectedGameId, 'game-hsr');
     expect(state.selectedCharacter?.name, '崩铁角色');
   });
+
+  test('editing a shared task updates fields and preserves completion',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final completed = dateKey(DateTime(2026, 9, 13));
+    final source = TaskRecord(
+      id: 'task-1',
+      templateId: 'template-1',
+      title: '大战',
+      characterId: 'char-1',
+      frequency: TaskFrequency.daily,
+      createdAt: DateTime(2026, 9, 1),
+      completedDates: [completed],
+    );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [source];
+    final state = AppState(store);
+
+    await state.updateTaskTemplate(
+      source: source,
+      title: '十人本',
+      characterIds: {'char-1', 'char-2'},
+      frequency: TaskFrequency.weeklyCount,
+      dueDate: DateTime(2026, 10, 1),
+      targetCount: 3,
+      weeklyDays: [2, 4],
+      note: '周四前完成',
+    );
+
+    expect(store.tasks, hasLength(2));
+    expect(store.tasks.every((task) => task.title == '十人本'), isTrue);
+    expect(store.tasks.every(
+        (task) => task.frequency == TaskFrequency.weeklyCount), isTrue);
+    expect(store.tasks.every((task) => task.targetCount == 3), isTrue);
+    expect(store.tasks.first.completedDates, contains(completed));
+    expect(store.tasks.last.completedDates, isEmpty);
+  });
 }

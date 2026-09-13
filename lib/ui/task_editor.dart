@@ -5,12 +5,16 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'widgets/common.dart';
 
-Future<void> showTaskEditor(BuildContext context, AppState state) async {
+Future<void> showTaskEditor(
+  BuildContext context,
+  AppState state, {
+  TaskRecord? task,
+}) async {
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      builder: (_) => _TaskEditor(state: state));
+      builder: (_) => _TaskEditor(state: state, task: task));
 }
 
 Future<void> showCharacterEditor(
@@ -24,25 +28,46 @@ Future<void> showCharacterEditor(
 }
 
 class _TaskEditor extends StatefulWidget {
-  const _TaskEditor({required this.state});
+  const _TaskEditor({required this.state, this.task});
   final AppState state;
+  final TaskRecord? task;
   @override
   State<_TaskEditor> createState() => _TaskEditorState();
 }
 
 class _TaskEditorState extends State<_TaskEditor> {
-  final titleController = TextEditingController();
-  final noteController = TextEditingController();
-  late final Set<String> selected = {
-    if (widget.state.selectedCharacterId != null)
-      widget.state.selectedCharacterId!
-  };
-  TaskFrequency frequency = TaskFrequency.daily;
+  late final TextEditingController titleController;
+  late final TextEditingController noteController;
+  late final Set<String> selected;
+  late TaskFrequency frequency;
   DateTime? dueDate;
-  int targetCount = 5;
-  final Set<int> weeklyDays = {};
+  late int targetCount;
+  late final Set<int> weeklyDays;
   bool assignExisting = false;
   String? existingTemplateId;
+
+  bool get isEditing => widget.task != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final task = widget.task;
+    titleController = TextEditingController(text: task?.title ?? '');
+    noteController = TextEditingController(text: task?.note ?? '');
+    frequency = task?.frequency ?? TaskFrequency.daily;
+    dueDate = task?.dueDate;
+    targetCount = task?.targetCount ?? 5;
+    weeklyDays = {...?task?.weeklyDays};
+    selected = task == null
+        ? {
+            if (widget.state.selectedCharacterId != null)
+              widget.state.selectedCharacterId!
+          }
+        : widget.state
+            .tasksForTemplate(task.templateId)
+            .map((item) => item.characterId)
+            .toSet();
+  }
 
   List<TaskRecord> get existingTasks {
     final byTemplate = <String, TaskRecord>{};
@@ -90,7 +115,11 @@ class _TaskEditorState extends State<_TaskEditor> {
                   children: [
                 Row(children: [
                   Expanded(
-                      child: Text(assignExisting ? '分配已有任务' : '新建任务',
+                      child: Text(isEditing
+                          ? '编辑任务'
+                          : assignExisting
+                              ? '分配已有任务'
+                              : '新建任务',
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w700))),
                   IconButton(
@@ -98,21 +127,22 @@ class _TaskEditorState extends State<_TaskEditor> {
                       icon: const Icon(Icons.close, size: 20))
                 ]),
                 const SizedBox(height: 14),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(
-                        value: false,
-                        icon: Icon(Icons.add, size: 17),
-                        label: Text('新建任务')),
-                    ButtonSegment(
-                        value: true,
-                        icon: Icon(Icons.content_copy_outlined, size: 17),
-                        label: Text('分配已有任务')),
-                  ],
-                  selected: {assignExisting},
-                  onSelectionChanged: (value) =>
-                      _setAssignExisting(value.first),
-                ),
+                if (!isEditing)
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.add, size: 17),
+                          label: Text('新建任务')),
+                      ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.content_copy_outlined, size: 17),
+                          label: Text('分配已有任务')),
+                    ],
+                    selected: {assignExisting},
+                    onSelectionChanged: (value) =>
+                        _setAssignExisting(value.first),
+                  ),
                 const SizedBox(height: 14),
                 if (assignExisting) ...[
                   if (existingTasks.isEmpty)
@@ -197,59 +227,71 @@ class _TaskEditorState extends State<_TaskEditor> {
                     }),
                   if (frequency == TaskFrequency.weeklyCount ||
                       frequency == TaskFrequency.monthlyCount) ...[
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    const Text('目标次数', style: TextStyle(fontSize: 13)),
-                    const SizedBox(width: 16),
-                    IconButton(
-                        onPressed: targetCount > 1
-                            ? () => setState(() => targetCount--)
-                            : null,
-                        icon:
-                            const Icon(Icons.remove_circle_outline, size: 19)),
-                    Text('$targetCount',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    IconButton(
-                        onPressed: () => setState(() => targetCount++),
-                        icon: const Icon(Icons.add_circle_outline, size: 19))
-                  ]),
-                  if (frequency == TaskFrequency.weeklyCount) ...[
-                    const SizedBox(height: 10),
-                    const Text('可选日期（不选则本周任意几天完成）',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-                    const SizedBox(height: 7),
-                    Wrap(
-                      spacing: 6,
-                      children: List.generate(7, (index) {
-                        final day = index + 1;
-                        const labels = ['一', '二', '三', '四', '五', '六', '日'];
-                        return FilterChip(
-                          label: Text('周${labels[index]}'),
-                          selected: weeklyDays.contains(day),
-                          onSelected: (value) => setState(() {
-                            value
-                                ? weeklyDays.add(day)
-                                : weeklyDays.remove(day);
-                          }),
-                        );
-                      }),
-                    ),
-                  ],
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      const Text('目标次数', style: TextStyle(fontSize: 13)),
+                      const SizedBox(width: 16),
+                      IconButton(
+                          onPressed: targetCount > 1
+                              ? () => setState(() => targetCount--)
+                              : null,
+                          icon: const Icon(Icons.remove_circle_outline,
+                              size: 19)),
+                      Text('$targetCount',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      IconButton(
+                          onPressed: () => setState(() => targetCount++),
+                          icon:
+                              const Icon(Icons.add_circle_outline, size: 19))
+                    ]),
+                    if (frequency == TaskFrequency.weeklyCount) ...[
+                      const SizedBox(height: 10),
+                      const Text('可选日期（不选则本周任意几天完成）',
+                          style:
+                              TextStyle(fontSize: 12, color: AppTheme.muted)),
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 6,
+                        children: List.generate(7, (index) {
+                          final day = index + 1;
+                          const labels = ['一', '二', '三', '四', '五', '六', '日'];
+                          return FilterChip(
+                            label: Text('周${labels[index]}'),
+                            selected: weeklyDays.contains(day),
+                            onSelected: (value) => setState(() {
+                              value
+                                  ? weeklyDays.add(day)
+                                  : weeklyDays.remove(day);
+                            }),
+                          );
+                        }),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 12),
                   ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  leading: const Icon(Icons.event_outlined,
-                      size: 19, color: AppTheme.muted),
-                  title: const Text('截止日期', style: TextStyle(fontSize: 13)),
-                  subtitle: Text(dueDate == null ? '不设置' : dueLabel(dueDate),
-                      style:
-                          const TextStyle(fontSize: 11, color: AppTheme.muted)),
-                  trailing: TextButton(
-                      onPressed: _pickDate,
-                      child: Text(dueDate == null ? '选择' : '修改')),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: const Icon(Icons.event_outlined,
+                        size: 19, color: AppTheme.muted),
+                    title:
+                        const Text('截止日期', style: TextStyle(fontSize: 13)),
+                    subtitle: Text(
+                        dueDate == null ? '不设置' : dueLabel(dueDate),
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.muted)),
+                    trailing: TextButton(
+                        onPressed: _pickDate,
+                        child: Text(dueDate == null ? '选择' : '修改')),
                   ),
+                  if (dueDate != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() => dueDate = null),
+                        child: const Text('清除截止日期'),
+                      ),
+                    ),
                   TextField(
                     controller: noteController,
                     maxLines: 2,
@@ -262,7 +304,11 @@ class _TaskEditorState extends State<_TaskEditor> {
                         onPressed: assignExisting && existingTask == null
                             ? null
                             : _save,
-                        child: Text(assignExisting ? '分配任务' : '创建任务')))
+                        child: Text(isEditing
+                            ? '保存修改'
+                            : assignExisting
+                                ? '分配任务'
+                                : '创建任务')))
               ]))));
 
   Widget _characterAction({
@@ -301,15 +347,27 @@ class _TaskEditorState extends State<_TaskEditor> {
   Future<void> _pickDate() async {
     final date = await showDatePicker(
         context: context,
-        firstDate: DateTime.now().subtract(const Duration(days: 1)),
-        lastDate: DateTime.now().add(const Duration(days: 730)),
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100),
         initialDate: dueDate ?? DateTime.now());
     if (date != null) setState(() => dueDate = date);
   }
 
   Future<void> _save() async {
     if (selected.isEmpty) return;
-    if (assignExisting) {
+    if (isEditing) {
+      if (titleController.text.trim().isEmpty) return;
+      await widget.state.updateTaskTemplate(
+        source: widget.task!,
+        title: titleController.text.trim(),
+        characterIds: Set.of(selected),
+        frequency: frequency,
+        dueDate: dueDate,
+        targetCount: targetCount,
+        weeklyDays: weeklyDays.toList()..sort(),
+        note: noteController.text.trim(),
+      );
+    } else if (assignExisting) {
       final task = existingTask;
       if (task == null) return;
       await widget.state.assignExistingTask(

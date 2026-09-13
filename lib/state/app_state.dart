@@ -321,6 +321,60 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> updateTaskTemplate({
+    required TaskRecord source,
+    required String title,
+    required Set<String> characterIds,
+    required TaskFrequency frequency,
+    DateTime? dueDate,
+    required int targetCount,
+    List<int> weeklyDays = const [],
+    String note = '',
+  }) async {
+    if (characterIds.isEmpty) return;
+    final linkedTasks = store.tasks
+        .where((task) => task.templateId == source.templateId)
+        .toList();
+    final existingByCharacter = {
+      for (final task in linkedTasks) task.characterId: task,
+    };
+
+    store.tasks.removeWhere((task) =>
+        task.templateId == source.templateId &&
+        !characterIds.contains(task.characterId));
+
+    for (final characterId in characterIds) {
+      final existing = existingByCharacter[characterId];
+      if (existing == null) {
+        store.tasks.add(TaskRecord(
+          id: '${source.templateId}-$characterId',
+          templateId: source.templateId,
+          title: title,
+          characterId: characterId,
+          frequency: frequency,
+          createdAt: source.createdAt,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: [...weeklyDays],
+          note: note,
+        ));
+        continue;
+      }
+      final index = store.tasks.indexWhere((task) => task.id == existing.id);
+      if (index < 0) continue;
+      store.tasks[index] = existing.copyWith(
+        title: title,
+        frequency: frequency,
+        dueDate: dueDate,
+        clearDueDate: dueDate == null,
+        targetCount: targetCount,
+        weeklyDays: [...weeklyDays],
+        note: note,
+      );
+    }
+    await _saveDataChange();
+  }
+
   Future<void> assignExistingTask({
     required TaskRecord source,
     required Set<String> characterIds,
