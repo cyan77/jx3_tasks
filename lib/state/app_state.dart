@@ -34,6 +34,7 @@ class AppState extends ChangeNotifier {
   String? selectedCharacterId;
   int currentTab = 0;
   DateTime focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime selectedCalendarDate = startOfDay(DateTime.now());
 
   List<Game> get games => store.games;
   Game? get selectedGame =>
@@ -74,6 +75,13 @@ class AppState extends ChangeNotifier {
 
   void setMonth(DateTime month) {
     focusedMonth = DateTime(month.year, month.month);
+    selectedCalendarDate = focusedMonth;
+    notifyListeners();
+  }
+
+  void selectCalendarDate(DateTime date) {
+    selectedCalendarDate = startOfDay(date);
+    focusedMonth = DateTime(date.year, date.month);
     notifyListeners();
   }
 

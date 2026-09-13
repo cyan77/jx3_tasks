@@ -41,6 +41,15 @@ void main() {
     expect(service.backupTime(backup), DateTime(2026, 9, 13, 12));
   });
 
+  test('calendar date selection also focuses its month', () {
+    SharedPreferences.setMockInitialValues({});
+    final state = AppState(LocalStore());
+    state.selectCalendarDate(DateTime(2027, 2, 18, 19, 30));
+
+    expect(state.selectedCalendarDate, DateTime(2027, 2, 18));
+    expect(state.focusedMonth, DateTime(2027, 2));
+  });
+
   test('adding a character in another game selects its game and character',
       () async {
     SharedPreferences.setMockInitialValues({});

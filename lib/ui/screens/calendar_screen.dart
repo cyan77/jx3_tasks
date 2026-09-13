@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../task_editor.dart';
 import '../widgets/common.dart';
 
 class CalendarScreen extends StatelessWidget {
@@ -35,8 +36,7 @@ class CalendarScreen extends StatelessWidget {
                   icon: const Icon(Icons.chevron_right, size: 20)),
               const Spacer(),
               TextButton(
-                  onPressed: () => state.setMonth(
-                      DateTime(DateTime.now().year, DateTime.now().month)),
+                  onPressed: () => state.selectCalendarDate(DateTime.now()),
                   child: const Text('回到本月')),
             ],
           ),
@@ -56,6 +56,8 @@ class CalendarScreen extends StatelessWidget {
                         month: month.month,
                         days: days,
                         leading: leading),
+                    const SizedBox(height: 18),
+                    _DayTasks(state: state, date: state.selectedCalendarDate),
                     const SizedBox(height: 24),
                     _Upcoming(state: state),
                   ],
@@ -116,43 +118,60 @@ class _CalendarGrid extends StatelessWidget {
           .where((task) => task.isDoneOn(date))
           .length;
       final isToday = dateKey(date) == dateKey(DateTime.now());
-      cells.add(Container(
-          padding: EdgeInsets.all(compact ? 6 : 8),
-          decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.line),
-              color: isToday ? const Color(0xfff2f8f6) : Colors.white),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('$day',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
-                    color: isToday ? AppTheme.accent : AppTheme.ink)),
-            const Spacer(),
-            if (compact && (done > 0 || dateTasks.isNotEmpty))
-              Row(children: [
-                if (done > 0)
-                  Container(
-                      width: 5,
-                      height: 5,
-                      decoration: const BoxDecoration(
-                          color: AppTheme.accent, shape: BoxShape.circle)),
-                if (done > 0 && dateTasks.isNotEmpty) const SizedBox(width: 3),
-                if (dateTasks.isNotEmpty)
-                  Container(
-                      width: 5,
-                      height: 5,
-                      decoration: const BoxDecoration(
-                          color: AppTheme.muted, shape: BoxShape.circle)),
-              ]),
-            if (!compact && done > 0)
-              Text('$done 项完成',
-                  style: const TextStyle(fontSize: 10, color: AppTheme.accent)),
-            if (!compact)
-              ...dateTasks.take(2).map((task) => Text(task.title,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: AppTheme.muted)))
-          ])));
+      final isSelected =
+          dateKey(date) == dateKey(state.selectedCalendarDate);
+      cells.add(InkWell(
+        onTap: () => state.selectCalendarDate(date),
+        child: Container(
+            padding: EdgeInsets.all(compact ? 6 : 8),
+            decoration: BoxDecoration(
+                border: Border.all(
+                    color: isSelected ? AppTheme.accent : AppTheme.line,
+                    width: isSelected ? 2 : 1),
+                color: isSelected
+                    ? const Color(0xffe8f3f0)
+                    : isToday
+                        ? const Color(0xfff2f8f6)
+                        : Colors.white),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('$day',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                          isToday || isSelected ? FontWeight.w700 : FontWeight.w400,
+                      color: isToday || isSelected
+                          ? AppTheme.accent
+                          : AppTheme.ink)),
+              const Spacer(),
+              if (compact && (done > 0 || dateTasks.isNotEmpty))
+                Row(children: [
+                  if (done > 0)
+                    Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                            color: AppTheme.accent, shape: BoxShape.circle)),
+                  if (done > 0 && dateTasks.isNotEmpty)
+                    const SizedBox(width: 3),
+                  if (dateTasks.isNotEmpty)
+                    Container(
+                        width: 5,
+                        height: 5,
+                        decoration: const BoxDecoration(
+                            color: AppTheme.muted, shape: BoxShape.circle)),
+                ]),
+              if (!compact && done > 0)
+                Text('$done 项完成',
+                    style:
+                        const TextStyle(fontSize: 10, color: AppTheme.accent)),
+              if (!compact)
+                ...dateTasks.take(2).map((task) => Text(task.title,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(fontSize: 10, color: AppTheme.muted)))
+            ])),
+      ));
     }
     return LayoutBuilder(builder: (context, constraints) {
       final cellWidth = constraints.maxWidth / 7;
@@ -164,6 +183,109 @@ class _CalendarGrid extends StatelessWidget {
           childAspectRatio: cellWidth / cellHeight,
           children: cells);
     });
+  }
+}
+
+class _DayTasks extends StatelessWidget {
+  const _DayTasks({required this.state, required this.date});
+  final AppState state;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final source =
+        state.selectedCharacterId == null ? state.tasks : state.selectedTasks;
+    final tasks = source.where((task) {
+      if (task.isDoneOn(date)) return true;
+      if (task.frequency == TaskFrequency.once) {
+        return task.dueDate != null &&
+            dateKey(task.dueDate!) == dateKey(date);
+      }
+      return true;
+    }).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle('${date.month}月${date.day}日任务'),
+        const SizedBox(height: 8),
+        if (tasks.isEmpty)
+          const Text('当天没有任务',
+              style: TextStyle(fontSize: 12, color: AppTheme.muted)),
+        ...tasks.map((task) => _InteractiveTaskTile(
+              state: state,
+              task: task,
+              date: date,
+            )),
+      ],
+    );
+  }
+}
+
+class _InteractiveTaskTile extends StatelessWidget {
+  const _InteractiveTaskTile({
+    required this.state,
+    required this.task,
+    required this.date,
+    this.showDueDate = false,
+  });
+  final AppState state;
+  final TaskRecord task;
+  final DateTime date;
+  final bool showDueDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final linkedCount = state.tasksForTemplate(task.templateId).length;
+    final checked = task.isDoneOn(date);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      onTap: () => state.toggleTask(task, date: date),
+      leading: TaskCheck(
+        checked: checked,
+        onTap: () => state.toggleTask(task, date: date),
+      ),
+      title: Text(
+        task.title,
+        style: TextStyle(
+          fontSize: 13,
+          color: checked ? AppTheme.muted : AppTheme.ink,
+          decoration: checked ? TextDecoration.lineThrough : null,
+        ),
+      ),
+      subtitle: Text(task.frequency.label,
+          style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showDueDate)
+            Text(dueLabel(task.dueDate),
+                style:
+                    const TextStyle(fontSize: 12, color: AppTheme.muted)),
+          PopupMenuButton<String>(
+            tooltip: '编辑任务',
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            onSelected: (value) => showTaskEditor(
+              context,
+              state,
+              task: task,
+              syncAll: value == 'all',
+            ),
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'single',
+                child: Text('仅编辑当前角色'),
+              ),
+              if (linkedCount > 1)
+                const PopupMenuItem(
+                  value: 'all',
+                  child: Text('编辑所有已分配角色'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -187,14 +309,11 @@ class _Upcoming extends StatelessWidget {
         if (tasks.isEmpty)
           const Text('暂无设置截止日期的任务',
               style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-        ...tasks.map((task) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: const Icon(Icons.event_note_outlined,
-                  size: 19, color: AppTheme.muted),
-              title: Text(task.title, style: const TextStyle(fontSize: 13)),
-              trailing: Text(dueLabel(task.dueDate),
-                  style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
+        ...tasks.map((task) => _InteractiveTaskTile(
+              state: state,
+              task: task,
+              date: task.dueDate!,
+              showDueDate: true,
             )),
       ],
     );
