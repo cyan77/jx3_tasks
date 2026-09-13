@@ -199,7 +199,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                     )
                   else
                     DropdownButtonFormField<String>(
-                      value: existingTemplateId,
+                      initialValue: existingTemplateId,
                       decoration: const InputDecoration(labelText: '选择已有任务'),
                       items: existingTasks
                           .map((task) => DropdownMenuItem(
@@ -273,7 +273,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                       (!isInboxEditing || selected.isNotEmpty)) ...[
                     const SizedBox(height: 18),
                     DropdownButtonFormField<TaskFrequency>(
-                    value: frequency,
+                    initialValue: frequency,
                     decoration: const InputDecoration(labelText: '周期'),
                     items: TaskFrequency.values
                         .map((item) => DropdownMenuItem(
