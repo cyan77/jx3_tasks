@@ -170,8 +170,8 @@ class WebDavSyncService {
             ))
         .toList();
     backups.sort((a, b) {
-      final aTime = a.modifiedAt ?? _timeFromName(a.name);
-      final bTime = b.modifiedAt ?? _timeFromName(b.name);
+      final aTime = _timeFromName(a.name) ?? a.modifiedAt;
+      final bTime = _timeFromName(b.name) ?? b.modifiedAt;
       if (aTime != null && bTime != null) return bTime.compareTo(aTime);
       return b.name.compareTo(a.name);
     });
@@ -187,7 +187,7 @@ class WebDavSyncService {
   }
 
   DateTime? backupTime(RemoteBackup backup) =>
-      backup.modifiedAt ?? _timeFromName(backup.name);
+      _timeFromName(backup.name) ?? backup.modifiedAt;
 
   Future<void> _removeOldBackups(Client client, SyncConfig config,
       {required int keep}) async {

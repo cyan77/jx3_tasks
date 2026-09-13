@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:jx3_tasks/data/local_store.dart';
+import 'package:jx3_tasks/data/sync_service.dart';
 import 'package:jx3_tasks/models/task_models.dart';
 import 'package:jx3_tasks/state/app_state.dart';
 
@@ -26,6 +27,18 @@ void main() {
     );
     expect(task.countInRange(DateTime(2026, 9, 7), DateTime(2026, 9, 14)), 2);
     expect(task.isCountTask, isTrue);
+  });
+
+  test('backup filename time takes precedence over unreliable WebDAV mtime',
+      () {
+    final service = WebDavSyncService();
+    final backup = RemoteBackup(
+      name: 'backup_20260913_120000000000000_device.json',
+      path: '/backup.json',
+      modifiedAt: DateTime(2030),
+    );
+
+    expect(service.backupTime(backup), DateTime(2026, 9, 13, 12));
   });
 
   test('adding a character in another game selects its game and character',
