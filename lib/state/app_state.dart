@@ -268,6 +268,29 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> toggleSubtask(
+    TaskRecord task,
+    TaskSubtask subtask, {
+    DateTime? date,
+  }) async {
+    final key = dateKey(date ?? DateTime.now());
+    final taskIndex = store.tasks.indexWhere((item) => item.id == task.id);
+    if (taskIndex < 0) return;
+    final subtasks = [...task.subtasks];
+    final subtaskIndex = subtasks.indexWhere((item) => item.id == subtask.id);
+    if (subtaskIndex < 0) return;
+    final completedDates = [...subtask.completedDates];
+    if (completedDates.contains(key)) {
+      completedDates.remove(key);
+    } else {
+      completedDates.add(key);
+    }
+    subtasks[subtaskIndex] =
+        subtask.copyWith(completedDates: completedDates);
+    store.tasks[taskIndex] = task.copyWith(subtasks: subtasks);
+    await _saveDataChange();
+  }
+
   Future<void> setTaskCompletionForCharacters({
     required String templateId,
     required Set<String> characterIds,
@@ -302,6 +325,7 @@ class AppState extends ChangeNotifier {
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
+    List<TaskSubtask> subtasks = const [],
     String note = '',
   }) async {
     final now = DateTime.now();
@@ -316,6 +340,10 @@ class AppState extends ChangeNotifier {
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays,
+          subtasks: subtasks
+              .map((item) =>
+                  TaskSubtask(id: item.id, title: item.title))
+              .toList(),
           note: note,
         )));
     await _saveDataChange();
@@ -329,6 +357,7 @@ class AppState extends ChangeNotifier {
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
+    List<TaskSubtask> subtasks = const [],
     String note = '',
   }) async {
     if (characterIds.isEmpty) return;
@@ -356,6 +385,9 @@ class AppState extends ChangeNotifier {
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: [...weeklyDays],
+          subtasks: subtasks
+              .map((item) => TaskSubtask(id: item.id, title: item.title))
+              .toList(),
           note: note,
         ));
         continue;
@@ -369,9 +401,35 @@ class AppState extends ChangeNotifier {
         clearDueDate: dueDate == null,
         targetCount: targetCount,
         weeklyDays: [...weeklyDays],
+        subtasks: _mergeSubtasks(existing.subtasks, subtasks),
         note: note,
       );
     }
+    await _saveDataChange();
+  }
+
+  Future<void> updateTaskRecord({
+    required TaskRecord source,
+    required String title,
+    required TaskFrequency frequency,
+    DateTime? dueDate,
+    required int targetCount,
+    List<int> weeklyDays = const [],
+    List<TaskSubtask> subtasks = const [],
+    String note = '',
+  }) async {
+    final index = store.tasks.indexWhere((task) => task.id == source.id);
+    if (index < 0) return;
+    store.tasks[index] = source.copyWith(
+      title: title,
+      frequency: frequency,
+      dueDate: dueDate,
+      clearDueDate: dueDate == null,
+      targetCount: targetCount,
+      weeklyDays: [...weeklyDays],
+      subtasks: _mergeSubtasks(source.subtasks, subtasks),
+      note: note,
+    );
     await _saveDataChange();
   }
 
@@ -400,9 +458,27 @@ class AppState extends ChangeNotifier {
           dueDate: source.dueDate,
           targetCount: source.targetCount,
           weeklyDays: [...source.weeklyDays],
+          subtasks: source.subtasks
+              .map((item) => TaskSubtask(id: item.id, title: item.title))
+              .toList(),
           note: source.note,
         )));
     await _saveDataChange();
+  }
+
+  List<TaskSubtask> _mergeSubtasks(
+    List<TaskSubtask> existing,
+    List<TaskSubtask> definitions,
+  ) {
+    final existingById = {for (final item in existing) item.id: item};
+    return definitions
+        .map((definition) => TaskSubtask(
+              id: definition.id,
+              title: definition.title,
+              completedDates:
+                  [...?existingById[definition.id]?.completedDates],
+            ))
+        .toList();
   }
 
   Future<void> addCharacter({

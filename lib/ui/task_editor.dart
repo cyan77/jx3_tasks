@@ -9,12 +9,14 @@ Future<void> showTaskEditor(
   BuildContext context,
   AppState state, {
   TaskRecord? task,
+  bool syncAll = false,
 }) async {
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      builder: (_) => _TaskEditor(state: state, task: task));
+      builder: (_) =>
+          _TaskEditor(state: state, task: task, syncAll: syncAll));
 }
 
 Future<void> showCharacterEditor(
@@ -28,9 +30,14 @@ Future<void> showCharacterEditor(
 }
 
 class _TaskEditor extends StatefulWidget {
-  const _TaskEditor({required this.state, this.task});
+  const _TaskEditor({
+    required this.state,
+    this.task,
+    this.syncAll = false,
+  });
   final AppState state;
   final TaskRecord? task;
+  final bool syncAll;
   @override
   State<_TaskEditor> createState() => _TaskEditorState();
 }
@@ -43,6 +50,8 @@ class _TaskEditorState extends State<_TaskEditor> {
   DateTime? dueDate;
   late int targetCount;
   late final Set<int> weeklyDays;
+  late final List<_SubtaskDraft> subtaskDrafts;
+  int subtaskSequence = 0;
   bool assignExisting = false;
   String? existingTemplateId;
 
@@ -58,15 +67,24 @@ class _TaskEditorState extends State<_TaskEditor> {
     dueDate = task?.dueDate;
     targetCount = task?.targetCount ?? 5;
     weeklyDays = {...?task?.weeklyDays};
+    subtaskDrafts = [
+      for (final subtask in task?.subtasks ?? const <TaskSubtask>[])
+        _SubtaskDraft(
+          id: subtask.id,
+          controller: TextEditingController(text: subtask.title),
+        ),
+    ];
     selected = task == null
         ? {
             if (widget.state.selectedCharacterId != null)
               widget.state.selectedCharacterId!
           }
-        : widget.state
-            .tasksForTemplate(task.templateId)
-            .map((item) => item.characterId)
-            .toSet();
+        : !widget.syncAll
+            ? {task.characterId}
+            : widget.state
+                .tasksForTemplate(task.templateId)
+                .map((item) => item.characterId)
+                .toSet();
   }
 
   List<TaskRecord> get existingTasks {
@@ -116,7 +134,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                 Row(children: [
                   Expanded(
                       child: Text(isEditing
-                          ? '编辑任务'
+                          ? widget.syncAll
+                              ? '编辑所有角色的任务'
+                              : '仅编辑当前角色任务'
                           : assignExisting
                               ? '分配已有任务'
                               : '新建任务',
@@ -177,33 +197,41 @@ class _TaskEditorState extends State<_TaskEditor> {
                       decoration: const InputDecoration(
                           labelText: '任务名称',
                           hintText: '例如：大战、茶馆、门派周常')),
-                const SizedBox(height: 18),
-                const Text('关联角色',
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                if (availableCharacters.isNotEmpty)
-                  Wrap(spacing: 4, runSpacing: 0, children: [
-                    _characterAction(
-                        label: '全选', onPressed: _selectAllCharacters),
-                    _characterAction(label: '全不选', onPressed: _clearCharacters),
-                    _characterAction(label: '反选', onPressed: _invertCharacters),
-                  ]),
-                if (availableCharacters.isNotEmpty)
-                  const SizedBox(height: 4),
-                Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: availableCharacters
-                        .map((character) => FilterChip(
-                            label: Text(character.name),
-                            selected: selected.contains(character.id),
-                            onSelected: (value) => setState(() {
-                                  value
-                                      ? selected.add(character.id)
-                                      : selected.remove(character.id);
-                                })))
-                        .toList()),
+                if (!isEditing || widget.syncAll) ...[
+                  const SizedBox(height: 18),
+                  const Text('关联角色',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  if (availableCharacters.isNotEmpty)
+                    Wrap(spacing: 4, runSpacing: 0, children: [
+                      _characterAction(
+                          label: '全选', onPressed: _selectAllCharacters),
+                      _characterAction(
+                          label: '全不选', onPressed: _clearCharacters),
+                      _characterAction(
+                          label: '反选', onPressed: _invertCharacters),
+                    ]),
+                  if (availableCharacters.isNotEmpty)
+                    const SizedBox(height: 4),
+                  Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: availableCharacters
+                          .map((character) => FilterChip(
+                              label: Text(character.name),
+                              selected: selected.contains(character.id),
+                              onSelected: (value) => setState(() {
+                                    value
+                                        ? selected.add(character.id)
+                                        : selected.remove(character.id);
+                                  })))
+                          .toList()),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  const Text('本次修改不会影响其他角色',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted)),
+                ],
                 if (assignExisting && existingTask != null) ...[
                   const SizedBox(height: 14),
                   Text(
@@ -292,6 +320,41 @@ class _TaskEditorState extends State<_TaskEditor> {
                         child: const Text('清除截止日期'),
                       ),
                     ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('子任务',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                      TextButton.icon(
+                        onPressed: _addSubtask,
+                        icon: const Icon(Icons.add, size: 17),
+                        label: const Text('添加子任务'),
+                      ),
+                    ],
+                  ),
+                  ...subtaskDrafts.asMap().entries.map((entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: entry.value.controller,
+                                decoration: InputDecoration(
+                                  labelText: '子任务 ${entry.key + 1}',
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '删除子任务',
+                              onPressed: () => _removeSubtask(entry.key),
+                              icon: const Icon(Icons.delete_outline, size: 19),
+                            ),
+                          ],
+                        ),
+                      )),
                   TextField(
                     controller: noteController,
                     maxLines: 2,
@@ -357,16 +420,30 @@ class _TaskEditorState extends State<_TaskEditor> {
     if (selected.isEmpty) return;
     if (isEditing) {
       if (titleController.text.trim().isEmpty) return;
-      await widget.state.updateTaskTemplate(
-        source: widget.task!,
-        title: titleController.text.trim(),
-        characterIds: Set.of(selected),
-        frequency: frequency,
-        dueDate: dueDate,
-        targetCount: targetCount,
-        weeklyDays: weeklyDays.toList()..sort(),
-        note: noteController.text.trim(),
-      );
+      if (widget.syncAll) {
+        await widget.state.updateTaskTemplate(
+          source: widget.task!,
+          title: titleController.text.trim(),
+          characterIds: Set.of(selected),
+          frequency: frequency,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          note: noteController.text.trim(),
+        );
+      } else {
+        await widget.state.updateTaskRecord(
+          source: widget.task!,
+          title: titleController.text.trim(),
+          frequency: frequency,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          note: noteController.text.trim(),
+        );
+      }
     } else if (assignExisting) {
       final task = existingTask;
       if (task == null) return;
@@ -381,6 +458,7 @@ class _TaskEditorState extends State<_TaskEditor> {
         dueDate: dueDate,
         targetCount: targetCount,
         weeklyDays: weeklyDays.toList()..sort(),
+        subtasks: _subtasks(),
         note: noteController.text.trim());
     }
     if (mounted) Navigator.pop(context);
@@ -411,12 +489,42 @@ class _TaskEditorState extends State<_TaskEditor> {
     });
   }
 
+  void _addSubtask() {
+    setState(() {
+      subtaskDrafts.add(_SubtaskDraft(
+        id: 'subtask-${DateTime.now().microsecondsSinceEpoch}-${subtaskSequence++}',
+        controller: TextEditingController(),
+      ));
+    });
+  }
+
+  void _removeSubtask(int index) {
+    setState(() {
+      subtaskDrafts.removeAt(index).controller.dispose();
+    });
+  }
+
+  List<TaskSubtask> _subtasks() => subtaskDrafts
+      .where((draft) => draft.controller.text.trim().isNotEmpty)
+      .map((draft) =>
+          TaskSubtask(id: draft.id, title: draft.controller.text.trim()))
+      .toList();
+
   @override
   void dispose() {
     titleController.dispose();
     noteController.dispose();
+    for (final draft in subtaskDrafts) {
+      draft.controller.dispose();
+    }
     super.dispose();
   }
+}
+
+class _SubtaskDraft {
+  const _SubtaskDraft({required this.id, required this.controller});
+  final String id;
+  final TextEditingController controller;
 }
 
 class _CharacterEditor extends StatefulWidget {

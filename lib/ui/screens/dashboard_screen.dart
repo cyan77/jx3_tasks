@@ -278,44 +278,102 @@ class _TaskList extends StatelessWidget {
           final checked = task.isCountTask
               ? count >= task.targetCount
               : task.isDoneOn(date);
-          return ListTile(
-            dense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 13, vertical: 3),
-            leading: TaskCheck(
-                checked: checked, onTap: () => state.toggleTask(task)),
-            title: Text(task.title,
-                style: TextStyle(
-                    fontSize: 14,
-                    decoration: checked ? TextDecoration.lineThrough : null,
-                    color: checked ? AppTheme.muted : AppTheme.ink)),
-            subtitle: Text(
-                task.isCountTask
-                    ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
-                    : '${task.frequency.label}${task.dueDate == null ? '' : ' · ${dueLabel(task.dueDate)}'}',
-                style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: '编辑任务',
-                  onPressed: () => showTaskEditor(context, state, task: task),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
+          return Column(
+            children: [
+              ListTile(
+                dense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 13, vertical: 3),
+                leading: TaskCheck(
+                    checked: checked, onTap: () => state.toggleTask(task)),
+                title: Text(task.title,
+                    style: TextStyle(
+                        fontSize: 14,
+                        decoration:
+                            checked ? TextDecoration.lineThrough : null,
+                        color: checked ? AppTheme.muted : AppTheme.ink)),
+                subtitle: Text(
+                    task.isCountTask
+                        ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
+                        : '${task.frequency.label}${task.dueDate == null ? '' : ' · ${dueLabel(task.dueDate)}'}',
+                    style:
+                        const TextStyle(fontSize: 11, color: AppTheme.muted)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PopupMenuButton<String>(
+                      tooltip: '编辑任务',
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      onSelected: (value) => showTaskEditor(
+                        context,
+                        state,
+                        task: task,
+                        syncAll: value == 'all',
+                      ),
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'single',
+                          child: Text('仅编辑当前角色'),
+                        ),
+                        if (canCompleteForMultipleCharacters)
+                          const PopupMenuItem(
+                            value: 'all',
+                            child: Text('编辑所有已分配角色'),
+                          ),
+                      ],
+                    ),
+                    if (canCompleteForMultipleCharacters)
+                      IconButton(
+                        tooltip: '为多个角色完成',
+                        onPressed: () => _showMultiCharacterCompletion(
+                            context, state, task, date),
+                        icon: const Icon(Icons.group_outlined, size: 19),
+                      ),
+                    if (showPeriod && task.isCountTask)
+                      SizedBox(
+                        width: 64,
+                        child: ProgressLine(value: count / task.targetCount),
+                      ),
+                  ],
                 ),
-                if (canCompleteForMultipleCharacters)
-                  IconButton(
-                    tooltip: '为多个角色完成',
-                    onPressed: () => _showMultiCharacterCompletion(
-                        context, state, task, date),
-                    icon: const Icon(Icons.group_outlined, size: 19),
+              ),
+              if (task.subtasks.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(46, 0, 13, 8),
+                  child: Column(
+                    children: task.subtasks.map((subtask) {
+                      final subtaskDone = subtask.isDoneOn(date);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            TaskCheck(
+                              checked: subtaskDone,
+                              onTap: () =>
+                                  state.toggleSubtask(task, subtask, date: date),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                subtask.title,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: subtaskDone
+                                      ? AppTheme.muted
+                                      : AppTheme.ink,
+                                  decoration: subtaskDone
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
-                if (showPeriod && task.isCountTask)
-                  SizedBox(
-                    width: 64,
-                    child: ProgressLine(value: count / task.targetCount),
-                  ),
-              ],
-            ),
+                ),
+            ],
           );
         }).toList(),
       ),
