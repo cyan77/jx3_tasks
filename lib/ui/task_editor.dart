@@ -10,13 +10,17 @@ Future<void> showTaskEditor(
   AppState state, {
   TaskRecord? task,
   bool syncAll = false,
+  bool createInInbox = false,
 }) async {
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      builder: (_) =>
-          _TaskEditor(state: state, task: task, syncAll: syncAll));
+      builder: (_) => _TaskEditor(
+          state: state,
+          task: task,
+          syncAll: syncAll,
+          createInInbox: createInInbox));
 }
 
 Future<void> showCharacterEditor(
@@ -34,10 +38,12 @@ class _TaskEditor extends StatefulWidget {
     required this.state,
     this.task,
     this.syncAll = false,
+    this.createInInbox = false,
   });
   final AppState state;
   final TaskRecord? task;
   final bool syncAll;
+  final bool createInInbox;
   @override
   State<_TaskEditor> createState() => _TaskEditorState();
 }
@@ -56,6 +62,22 @@ class _TaskEditorState extends State<_TaskEditor> {
   String? existingTemplateId;
 
   bool get isEditing => widget.task != null;
+  bool get isInboxEditing => widget.task?.isInbox ?? false;
+  String get editorTitle {
+    if (widget.createInInbox) return '记录到收集箱';
+    if (isInboxEditing) return '整理收集箱任务';
+    if (isEditing) {
+      return widget.syncAll ? '编辑所有角色的任务' : '仅编辑当前角色任务';
+    }
+    return assignExisting ? '分配已有任务' : '新建任务';
+  }
+
+  String get saveLabel {
+    if (widget.createInInbox) return '放入收集箱';
+    if (isInboxEditing && selected.isNotEmpty) return '分配并移出收集箱';
+    if (isEditing) return '保存修改';
+    return assignExisting ? '分配任务' : '创建任务';
+  }
 
   @override
   void initState() {
@@ -76,10 +98,13 @@ class _TaskEditorState extends State<_TaskEditor> {
     ];
     selected = task == null
         ? {
-            if (widget.state.selectedCharacterId != null)
+            if (!widget.createInInbox &&
+                widget.state.selectedCharacterId != null)
               widget.state.selectedCharacterId!
           }
-        : !widget.syncAll
+        : task.isInbox
+            ? <String>{}
+            : !widget.syncAll
             ? {task.characterId}
             : widget.state
                 .tasksForTemplate(task.templateId)
@@ -133,13 +158,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                   children: [
                 Row(children: [
                   Expanded(
-                      child: Text(isEditing
-                          ? widget.syncAll
-                              ? '编辑所有角色的任务'
-                              : '仅编辑当前角色任务'
-                          : assignExisting
-                              ? '分配已有任务'
-                              : '新建任务',
+                      child: Text(editorTitle,
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w700))),
                   IconButton(
@@ -147,7 +166,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                       icon: const Icon(Icons.close, size: 20))
                 ]),
                 const SizedBox(height: 14),
-                if (!isEditing)
+                if (!isEditing && !widget.createInInbox)
                   SegmentedButton<bool>(
                     segments: const [
                       ButtonSegment(
@@ -197,7 +216,8 @@ class _TaskEditorState extends State<_TaskEditor> {
                       decoration: const InputDecoration(
                           labelText: '任务名称',
                           hintText: '例如：大战、茶馆、门派周常')),
-                if (!isEditing || widget.syncAll) ...[
+                if (!widget.createInInbox &&
+                    (!isEditing || widget.syncAll || isInboxEditing)) ...[
                   const SizedBox(height: 18),
                   const Text('关联角色',
                       style:
@@ -227,7 +247,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                                         : selected.remove(character.id);
                                   })))
                           .toList()),
-                ] else ...[
+                ] else if (isEditing && !isInboxEditing) ...[
                   const SizedBox(height: 12),
                   const Text('本次修改不会影响其他角色',
                       style: TextStyle(fontSize: 12, color: AppTheme.muted)),
@@ -242,8 +262,10 @@ class _TaskEditorState extends State<_TaskEditor> {
                   ),
                 ],
                 if (!assignExisting) ...[
-                  const SizedBox(height: 18),
-                  DropdownButtonFormField<TaskFrequency>(
+                  if (!widget.createInInbox &&
+                      (!isInboxEditing || selected.isNotEmpty)) ...[
+                    const SizedBox(height: 18),
+                    DropdownButtonFormField<TaskFrequency>(
                     value: frequency,
                     decoration: const InputDecoration(labelText: '周期'),
                     items: TaskFrequency.values
@@ -253,8 +275,8 @@ class _TaskEditorState extends State<_TaskEditor> {
                     onChanged: (value) {
                       if (value != null) setState(() => frequency = value);
                     }),
-                  if (frequency == TaskFrequency.weeklyCount ||
-                      frequency == TaskFrequency.monthlyCount) ...[
+                    if (frequency == TaskFrequency.weeklyCount ||
+                        frequency == TaskFrequency.monthlyCount) ...[
                     const SizedBox(height: 12),
                     Row(children: [
                       const Text('目标次数', style: TextStyle(fontSize: 13)),
@@ -295,9 +317,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                         }),
                       ),
                     ],
-                  ],
-                  const SizedBox(height: 12),
-                  ListTile(
+                    ],
+                    const SizedBox(height: 12),
+                    ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     leading: const Icon(Icons.event_outlined,
@@ -312,14 +334,21 @@ class _TaskEditorState extends State<_TaskEditor> {
                         onPressed: _pickDate,
                         child: Text(dueDate == null ? '选择' : '修改')),
                   ),
-                  if (dueDate != null)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => setState(() => dueDate = null),
-                        child: const Text('清除截止日期'),
+                    if (dueDate != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => setState(() => dueDate = null),
+                          child: const Text('清除截止日期'),
+                        ),
                       ),
-                    ),
+                  ] else if (isInboxEditing) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                        '选择至少一个当前游戏角色后，即可设置周期和截止日期；不选择则继续留在收集箱。',
+                        style:
+                            TextStyle(fontSize: 12, color: AppTheme.muted)),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -367,11 +396,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                         onPressed: assignExisting && existingTask == null
                             ? null
                             : _save,
-                        child: Text(isEditing
-                            ? '保存修改'
-                            : assignExisting
-                                ? '分配任务'
-                                : '创建任务')))
+                        child: Text(saveLabel)))
               ]))));
 
   Widget _characterAction({
@@ -417,13 +442,41 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   Future<void> _save() async {
-    if (selected.isEmpty) return;
-    if (isEditing) {
-      if (titleController.text.trim().isEmpty) return;
+    final title = titleController.text.trim();
+    if (title.isEmpty) return;
+    if (widget.createInInbox) {
+      await widget.state.addInboxTask(
+        title: title,
+        subtasks: _subtasks(),
+        note: noteController.text.trim(),
+      );
+    } else if (isInboxEditing) {
+      if (selected.isEmpty) {
+        await widget.state.updateInboxTask(
+          source: widget.task!,
+          title: title,
+          subtasks: _subtasks(),
+          note: noteController.text.trim(),
+        );
+      } else {
+        await widget.state.assignInboxTask(
+          source: widget.task!,
+          title: title,
+          characterIds: Set.of(selected),
+          frequency: frequency,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          note: noteController.text.trim(),
+        );
+      }
+    } else if (isEditing) {
+      if (selected.isEmpty) return;
       if (widget.syncAll) {
         await widget.state.updateTaskTemplate(
           source: widget.task!,
-          title: titleController.text.trim(),
+          title: title,
           characterIds: Set.of(selected),
           frequency: frequency,
           dueDate: dueDate,
@@ -435,7 +488,7 @@ class _TaskEditorState extends State<_TaskEditor> {
       } else {
         await widget.state.updateTaskRecord(
           source: widget.task!,
-          title: titleController.text.trim(),
+          title: title,
           frequency: frequency,
           dueDate: dueDate,
           targetCount: targetCount,
@@ -445,14 +498,15 @@ class _TaskEditorState extends State<_TaskEditor> {
         );
       }
     } else if (assignExisting) {
+      if (selected.isEmpty) return;
       final task = existingTask;
       if (task == null) return;
       await widget.state.assignExistingTask(
           source: task, characterIds: Set.of(selected));
     } else {
-      if (titleController.text.trim().isEmpty) return;
+      if (selected.isEmpty) return;
       await widget.state.addTask(
-        title: titleController.text.trim(),
+        title: title,
         characterIds: selected.toList(),
         frequency: frequency,
         dueDate: dueDate,

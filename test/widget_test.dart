@@ -173,4 +173,64 @@ void main() {
         store.tasks.firstWhere((task) => task.characterId == 'char-2').subtasks,
         hasLength(2));
   });
+
+  test('inbox tasks stay outside character task lists until assigned',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号一',
+          name: '角色一',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '账号二',
+          name: '角色二',
+          occupation: '冰心',
+          color: 0xff5a78aa,
+        ),
+      ];
+    final state = AppState(store);
+
+    await state.addInboxTask(
+      title: '想做的新任务',
+      subtasks: const [TaskSubtask(id: 'subtask-1', title: '先查攻略')],
+      note: '稍后安排',
+    );
+
+    expect(state.inboxTasks, hasLength(1));
+    expect(state.tasks, isEmpty);
+    expect(state.inboxTasks.single.isInbox, isTrue);
+    expect(state.inboxTasks.single.dueDate, isNull);
+
+    final inboxTask = state.inboxTasks.single;
+    await state.assignInboxTask(
+      source: inboxTask,
+      title: inboxTask.title,
+      characterIds: {'char-1', 'char-2'},
+      frequency: TaskFrequency.weekly,
+      dueDate: DateTime(2026, 9, 20),
+      targetCount: 1,
+      weeklyDays: const [6],
+      subtasks: inboxTask.subtasks,
+      note: inboxTask.note,
+    );
+
+    expect(state.inboxTasks, isEmpty);
+    expect(state.tasks, hasLength(2));
+    expect(state.tasks.map((task) => task.characterId).toSet(),
+        {'char-1', 'char-2'});
+    expect(state.tasks.every((task) => task.frequency == TaskFrequency.weekly),
+        isTrue);
+    expect(state.tasks.every((task) => task.dueDate == DateTime(2026, 9, 20)),
+        isTrue);
+    expect(state.tasks.every((task) => task.subtasks.length == 1), isTrue);
+  });
 }

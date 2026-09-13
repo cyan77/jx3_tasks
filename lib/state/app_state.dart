@@ -52,6 +52,8 @@ class AppState extends ChangeNotifier {
         .where((task) => characterIds.contains(task.characterId))
         .toList();
   }
+  List<TaskRecord> get inboxTasks =>
+      store.tasks.where((task) => task.isInbox).toList();
 
   Character? get selectedCharacter =>
       characters.where((item) => item.id == selectedCharacterId).firstOrNull;
@@ -361,6 +363,84 @@ class AppState extends ChangeNotifier {
           subtasks: subtasks
               .map((item) =>
                   TaskSubtask(id: item.id, title: item.title))
+              .toList(),
+          note: note,
+        )));
+    await _saveDataChange();
+  }
+
+  Future<void> addInboxTask({
+    required String title,
+    List<TaskSubtask> subtasks = const [],
+    String note = '',
+  }) async {
+    final now = DateTime.now();
+    final templateId = 'template-${now.microsecondsSinceEpoch}';
+    store.tasks.add(TaskRecord(
+      id: '$templateId-inbox',
+      templateId: templateId,
+      title: title,
+      characterId: '',
+      frequency: TaskFrequency.once,
+      createdAt: now,
+      subtasks: subtasks
+          .map((item) => TaskSubtask(id: item.id, title: item.title))
+          .toList(),
+      note: note,
+    ));
+    await _saveDataChange();
+  }
+
+  Future<void> updateInboxTask({
+    required TaskRecord source,
+    required String title,
+    List<TaskSubtask> subtasks = const [],
+    String note = '',
+  }) async {
+    final index = store.tasks.indexWhere((task) => task.id == source.id);
+    if (index < 0 || !source.isInbox) return;
+    store.tasks[index] = source.copyWith(
+      title: title,
+      frequency: TaskFrequency.once,
+      clearDueDate: true,
+      targetCount: 1,
+      weeklyDays: const [],
+      subtasks: _mergeSubtasks(source.subtasks, subtasks),
+      note: note,
+    );
+    await _saveDataChange();
+  }
+
+  Future<void> assignInboxTask({
+    required TaskRecord source,
+    required String title,
+    required Set<String> characterIds,
+    required TaskFrequency frequency,
+    DateTime? dueDate,
+    required int targetCount,
+    List<int> weeklyDays = const [],
+    List<TaskSubtask> subtasks = const [],
+    String note = '',
+  }) async {
+    if (!source.isInbox || characterIds.isEmpty) return;
+    final validCharacterIds = characters
+        .map((character) => character.id)
+        .where(characterIds.contains)
+        .toList();
+    if (validCharacterIds.isEmpty) return;
+    store.tasks.removeWhere((task) => task.id == source.id);
+    store.tasks.addAll(validCharacterIds.map((characterId) => TaskRecord(
+          id: '${source.templateId}-$characterId',
+          templateId: source.templateId,
+          title: title,
+          characterId: characterId,
+          frequency: frequency,
+          createdAt: source.createdAt,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: [...weeklyDays],
+          subtasks: subtasks
+              .map((item) => TaskSubtask(id: item.id, title: item.title))
               .toList(),
           note: note,
         )));

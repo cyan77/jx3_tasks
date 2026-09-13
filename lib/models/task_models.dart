@@ -161,6 +161,8 @@ class TaskRecord {
   final List<TaskSubtask> subtasks;
   final String note;
 
+  bool get isInbox => characterId.isEmpty;
+
   bool get isCountTask =>
       frequency == TaskFrequency.weeklyCount ||
       frequency == TaskFrequency.monthlyCount;
