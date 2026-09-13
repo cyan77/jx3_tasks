@@ -5,15 +5,48 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/common.dart';
 
-class MatrixScreen extends StatelessWidget {
+class MatrixScreen extends StatefulWidget {
   const MatrixScreen({required this.state, super.key});
   final AppState state;
 
   @override
+  State<MatrixScreen> createState() => _MatrixScreenState();
+}
+
+class _MatrixScreenState extends State<MatrixScreen> {
+  final searchController = TextEditingController();
+  String query = '';
+
+  AppState get state => widget.state;
+
+  @override
   Widget build(BuildContext context) {
-    final titles = state.tasks.map((task) => task.title).toSet().toList();
+    final templates = <String, List<TaskRecord>>{};
+    for (final task in state.tasks) {
+      templates.putIfAbsent(task.templateId, () => []).add(task);
+    }
+    final visibleTemplates = templates.values
+        .where((tasks) => query.isEmpty ||
+            tasks.any((task) =>
+                task.title.toLowerCase().contains(query.toLowerCase())))
+        .toList()
+      ..sort((a, b) => a.first.title.compareTo(b.first.title));
     return Column(children: [
-      PageHeader(title: '任务', subtitle: '横向查看每个角色的完成情况'),
+      PageHeader(
+        title: '任务',
+        subtitle: '横向查看每个角色的完成情况',
+        action: SizedBox(
+          width: 230,
+          child: TextField(
+            controller: searchController,
+            onChanged: (value) => setState(() => query = value.trim()),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search, size: 18),
+              hintText: '搜索任务',
+            ),
+          ),
+        ),
+      ),
       Expanded(
           child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -38,16 +71,18 @@ class MatrixScreen extends StatelessWidget {
                               Text(character.name)
                             ])))
                       ],
-                      rows: titles
-                          .map((title) => DataRow(cells: [
-                                DataCell(Text(title,
+                      rows: visibleTemplates
+                          .map((templateTasks) => DataRow(cells: [
+                                DataCell(Text(templateTasks.first.title,
                                     style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600))),
                                 ...state.characters.map((character) {
                                   final task = state
                                       .tasksForCharacter(character.id)
-                                      .where((item) => item.title == title)
+                                      .where((item) =>
+                                          item.templateId ==
+                                          templateTasks.first.templateId)
                                       .firstOrNull;
                                   final done = task != null &&
                                       (task.isCountTask
@@ -90,5 +125,11 @@ class MatrixScreen extends StatelessWidget {
                               ]))
                           .toList()))))
     ]);
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 }

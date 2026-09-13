@@ -38,6 +38,7 @@ class LocalStore {
         .map((item) =>
             TaskRecord.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
+    _migrateInboxGames();
   }
 
   Future<void> save() async {
@@ -52,7 +53,7 @@ class LocalStore {
 
   String exportJson() {
     final payload = {
-      'schemaVersion': 1,
+      'schemaVersion': 2,
       'app': 'JX3 Tasks',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'games': games.map((item) => item.toJson()).toList(),
@@ -84,7 +85,17 @@ class LocalStore {
         .map((item) =>
             TaskRecord.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
+    _migrateInboxGames();
     await save();
+  }
+
+  void _migrateInboxGames() {
+    final defaultGameId = games.first.id;
+    tasks = tasks
+        .map((task) => task.isInbox && task.inboxGameId == null
+            ? task.copyWith(inboxGameId: defaultGameId)
+            : task)
+        .toList();
   }
 
   void _loadDemoData() {

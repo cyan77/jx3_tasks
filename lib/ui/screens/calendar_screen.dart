@@ -107,10 +107,7 @@ class _CalendarGrid extends StatelessWidget {
       final dateTasks = (state.selectedCharacterId == null
               ? state.tasks
               : state.selectedTasks)
-          .where((task) =>
-              task.frequency == TaskFrequency.once &&
-              task.dueDate != null &&
-              dateKey(task.dueDate!) == dateKey(date))
+          .where((task) => task.isScheduledOn(date))
           .toList();
       final done = (state.selectedCharacterId == null
               ? state.tasks
@@ -196,12 +193,7 @@ class _DayTasks extends StatelessWidget {
     final source =
         state.selectedCharacterId == null ? state.tasks : state.selectedTasks;
     final tasks = source.where((task) {
-      if (task.isDoneOn(date)) return true;
-      if (task.frequency == TaskFrequency.once) {
-        return task.dueDate != null &&
-            dateKey(task.dueDate!) == dateKey(date);
-      }
-      return true;
+      return task.isDoneOn(date) || task.isScheduledOn(date);
     }).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,9 +251,15 @@ class _InteractiveTaskTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showDueDate)
-            Text(dueLabel(task.dueDate),
-                style:
-                    const TextStyle(fontSize: 12, color: AppTheme.muted)),
+            Text(
+              _deadlineLabel(task),
+              style: TextStyle(
+                fontSize: 12,
+                color: _isOverdue(task)
+                    ? const Color(0xffb94a48)
+                    : AppTheme.muted,
+              ),
+            ),
           PopupMenuButton<String>(
             tooltip: '编辑任务',
             icon: const Icon(Icons.edit_outlined, size: 18),
@@ -298,7 +296,8 @@ class _Upcoming extends StatelessWidget {
     final tasks = (state.selectedCharacterId == null
             ? state.tasks
             : state.selectedTasks)
-        .where((task) => task.dueDate != null)
+        .where((task) =>
+            task.dueDate != null && !task.isCompletedOn(DateTime.now()))
         .toList()
       ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
     return Column(
@@ -319,3 +318,11 @@ class _Upcoming extends StatelessWidget {
     );
   }
 }
+
+bool _isOverdue(TaskRecord task) => task.dueDate != null &&
+    startOfDay(task.dueDate!).isBefore(startOfDay(DateTime.now())) &&
+    !task.isCompletedOn(DateTime.now());
+
+String _deadlineLabel(TaskRecord task) => _isOverdue(task)
+    ? '${task.dueDate!.month}/${task.dueDate!.day} 已逾期'
+    : dueLabel(task.dueDate);

@@ -11,26 +11,43 @@ class PageHeader extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-                child: Column(
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final heading = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(subtitle!,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.muted)),
+              ],
+            ],
+          );
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+            child: compact
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(subtitle!,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.muted))
-                  ]
-                ])),
-            if (action != null) action!,
-          ],
-        ),
+                      heading,
+                      if (action != null) ...[
+                        const SizedBox(height: 12),
+                        action!,
+                      ],
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(child: heading),
+                      if (action != null) action!,
+                    ],
+                  ),
+          );
+        },
       );
 }
 

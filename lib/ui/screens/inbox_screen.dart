@@ -22,7 +22,8 @@ class InboxScreen extends StatelessWidget {
           children: [
             PageHeader(
               title: '收集箱',
-              subtitle: '先记下来，之后再分配角色、设置周期和截止日期',
+              subtitle:
+                  '${state.selectedGame?.name ?? '当前游戏'} · 先记下来，之后再分配角色、设置周期和截止日期',
               action: FilledButton.icon(
                 onPressed: () =>
                     showTaskEditor(context, state, createInInbox: true),

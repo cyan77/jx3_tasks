@@ -60,6 +60,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   int subtaskSequence = 0;
   bool assignExisting = false;
   String? existingTemplateId;
+  String? validationMessage;
 
   bool get isEditing => widget.task != null;
   bool get isInboxEditing => widget.task?.isInbox ?? false;
@@ -212,10 +213,16 @@ class _TaskEditorState extends State<_TaskEditor> {
                 ] else
                   TextField(
                       controller: titleController,
-                      autofocus: true,
+                      autofocus: !isEditing,
                       decoration: const InputDecoration(
                           labelText: '任务名称',
                           hintText: '例如：大战、茶馆、门派周常')),
+                if (validationMessage != null) ...[
+                  const SizedBox(height: 9),
+                  Text(validationMessage!,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xffb94a48))),
+                ],
                 if (!widget.createInInbox &&
                     (!isEditing || widget.syncAll || isInboxEditing)) ...[
                   const SizedBox(height: 18),
@@ -294,14 +301,20 @@ class _TaskEditorState extends State<_TaskEditor> {
                           icon:
                               const Icon(Icons.add_circle_outline, size: 19))
                     ]),
-                    if (frequency == TaskFrequency.weeklyCount) ...[
+                    ],
+                    if (frequency == TaskFrequency.weekly ||
+                        frequency == TaskFrequency.weeklyCount) ...[
                       const SizedBox(height: 10),
-                      const Text('可选日期（不选则本周任意几天完成）',
-                          style:
-                              TextStyle(fontSize: 12, color: AppTheme.muted)),
+                      Text(
+                          frequency == TaskFrequency.weekly
+                              ? '每周在哪几天显示（不选则按创建当天）'
+                              : '计划完成日期（不选则本周任意几天完成）',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppTheme.muted)),
                       const SizedBox(height: 7),
                       Wrap(
                         spacing: 6,
+                        runSpacing: 6,
                         children: List.generate(7, (index) {
                           final day = index + 1;
                           const labels = ['一', '二', '三', '四', '五', '六', '日'];
@@ -316,7 +329,6 @@ class _TaskEditorState extends State<_TaskEditor> {
                           );
                         }),
                       ),
-                    ],
                     ],
                     const SizedBox(height: 12),
                     ListTile(
@@ -390,6 +402,38 @@ class _TaskEditorState extends State<_TaskEditor> {
                     decoration: const InputDecoration(labelText: '备注（可选）')),
                 ],
                 const SizedBox(height: 18),
+                if (isEditing) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: _deleteTask,
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xffb94a48),
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(widget.syncAll
+                              ? '删除所有角色任务'
+                              : '删除任务'),
+                        ),
+                      ),
+                      if (!isInboxEditing) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _moveToInbox,
+                            icon: const Icon(Icons.move_to_inbox_outlined,
+                                size: 18),
+                            label: Text(widget.syncAll
+                                ? '全部移到收集箱'
+                                : '移到收集箱'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                     width: double.infinity,
                     child: FilledButton(
@@ -442,8 +486,27 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   Future<void> _save() async {
+    if (assignExisting) {
+      final task = existingTask;
+      if (task == null) {
+        _showValidation('请选择一个已有任务');
+        return;
+      }
+      if (selected.isEmpty) {
+        _showValidation('请至少选择一个尚未分配的角色');
+        return;
+      }
+      await widget.state.assignExistingTask(
+          source: task, characterIds: Set.of(selected));
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
     final title = titleController.text.trim();
-    if (title.isEmpty) return;
+    if (title.isEmpty) {
+      _showValidation('请填写任务名称');
+      return;
+    }
     if (widget.createInInbox) {
       await widget.state.addInboxTask(
         title: title,
@@ -472,7 +535,10 @@ class _TaskEditorState extends State<_TaskEditor> {
         );
       }
     } else if (isEditing) {
-      if (selected.isEmpty) return;
+      if (selected.isEmpty) {
+        _showValidation('请至少选择一个角色');
+        return;
+      }
       if (widget.syncAll) {
         await widget.state.updateTaskTemplate(
           source: widget.task!,
@@ -497,14 +563,11 @@ class _TaskEditorState extends State<_TaskEditor> {
           note: noteController.text.trim(),
         );
       }
-    } else if (assignExisting) {
-      if (selected.isEmpty) return;
-      final task = existingTask;
-      if (task == null) return;
-      await widget.state.assignExistingTask(
-          source: task, characterIds: Set.of(selected));
     } else {
-      if (selected.isEmpty) return;
+      if (selected.isEmpty) {
+        _showValidation('请至少选择一个角色');
+        return;
+      }
       await widget.state.addTask(
         title: title,
         characterIds: selected.toList(),
@@ -515,6 +578,70 @@ class _TaskEditorState extends State<_TaskEditor> {
         subtasks: _subtasks(),
         note: noteController.text.trim());
     }
+    if (mounted) Navigator.pop(context);
+  }
+
+  void _showValidation(String message) {
+    if (!mounted) return;
+    setState(() => validationMessage = message);
+  }
+
+  Future<void> _deleteTask() async {
+    final task = widget.task;
+    if (task == null) return;
+    final allLinked = widget.syncAll && !task.isInbox;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除任务？'),
+        content: Text(allLinked
+            ? '将删除所有已分配角色的“${task.title}”，完成记录也会一并删除。'
+            : '将删除“${task.title}”，完成记录也会一并删除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xffb94a48),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.state.deleteTask(task, allLinked: allLinked);
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _moveToInbox() async {
+    final task = widget.task;
+    if (task == null || task.isInbox) return;
+    final allLinked = widget.syncAll;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('移到收集箱？'),
+        content: Text(allLinked
+            ? '所有已分配角色的“${task.title}”将合并为一条收集箱任务，原有计划和完成记录会清除。'
+            : '“${task.title}”将取消当前角色的分配并进入收集箱，原有计划和完成记录会清除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('移到收集箱'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.state.moveTaskToInbox(task, allLinked: allLinked);
     if (mounted) Navigator.pop(context);
   }
 
