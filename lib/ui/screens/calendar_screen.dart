@@ -18,7 +18,7 @@ class CalendarScreen extends StatelessWidget {
     final leading = firstDay.weekday - 1;
     return Column(
       children: [
-        PageHeader(title: '日历 / 时间线', subtitle: '按日期查看任务安排'),
+        const PageHeader(title: '日历 / 时间线', subtitle: '按日期查看任务安排'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(

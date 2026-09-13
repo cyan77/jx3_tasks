@@ -860,8 +860,9 @@ class AppState extends ChangeNotifier {
         store.characters.indexWhere((item) => item.id == character.id);
     if (index < 0) return;
     store.characters[index] = character.copyWith(archived: true);
-    if (selectedCharacterId == character.id)
+    if (selectedCharacterId == character.id) {
       selectedCharacterId = characters.firstOrNull?.id;
+    }
     await _saveDataChange();
   }
 

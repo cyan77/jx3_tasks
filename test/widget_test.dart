@@ -426,7 +426,7 @@ void main() {
   test('inbox and archived characters respect game and can be restored',
       () async {
     SharedPreferences.setMockInitialValues({});
-    final archived = const Character(
+    const archived = Character(
       id: 'char-archived',
       gameId: 'game-jx3',
       account: '账号',

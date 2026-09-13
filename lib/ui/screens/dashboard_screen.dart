@@ -121,9 +121,9 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 26),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: SectionTitle('周期任务',
+                child: const SectionTitle('周期任务',
                     trailing: Text('按当前周期',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12, color: AppTheme.muted)))),
             const SizedBox(height: 8),
             Padding(
@@ -284,12 +284,13 @@ class _TaskList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tasks.isEmpty)
+    if (tasks.isEmpty) {
       return Container(
           padding: const EdgeInsets.symmetric(vertical: 22),
           alignment: Alignment.center,
           child: const Text('暂无任务，今天可以轻松一点',
               style: TextStyle(fontSize: 12, color: AppTheme.muted)));
+    }
     return Container(
       decoration: BoxDecoration(
           border: Border.all(color: AppTheme.line),
