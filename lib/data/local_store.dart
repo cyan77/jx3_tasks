@@ -138,28 +138,28 @@ class LocalStore {
           account: '',
           name: '奶歌',
           occupation: '奶歌',
-          color: 0xff2f7d72),
+          color: 0xff3c8c72),
       Character(
           id: 'char-2',
           gameId: 'game-jx3',
           account: '',
           name: '花间',
           occupation: '花间',
-          color: 0xff5a78aa),
+          color: 0xff66a892),
       Character(
           id: 'char-3',
           gameId: 'game-jx3',
           account: '',
           name: '苍云',
           occupation: '苍云',
-          color: 0xff8b6e54),
+          color: 0xff7fae9e),
       Character(
           id: 'char-4',
           gameId: 'game-jx3',
           account: '',
           name: '丐帮',
           occupation: '丐帮',
-          color: 0xff98734a),
+          color: 0xff4f796c),
     ];
     tasks = [
       TaskRecord(
