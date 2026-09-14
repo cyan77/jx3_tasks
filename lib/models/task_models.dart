@@ -11,13 +11,29 @@ extension TaskFrequencyLabel on TaskFrequency {
       };
 }
 
-enum MetadataFieldType { text, number, choice }
+enum MetadataFieldType {
+  text,
+  multiline,
+  number,
+  choice,
+  multiChoice,
+  boolean,
+  date,
+  time,
+  url,
+}
 
 extension MetadataFieldTypeLabel on MetadataFieldType {
   String get label => switch (this) {
-        MetadataFieldType.text => '文本',
+        MetadataFieldType.text => '单行文本',
+        MetadataFieldType.multiline => '长文本',
         MetadataFieldType.number => '数字',
-        MetadataFieldType.choice => '选项',
+        MetadataFieldType.choice => '单选',
+        MetadataFieldType.multiChoice => '多选',
+        MetadataFieldType.boolean => '开关',
+        MetadataFieldType.date => '日期',
+        MetadataFieldType.time => '时间',
+        MetadataFieldType.url => '链接',
       };
 }
 
@@ -136,7 +152,13 @@ class Character {
   String metadataSummary(Game game) => game.metadataFields
       .map((field) {
         final value = metadataValues[field.id]?.trim() ?? '';
-        return value.isEmpty ? '' : '${field.name}：$value';
+        if (value.isEmpty) return '';
+        final display = field.type == MetadataFieldType.boolean
+            ? (value == 'true' ? '是' : '否')
+            : field.type == MetadataFieldType.multiChoice
+                ? value.split('\\n').where((item) => item.isNotEmpty).join('、')
+                : value;
+        return '${field.name}：$display';
       })
       .where((value) => value.isNotEmpty)
       .join(' · ');

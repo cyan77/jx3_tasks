@@ -791,6 +791,8 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   final accountController = TextEditingController();
   final controllers = <String, TextEditingController>{};
   final choiceValues = <String, String?>{};
+  final multiValues = <String, Set<String>>{};
+  final booleanValues = <String, bool>{};
   String? selectedGameId;
   String? validationMessage;
 
@@ -810,14 +812,36 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   }
 
   void _prepareFields() {
-    final values = widget.character?.metadataValues ?? const <String, String>{};
-    for (final field in selectedGame?.metadataFields ?? const <GameMetadataField>[]) {
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    controllers.clear();
+    choiceValues.clear();
+    multiValues.clear();
+    booleanValues.clear();
+    final values = selectedGameId == widget.character?.gameId
+        ? widget.character?.metadataValues ?? const <String, String>{}
+        : const <String, String>{};
+    for (final field in selectedGame?.metadataFields ??
+        const <GameMetadataField>[]) {
       final value = values[field.id] ?? '';
-      if (field.type == MetadataFieldType.choice) {
-        choiceValues[field.id] = field.options.contains(value) ? value : null;
-      } else {
-        controllers.putIfAbsent(field.id, () => TextEditingController())
-          ..text = value;
+      switch (field.type) {
+        case MetadataFieldType.choice:
+          choiceValues[field.id] =
+              field.options.contains(value) ? value : null;
+          break;
+        case MetadataFieldType.multiChoice:
+          multiValues[field.id] = value
+              .split('\n')
+              .where(field.options.contains)
+              .toSet();
+          break;
+        case MetadataFieldType.boolean:
+          booleanValues[field.id] = value == 'true';
+          break;
+        default:
+          controllers[field.id] = TextEditingController(text: value);
+          break;
       }
     }
   }
@@ -827,79 +851,55 @@ class _CharacterEditorState extends State<_CharacterEditor> {
         title: Text(widget.character == null ? '添加角色' : '编辑角色',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         content: SizedBox(
-          width: 430,
+          width: 460,
           child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                      labelText: '角色名称', hintText: '例如：奶歌')),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: accountController,
-                  decoration: const InputDecoration(
-                      labelText: '账号', hintText: '例如：主账号 / 小号账号')),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: selectedGameId,
-                decoration: const InputDecoration(labelText: '所属游戏'),
-                items: widget.state.games
-                    .map((game) => DropdownMenuItem(
-                          value: game.id,
-                          child: Text(game.name),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    selectedGameId = value;
-                    _prepareFields();
-                  });
-                },
-              ),
-              for (final field in selectedGame?.metadataFields ??
-                  const <GameMetadataField>[]) ...[
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                        labelText: '角色名称', hintText: '例如：奶歌')),
                 const SizedBox(height: 12),
-                if (field.type == MetadataFieldType.choice)
-                  DropdownButtonFormField<String?>(
-                    initialValue: choiceValues[field.id],
-                    decoration: InputDecoration(labelText: field.name),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                          value: null, child: Text('未设置')),
-                      ...field.options.map((option) =>
-                          DropdownMenuItem<String?>(
-                              value: option, child: Text(option))),
-                    ],
-                    onChanged: (value) =>
-                        setState(() => choiceValues[field.id] = value),
-                  )
-                else
-                  TextField(
-                    controller: controllers.putIfAbsent(
-                        field.id, () => TextEditingController()),
-                    keyboardType: field.type == MetadataFieldType.number
-                        ? const TextInputType.numberWithOptions(decimal: true)
-                        : TextInputType.text,
-                    decoration: InputDecoration(
-                      labelText: field.name,
-                      hintText: field.type == MetadataFieldType.number
-                          ? '请输入数字'
-                          : null,
-                    ),
-                  ),
-              ],
-              if (validationMessage != null) ...[
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(validationMessage!,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xffb94a48))),
+                TextField(
+                    controller: accountController,
+                    decoration: const InputDecoration(
+                        labelText: '账号', hintText: '例如：主账号 / 小号账号')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedGameId,
+                  decoration: const InputDecoration(labelText: '所属游戏'),
+                  items: widget.state.games
+                      .map((game) => DropdownMenuItem(
+                            value: game.id,
+                            child: Text(game.name),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      selectedGameId = value;
+                      _prepareFields();
+                    });
+                  },
                 ),
+                for (final field in selectedGame?.metadataFields ??
+                    const <GameMetadataField>[]) ...[
+                  const SizedBox(height: 12),
+                  _fieldEditor(field),
+                ],
+                if (validationMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(validationMessage!,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xffb94a48))),
+                  ),
+                ],
               ],
-            ]),
+            ),
           ),
         ),
         actions: [
@@ -909,6 +909,149 @@ class _CharacterEditorState extends State<_CharacterEditor> {
           FilledButton(onPressed: _save, child: const Text('保存')),
         ],
       );
+
+  Widget _fieldEditor(GameMetadataField field) {
+    switch (field.type) {
+      case MetadataFieldType.choice:
+        return DropdownButtonFormField<String?>(
+          initialValue: choiceValues[field.id],
+          decoration: InputDecoration(labelText: field.name),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('未设置')),
+            ...field.options.map((option) => DropdownMenuItem<String?>(
+                  value: option,
+                  child: Text(option),
+                )),
+          ],
+          onChanged: (value) =>
+              setState(() => choiceValues[field.id] = value),
+        );
+      case MetadataFieldType.multiChoice:
+        final selected = multiValues.putIfAbsent(field.id, () => <String>{});
+        return InputDecorator(
+          decoration: InputDecoration(labelText: field.name),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: field.options
+                .map((option) => FilterChip(
+                      label: Text(option),
+                      selected: selected.contains(option),
+                      onSelected: (enabled) => setState(() {
+                        if (enabled) {
+                          selected.add(option);
+                        } else {
+                          selected.remove(option);
+                        }
+                      }),
+                    ))
+                .toList(),
+          ),
+        );
+      case MetadataFieldType.boolean:
+        return SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(field.name, style: const TextStyle(fontSize: 13)),
+          value: booleanValues[field.id] ?? false,
+          onChanged: (value) =>
+              setState(() => booleanValues[field.id] = value),
+        );
+      case MetadataFieldType.date:
+        return _pickerField(
+          field,
+          icon: Icons.calendar_today_outlined,
+          hint: '未设置日期',
+          onPressed: () => _pickDate(field),
+        );
+      case MetadataFieldType.time:
+        return _pickerField(
+          field,
+          icon: Icons.schedule_outlined,
+          hint: '未设置时间',
+          onPressed: () => _pickTime(field),
+        );
+      case MetadataFieldType.multiline:
+        return TextField(
+          controller: controllers[field.id],
+          minLines: 3,
+          maxLines: 6,
+          decoration: InputDecoration(labelText: field.name),
+        );
+      case MetadataFieldType.number:
+        return TextField(
+          controller: controllers[field.id],
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration:
+              InputDecoration(labelText: field.name, hintText: '请输入数字'),
+        );
+      case MetadataFieldType.url:
+        return TextField(
+          controller: controllers[field.id],
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+              labelText: field.name, hintText: 'https://example.com'),
+        );
+      case MetadataFieldType.text:
+        return TextField(
+          controller: controllers[field.id],
+          decoration: InputDecoration(labelText: field.name),
+        );
+    }
+  }
+
+  Widget _pickerField(
+    GameMetadataField field, {
+    required IconData icon,
+    required String hint,
+    required VoidCallback onPressed,
+  }) {
+    final value = controllers[field.id]?.text ?? '';
+    return InputDecorator(
+      decoration: InputDecoration(labelText: field.name),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(value.isEmpty ? hint : value)),
+          TextButton(onPressed: onPressed, child: const Text('选择')),
+          if (value.isNotEmpty)
+            IconButton(
+              tooltip: '清除',
+              onPressed: () => setState(() => controllers[field.id]?.clear()),
+              icon: const Icon(Icons.close, size: 17),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDate(GameMetadataField field) async {
+    final controller = controllers[field.id]!;
+    final initial = DateTime.tryParse(controller.text) ?? DateTime.now();
+    final value = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (value != null) setState(() => controller.text = dateKey(value));
+  }
+
+  Future<void> _pickTime(GameMetadataField field) async {
+    final controller = controllers[field.id]!;
+    final parts = controller.text.split(':');
+    final initial = parts.length == 2
+        ? TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 0,
+            minute: int.tryParse(parts[1]) ?? 0)
+        : TimeOfDay.now();
+    final value =
+        await showTimePicker(context: context, initialTime: initial);
+    if (value != null) {
+      setState(() => controller.text =
+          '${twoDigits(value.hour)}:${twoDigits(value.minute)}');
+    }
+  }
 
   Future<void> _save() async {
     final name = nameController.text.trim();
@@ -920,14 +1063,26 @@ class _CharacterEditorState extends State<_CharacterEditor> {
     final values = <String, String>{};
     for (final field in selectedGame?.metadataFields ??
         const <GameMetadataField>[]) {
-      final value = field.type == MetadataFieldType.choice
-          ? choiceValues[field.id] ?? ''
-          : controllers[field.id]?.text.trim() ?? '';
+      final value = switch (field.type) {
+        MetadataFieldType.choice => choiceValues[field.id] ?? '',
+        MetadataFieldType.multiChoice =>
+          (multiValues[field.id] ?? const <String>{}).join('\n'),
+        MetadataFieldType.boolean =>
+          (booleanValues[field.id] ?? false).toString(),
+        _ => controllers[field.id]?.text.trim() ?? '',
+      };
       if (field.type == MetadataFieldType.number &&
           value.isNotEmpty &&
           num.tryParse(value) == null) {
         setState(() => validationMessage = '“${field.name}”需要填写数字');
         return;
+      }
+      if (field.type == MetadataFieldType.url && value.isNotEmpty) {
+        final uri = Uri.tryParse(value);
+        if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+          setState(() => validationMessage = '“${field.name}”需要填写完整链接');
+          return;
+        }
       }
       if (value.isNotEmpty) values[field.id] = value;
     }
