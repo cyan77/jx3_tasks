@@ -56,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _SettingCard(
                       icon: Icons.sports_esports_outlined,
                       title: '游戏管理',
-                      subtitle: '添加、编辑或删除游戏分类',
+                      subtitle: '添加、编辑游戏，并设置每日任务截止时间',
                       onTap: () =>
                           _open(context, GameManagementScreen(state: state)),
                     ),

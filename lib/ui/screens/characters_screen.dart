@@ -380,7 +380,7 @@ class _CharacterCard extends StatelessWidget {
     final tasks = state.store.tasks
         .where((task) => task.characterId == character.id)
         .toList();
-    final week = startOfWeek(DateTime.now());
+    final week = startOfWeek(game.taskDayAt(DateTime.now()));
     final progress =
         state.progressFor(tasks, week, week.add(const Duration(days: 7)));
 

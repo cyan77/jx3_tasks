@@ -19,6 +19,7 @@ class AppState extends ChangeNotifier {
   Timer? _autoSyncTimer;
   Timer? _changeSyncTimer;
   Timer? _backupCheckRetryTimer;
+  Timer? _taskDayTimer;
   Completer<void>? _syncCompleter;
   SyncConfig? _syncConfig;
   DateTime? _lastSyncAt;
@@ -27,6 +28,7 @@ class AppState extends ChangeNotifier {
   int _successfulSyncGeneration = 0;
   int _dataRevision = 0;
   int _syncedRevision = 0;
+  bool _taskDayClockStarted = false;
   bool syncBusy = false;
   bool restoreBusy = false;
   bool backupCheckBusy = false;
@@ -40,10 +42,35 @@ class AppState extends ChangeNotifier {
   List<Game> get games => store.games;
   Game? get selectedGame =>
       games.where((item) => item.id == selectedGameId).firstOrNull;
+  DateTime get currentTaskDate {
+    final now = DateTime.now();
+    return selectedGame?.taskDayAt(now) ?? startOfDay(now);
+  }
   bool get isSyncConfigured => _syncConfig?.isValid ?? false;
   SyncConfig? get syncConfig => _syncConfig;
   DateTime? get lastSyncAt => _lastSyncAt;
   RemoteBackup? get newerRemoteBackup => _newerRemoteBackup;
+
+  Game? gameForTask(TaskRecord task) {
+    final gameId = task.isInbox
+        ? task.inboxGameId
+        : store.characters
+            .where((character) => character.id == task.characterId)
+            .firstOrNull
+            ?.gameId;
+    return games.where((game) => game.id == gameId).firstOrNull;
+  }
+
+  DateTime taskDateFor(TaskRecord task, [DateTime? moment]) {
+    final timestamp = moment ?? DateTime.now();
+    return (gameForTask(task) ?? selectedGame)?.taskDayAt(timestamp) ??
+        startOfDay(timestamp);
+  }
+
+  bool isTaskScheduledOn(TaskRecord task, DateTime date) => task.isScheduledOn(
+        date,
+        dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
+      );
   List<Character> get characters => store.characters
       .where((item) => item.gameId == selectedGameId && !item.archived)
       .toList();
@@ -95,11 +122,26 @@ class AppState extends ChangeNotifier {
       tasks.where((task) => task.characterId == characterId).toList();
 
   List<TaskRecord> tasksForTemplate(String templateId) =>
-      tasks.where((task) => task.templateId == templateId).toList();
+      store.tasks
+          .where((task) =>
+              !task.isInbox && task.templateId == templateId)
+          .toList();
 
   List<TaskRecord> get selectedTasks => selectedCharacterId == null
       ? const []
       : tasksForCharacter(selectedCharacterId!);
+
+  List<TaskRecord> calendarTasks({String? gameId}) {
+    final characterIds = store.characters
+        .where((character) =>
+            !character.archived &&
+            (gameId == null || character.gameId == gameId))
+        .map((character) => character.id)
+        .toSet();
+    return store.tasks
+        .where((task) => characterIds.contains(task.characterId))
+        .toList();
+  }
 
   String exportBackup() => store.exportJson();
 
@@ -156,6 +198,43 @@ class AppState extends ChangeNotifier {
       Duration(minutes: config.autoSyncMinutes),
       (_) => checkAutoSync(),
     );
+  }
+
+  void _scheduleTaskDayRefresh() {
+    _taskDayTimer?.cancel();
+    if (!_taskDayClockStarted || games.isEmpty) return;
+    final now = DateTime.now();
+    DateTime? nextReset;
+    for (final game in games) {
+      final hour = game.dailyResetMinutes ~/ 60;
+      final minute = game.dailyResetMinutes % 60;
+      var candidate = DateTime(now.year, now.month, now.day, hour, minute);
+      if (!candidate.isAfter(now)) {
+        candidate =
+            DateTime(now.year, now.month, now.day + 1, hour, minute);
+      }
+      if (nextReset == null || candidate.isBefore(nextReset)) {
+        nextReset = candidate;
+      }
+    }
+    _taskDayTimer = Timer(
+      nextReset!.difference(now) + const Duration(seconds: 1),
+      () {
+        notifyListeners();
+        _scheduleTaskDayRefresh();
+      },
+    );
+  }
+
+  void startTaskDayClock() {
+    _taskDayClockStarted = true;
+    _scheduleTaskDayRefresh();
+  }
+
+  void refreshTaskDayClock() {
+    if (!_taskDayClockStarted) return;
+    notifyListeners();
+    _scheduleTaskDayRefresh();
   }
 
   Future<void> checkForNewerBackupWithRetry() async {
@@ -305,6 +384,7 @@ class AppState extends ChangeNotifier {
     await store.importJson(raw);
     selectedGameId = games.firstOrNull?.id;
     selectedCharacterId = characters.firstOrNull?.id;
+    _scheduleTaskDayRefresh();
     if (markAsLocalChange) {
       _dataRevision++;
       _newerRemoteBackup = null;
@@ -314,7 +394,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> toggleTask(TaskRecord task, {DateTime? date}) async {
-    final targetDate = date ?? DateTime.now();
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
     final key = dateKey(targetDate);
     final index = store.tasks.indexWhere((item) => item.id == task.id);
     if (index < 0) return;
@@ -349,7 +429,7 @@ class AppState extends ChangeNotifier {
     TaskSubtask subtask, {
     DateTime? date,
   }) async {
-    final targetDate = date ?? DateTime.now();
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
     final key = dateKey(targetDate);
     final taskIndex = store.tasks.indexWhere((item) => item.id == task.id);
     if (taskIndex < 0) return;
@@ -488,6 +568,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> addInboxTask({
     required String title,
+    TaskFrequency? frequency,
+    DateTime? dueDate,
+    int targetCount = 1,
+    List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     String note = '',
   }) async {
@@ -498,13 +582,17 @@ class AppState extends ChangeNotifier {
       templateId: templateId,
       title: title,
       characterId: '',
-      frequency: TaskFrequency.once,
+      frequency: frequency ?? TaskFrequency.once,
       createdAt: now,
+      dueDate: dueDate,
+      targetCount: frequency == null ? 1 : targetCount,
+      weeklyDays: frequency == null ? const [] : [...weeklyDays],
       subtasks: subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
       note: note,
       inboxGameId: selectedGameId,
+      inboxFrequencySet: frequency != null,
     ));
     await _saveDataChange();
   }
@@ -512,6 +600,10 @@ class AppState extends ChangeNotifier {
   Future<void> updateInboxTask({
     required TaskRecord source,
     required String title,
+    TaskFrequency? frequency,
+    DateTime? dueDate,
+    int targetCount = 1,
+    List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     String note = '',
   }) async {
@@ -519,12 +611,14 @@ class AppState extends ChangeNotifier {
     if (index < 0 || !source.isInbox) return;
     store.tasks[index] = source.copyWith(
       title: title,
-      frequency: TaskFrequency.once,
-      clearDueDate: true,
-      targetCount: 1,
-      weeklyDays: const [],
+      frequency: frequency ?? TaskFrequency.once,
+      dueDate: dueDate,
+      clearDueDate: dueDate == null,
+      targetCount: frequency == null ? 1 : targetCount,
+      weeklyDays: frequency == null ? const [] : [...weeklyDays],
       subtasks: _mergeSubtasks(source.subtasks, subtasks),
       note: note,
+      inboxFrequencySet: frequency != null,
     );
     await _saveDataChange();
   }
@@ -720,13 +814,17 @@ class AppState extends ChangeNotifier {
       templateId: templateId,
       title: source.title,
       characterId: '',
-      frequency: TaskFrequency.once,
-      createdAt: now,
+      frequency: source.frequency,
+      createdAt: source.createdAt,
+      dueDate: source.dueDate,
+      targetCount: source.targetCount,
+      weeklyDays: [...source.weeklyDays],
       subtasks: source.subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
       note: source.note,
       inboxGameId: sourceGameId ?? selectedGameId,
+      inboxFrequencySet: true,
     ));
     await _saveDataChange();
   }
@@ -782,10 +880,11 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
-  Future<void> addGame(String name) async {
+  Future<void> addGame(String name, {int dailyResetMinutes = 0}) async {
     final game = Game(
       id: 'game-${DateTime.now().microsecondsSinceEpoch}',
       name: name,
+      dailyResetMinutes: dailyResetMinutes,
       color: const [
         0xff2f7d72,
         0xff5a78aa,
@@ -796,13 +895,22 @@ class AppState extends ChangeNotifier {
     store.games.add(game);
     selectedGameId = game.id;
     selectedCharacterId = null;
+    _scheduleTaskDayRefresh();
     await _saveDataChange();
   }
 
-  Future<void> updateGame(Game game, String name) async {
+  Future<void> updateGame(
+    Game game,
+    String name, {
+    required int dailyResetMinutes,
+  }) async {
     final index = store.games.indexWhere((item) => item.id == game.id);
     if (index < 0) return;
-    store.games[index] = game.copyWith(name: name);
+    store.games[index] = game.copyWith(
+      name: name,
+      dailyResetMinutes: dailyResetMinutes,
+    );
+    _scheduleTaskDayRefresh();
     await _saveDataChange();
   }
 
@@ -821,6 +929,7 @@ class AppState extends ChangeNotifier {
       selectedGameId = games.firstOrNull?.id;
       selectedCharacterId = characters.firstOrNull?.id;
     }
+    _scheduleTaskDayRefresh();
     await _saveDataChange();
   }
 
@@ -919,6 +1028,8 @@ class AppState extends ChangeNotifier {
     _autoSyncTimer?.cancel();
     _changeSyncTimer?.cancel();
     _backupCheckRetryTimer?.cancel();
+    _taskDayTimer?.cancel();
+    _taskDayClockStarted = false;
     super.dispose();
   }
 

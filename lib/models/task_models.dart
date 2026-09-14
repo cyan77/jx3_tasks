@@ -16,26 +16,43 @@ class Game {
     required this.id,
     required this.name,
     this.color = 0xff2f7d72,
-  });
+    this.dailyResetMinutes = 0,
+  }) : assert(dailyResetMinutes >= 0 && dailyResetMinutes < 24 * 60);
 
   final String id;
   final String name;
   final int color;
+  final int dailyResetMinutes;
 
-  Game copyWith({String? name}) =>
-      Game(id: id, name: name ?? this.name, color: color);
+  Game copyWith({String? name, int? dailyResetMinutes}) => Game(
+        id: id,
+        name: name ?? this.name,
+        color: color,
+        dailyResetMinutes: dailyResetMinutes ?? this.dailyResetMinutes,
+      );
+
+  DateTime taskDayAt(DateTime moment) => startOfDay(
+        moment.subtract(Duration(minutes: dailyResetMinutes)),
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'color': color,
+        'dailyResetMinutes': dailyResetMinutes,
       };
 
   factory Game.fromJson(Map<String, dynamic> json) => Game(
         id: json['id'] as String,
         name: json['name'] as String,
         color: json['color'] as int? ?? 0xff2f7d72,
+        dailyResetMinutes: _readDailyResetMinutes(json['dailyResetMinutes']),
       );
+}
+
+int _readDailyResetMinutes(Object? value) {
+  final minutes = value is int ? value : 0;
+  return minutes.clamp(0, 24 * 60 - 1).toInt();
 }
 
 class Character {
@@ -153,6 +170,7 @@ class TaskRecord {
     this.subtasks = const [],
     this.note = '',
     this.inboxGameId,
+    this.inboxFrequencySet = false,
   });
 
   final String id;
@@ -168,8 +186,10 @@ class TaskRecord {
   final List<TaskSubtask> subtasks;
   final String note;
   final String? inboxGameId;
+  final bool inboxFrequencySet;
 
   bool get isInbox => characterId.isEmpty;
+  bool get hasConfiguredFrequency => !isInbox || inboxFrequencySet;
 
   bool get isCountTask =>
       frequency == TaskFrequency.weeklyCount ||
@@ -186,6 +206,7 @@ class TaskRecord {
     List<TaskSubtask>? subtasks,
     String? note,
     String? inboxGameId,
+    bool? inboxFrequencySet,
   }) =>
       TaskRecord(
         id: id,
@@ -201,6 +222,7 @@ class TaskRecord {
         subtasks: subtasks ?? this.subtasks,
         note: note ?? this.note,
         inboxGameId: inboxGameId ?? this.inboxGameId,
+        inboxFrequencySet: inboxFrequencySet ?? this.inboxFrequencySet,
       );
 
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
@@ -240,24 +262,28 @@ class TaskRecord {
               0,
       };
 
-  bool isScheduledOn(DateTime date) {
+  bool isScheduledOn(DateTime date, {int dailyResetMinutes = 0}) {
     final day = startOfDay(date);
-    if (day.isBefore(startOfDay(createdAt))) return false;
+    final createdDay = startOfDay(
+      createdAt.subtract(Duration(minutes: dailyResetMinutes)),
+    );
+    if (day.isBefore(createdDay)) return false;
     return switch (frequency) {
       TaskFrequency.once => dueDate != null && dateKey(dueDate!) == dateKey(day),
       TaskFrequency.daily => true,
       TaskFrequency.weekly => weeklyDays.isEmpty
-          ? day.weekday == (dueDate?.weekday ?? createdAt.weekday)
+          ? day.weekday == (dueDate?.weekday ?? createdDay.weekday)
           : weeklyDays.contains(day.weekday),
-      TaskFrequency.monthly => day.day == _clampedMonthlyDay(day),
+      TaskFrequency.monthly =>
+        day.day == _clampedMonthlyDay(day, createdDay: createdDay),
       TaskFrequency.weeklyCount =>
         weeklyDays.isEmpty || weeklyDays.contains(day.weekday),
       TaskFrequency.monthlyCount => true,
     };
   }
 
-  int _clampedMonthlyDay(DateTime month) {
-    final anchorDay = dueDate?.day ?? createdAt.day;
+  int _clampedMonthlyDay(DateTime month, {required DateTime createdDay}) {
+    final anchorDay = dueDate?.day ?? createdDay.day;
     final lastDay = DateTime(month.year, month.month + 1, 0).day;
     return anchorDay > lastDay ? lastDay : anchorDay;
   }
@@ -282,6 +308,7 @@ class TaskRecord {
         'subtasks': subtasks.map((item) => item.toJson()).toList(),
         'note': note,
         'inboxGameId': inboxGameId,
+        'inboxFrequencySet': inboxFrequencySet,
       };
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
@@ -305,6 +332,7 @@ class TaskRecord {
             .toList(),
         note: json['note'] as String? ?? '',
         inboxGameId: json['inboxGameId'] as String?,
+        inboxFrequencySet: json['inboxFrequencySet'] as bool? ?? false,
       );
 }
 

@@ -20,7 +20,7 @@ class GameManagementScreen extends StatelessWidget {
             children: [
               PageHeader(
                 title: '游戏列表',
-                subtitle: '不同游戏的任务和角色相互独立',
+                subtitle: '不同游戏可设置各自的每日任务截止/刷新时间',
                 action: FilledButton.icon(
                   onPressed: () => showGameEditor(context, state),
                   icon: const Icon(Icons.add, size: 17),
@@ -67,7 +67,8 @@ class GameManagementScreen extends StatelessWidget {
                                         fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '$characterCount 个角色${selected ? ' · 当前游戏' : ''}',
+                                  '$characterCount 个角色 · 每日 ${_resetTimeLabel(game)} 刷新'
+                                  '${selected ? ' · 当前游戏' : ''}',
                                   style: const TextStyle(
                                       fontSize: 11, color: AppTheme.muted),
                                 ),
@@ -109,6 +110,13 @@ class GameManagementScreen extends StatelessWidget {
           ),
         ),
       );
+}
+
+String _resetTimeLabel(Game game) {
+  final hour = game.dailyResetMinutes ~/ 60;
+  final minute = game.dailyResetMinutes % 60;
+  return '${hour.toString().padLeft(2, '0')}:'
+      '${minute.toString().padLeft(2, '0')}';
 }
 
 Future<void> _confirmDelete(

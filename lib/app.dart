@@ -25,6 +25,7 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
   @override
   void initState() {
     super.initState();
+    state.startTaskDayClock();
     _lifecycleObserver = _AppLifecycleObserver(state);
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
@@ -75,6 +76,7 @@ class _AppLifecycleObserver with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      appState.refreshTaskDayClock();
       appState.checkForNewerBackupWithRetry();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
