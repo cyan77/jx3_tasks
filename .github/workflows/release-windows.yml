@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.3.0 build 7
+# Release v0.4.0 build 8
 
 on:
   workflow_dispatch:
@@ -38,18 +38,13 @@ jobs:
       - name: Build Windows client
         run: flutter build windows --release
 
-      - name: Package Windows client
-        shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path build/windows/x64/runner/Release/* `
-            -DestinationPath jx3_tasks-windows-x64.zip
-
+      # Actions artifacts are ZIP downloads already. Upload the directory itself
+      # so trial builds only need to be extracted once.
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: jx3_tasks-windows-x64
-          path: jx3_tasks-windows-x64.zip
+          path: build/windows/x64/runner/Release/
           if-no-files-found: error
 
   build-android:
@@ -125,14 +120,20 @@ jobs:
       - name: Build macOS client
         run: flutter build macos --release
 
-      - name: Package macOS client
-        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/jx3_tasks.app jx3_tasks-macos.zip
+      - name: Package macOS client as DMG
+        run: |
+          hdiutil create \
+            -volname "JX3 Tasks" \
+            -srcfolder build/macos/Build/Products/Release/jx3_tasks.app \
+            -ov \
+            -format UDZO \
+            jx3_tasks-macos.dmg
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: jx3_tasks-macos
-          path: jx3_tasks-macos.zip
+          path: jx3_tasks-macos.dmg
           if-no-files-found: error
 
   publish-release:
@@ -145,29 +146,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download release artifacts
+      - name: Download Windows files
         uses: actions/download-artifact@v4
         with:
-          path: release-assets
-          merge-multiple: true
+          name: jx3_tasks-windows-x64
+          path: release-input/windows
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: jx3_tasks-android
+          path: release-input/android
+
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: jx3_tasks-macos
+          path: release-input/macos
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          (
+            cd release-input/windows
+            zip -r ../../release-assets/jx3_tasks-windows-x64.zip .
+          )
+          cp release-input/android/jx3_tasks-android.apk release-assets/
+          cp release-input/macos/jx3_tasks-macos.dmg release-assets/
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.0
-          name: v0.3.0 游戏日界线、全游戏日历与收集箱计划
+          tag_name: ${{ github.ref_name }}
+          name: v0.4.0 任务编辑、元数据与多端体验更新
           files: release-assets/*
           body: |
-            v0.3.0 游戏日界线、全游戏日历与收集箱计划
+            v0.4.0 任务编辑、元数据与多端体验更新
 
-            - 游戏管理新增每日任务截止/刷新时间，每个游戏可独立设置
-            - 例如设置 07:00，则当天 07:00 至次日 06:59 计为同一个任务日
-            - 首页、任务矩阵、角色统计、一次性任务逾期和日历记录统一按游戏日界线计算
-            - 日历汇总所有游戏、所有未归档角色的任务，并支持按游戏筛选
-            - 日历任务显示游戏和角色信息，可直接完成或编辑
-            - 收集箱任务可选填周期和截止日期，两项均不是必填
-            - 未选择角色的新任务自动进入收集箱；分配角色后移出收集箱
-            - 已分配任务移入收集箱时保留周期、截止日期、子任务和备注
-            - 右上角立即同步按钮旁显示上次同步成功时间，失败同步不会更新时间
-            - 延续固定 Android 发布签名，支持从 v0.2.1 及后续版本直接覆盖安装
+            - 已有任务支持编辑频率、截止日期、目标次数、执行星期、备注和子任务
+            - 编辑任务模板时可同步到所有已分配角色；仅编辑单个角色时不会影响其他角色
+            - 支持复制/分配已有任务给尚未分配的角色
+            - 相同任务支持一次选择多个角色并批量完成
+            - 新增收集箱；未分配角色的任务可选填频率和截止日期
+            - 已分配任务可移动到收集箱，也可删除单个角色任务或整组任务
+            - 修复一次性任务完成后次日重复显示，以及未完成任务在截止日前隐藏的问题
+            - 日历汇总所有游戏与角色任务，支持游戏筛选、日期选择及直接编辑/完成任务
+            - 每个游戏可设置独立的每日任务刷新时间
+            - 游戏支持自定义角色元数据，可新增、编辑和删除字段
+            - 元数据支持单行文本、长文本、数字、单选、多选、开关、日期、时间和链接
+            - WebDAV 在数据修改与退出前自动备份，启动时检测较新的云端备份
+            - 修复本地刚上传的备份被误报为云端更新
+            - 设置页新增检查更新，支持浅色、深色和跟随系统主题
+            - 优化导航返回、搜索入口、标题对齐和日历筛选布局
+            - 采用更柔和的灰绿配色，并优化桌面宽屏自适应和角色多列布局
+            - Windows 测试附件只需解压一次；正式版提供单层 ZIP
+            - macOS 正式版改为 DMG；Android 延续固定签名，可覆盖安装
             - 提供 Windows、Android 和 macOS 客户端
