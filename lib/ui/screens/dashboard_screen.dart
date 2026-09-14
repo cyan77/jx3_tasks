@@ -43,7 +43,7 @@ class DashboardScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 90),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1440),
+          constraints: const BoxConstraints(maxWidth: double.infinity),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             PageHeader(
