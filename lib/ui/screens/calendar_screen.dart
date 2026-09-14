@@ -61,16 +61,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       child: DropdownButton<String>(
                         value: validGameFilter,
                         isExpanded: true,
-                        icon: const Icon(Icons.filter_list, size: 18),
+                        alignment: Alignment.centerRight,
+                        icon: const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.filter_list, size: 18),
+                        ),
                         items: [
                           const DropdownMenuItem(
                             value: _allGames,
-                            child: Text('全部游戏'),
+                            alignment: Alignment.centerRight,
+                            child: Text('全部游戏', textAlign: TextAlign.right),
                           ),
                           ...state.games.map((game) => DropdownMenuItem(
                                 value: game.id,
+                                alignment: Alignment.centerRight,
                                 child: Text(
                                   game.name,
+                                  textAlign: TextAlign.right,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               )),
