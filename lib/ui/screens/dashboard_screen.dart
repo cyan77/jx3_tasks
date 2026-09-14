@@ -25,10 +25,7 @@ class DashboardScreen extends StatelessWidget {
     final todayTasks = allTasks.where((task) {
       if (task.frequency == TaskFrequency.daily) return true;
       if (task.frequency != TaskFrequency.once) return false;
-      if (!task.isVisibleOn(today)) return false;
-      return task.dueDate == null ||
-          !startOfDay(task.dueDate!).isAfter(today) ||
-          task.isDoneOn(today);
+      return task.isVisibleOn(today);
     }).toList()
       ..sort(_compareTasks);
     final periodTasks = allTasks

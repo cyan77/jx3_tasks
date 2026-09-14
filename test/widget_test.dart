@@ -487,4 +487,39 @@ void main() {
     expect(find.text('今日待办'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('unfinished once task stays visible before its due date',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final now = DateTime.now();
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'once-future',
+          templateId: 'once-future',
+          title: '截止日前持续显示',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: now.subtract(const Duration(days: 1)),
+          dueDate: now.add(const Duration(days: 3)),
+        ),
+      ];
+
+    await tester.pumpWidget(Jx3TasksApp(store: store));
+    await tester.pump();
+
+    expect(find.text('截止日前持续显示'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
