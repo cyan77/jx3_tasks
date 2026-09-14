@@ -90,8 +90,9 @@ class _GameEditorState extends State<_GameEditor> {
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     title: Text(field.name),
-                    subtitle: Text(field.type == MetadataFieldType.choice
-                        ? '选项 · ${field.options.join('、')}'
+                    subtitle: Text((field.type == MetadataFieldType.choice ||
+                                field.type == MetadataFieldType.multiChoice)
+                        ? '${field.type.label} · ${field.options.join('、')}'
                         : field.type.label),
                     trailing: Wrap(
                       children: [
@@ -145,7 +146,8 @@ class _GameEditorState extends State<_GameEditor> {
                       .toList(),
                   onChanged: (value) => setDialogState(() => type = value!),
                 ),
-                if (type == MetadataFieldType.choice) ...[
+                if (type == MetadataFieldType.choice ||
+                    type == MetadataFieldType.multiChoice) ...[
                   const SizedBox(height: 12),
                   TextField(
                     controller: options,
@@ -173,7 +175,9 @@ class _GameEditorState extends State<_GameEditor> {
                     .toList();
                 if (fieldName.isEmpty ||
                     fields.any((item) => item.id != source?.id && item.name == fieldName) ||
-                    (type == MetadataFieldType.choice && values.isEmpty)) {
+                    ((type == MetadataFieldType.choice ||
+                            type == MetadataFieldType.multiChoice) &&
+                        values.isEmpty)) {
                   return;
                 }
                 Navigator.pop(
@@ -182,7 +186,10 @@ class _GameEditorState extends State<_GameEditor> {
                     id: source?.id ?? 'metadata-${DateTime.now().microsecondsSinceEpoch}',
                     name: fieldName,
                     type: type,
-                    options: type == MetadataFieldType.choice ? values : const [],
+                    options: type == MetadataFieldType.choice ||
+                            type == MetadataFieldType.multiChoice
+                        ? values
+                        : const [],
                   ),
                 );
               },

@@ -948,6 +948,17 @@ class AppState extends ChangeNotifier {
               num.tryParse(entry.value) == null) continue;
           if (field.type == MetadataFieldType.choice &&
               !field.options.contains(entry.value)) continue;
+          if (field.type == MetadataFieldType.multiChoice) {
+            final selected = entry.value
+                .split('\n')
+                .where(field.options.contains)
+                .toList();
+            if (selected.isNotEmpty) values[entry.key] = selected.join('\n');
+            continue;
+          }
+          if (field.type == MetadataFieldType.boolean &&
+              entry.value != 'true' &&
+              entry.value != 'false') continue;
           values[entry.key] = entry.value;
         }
         store.characters[i] = character.copyWith(metadataValues: values);

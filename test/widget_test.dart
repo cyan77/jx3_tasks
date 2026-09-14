@@ -859,4 +859,59 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  test('game metadata supports common table field types and round trips', () {
+    const game = Game(
+      id: 'game-meta',
+      name: '元数据游戏',
+      metadataFields: [
+        GameMetadataField(
+            id: 'text', name: '文本', type: MetadataFieldType.text),
+        GameMetadataField(
+            id: 'long', name: '备注', type: MetadataFieldType.multiline),
+        GameMetadataField(
+            id: 'number', name: '等级', type: MetadataFieldType.number),
+        GameMetadataField(
+            id: 'choice',
+            name: '服务器',
+            type: MetadataFieldType.choice,
+            options: ['一服', '二服']),
+        GameMetadataField(
+            id: 'multi',
+            name: '标签',
+            type: MetadataFieldType.multiChoice,
+            options: ['副本', '休闲']),
+        GameMetadataField(
+            id: 'bool', name: '主角色', type: MetadataFieldType.boolean),
+        GameMetadataField(
+            id: 'date', name: '创建日期', type: MetadataFieldType.date),
+        GameMetadataField(
+            id: 'time', name: '上线时间', type: MetadataFieldType.time),
+        GameMetadataField(
+            id: 'url', name: '攻略链接', type: MetadataFieldType.url),
+      ],
+    );
+    final restored = Game.fromJson(game.toJson());
+    expect(restored.metadataFields.map((field) => field.type).toSet(),
+        MetadataFieldType.values.toSet());
+
+    final character = Character(
+      id: 'character-meta',
+      gameId: game.id,
+      account: '账号',
+      name: '角色',
+      occupation: '',
+      color: 0xff3c8c72,
+      metadataValues: const {
+        'multi': '副本\\n休闲',
+        'bool': 'true',
+        'date': '2026-09-14',
+      },
+    );
+    final restoredCharacter = Character.fromJson(character.toJson());
+    expect(restoredCharacter.metadataValues, character.metadataValues);
+    expect(restoredCharacter.metadataSummary(game), contains('副本、休闲'));
+    expect(restoredCharacter.metadataSummary(game), contains('主角色：是'));
+  });
+
 }
