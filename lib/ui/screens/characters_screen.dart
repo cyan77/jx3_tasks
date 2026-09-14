@@ -55,7 +55,6 @@ class _CharactersScreenState extends State<CharactersScreen> {
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: state,
         builder: (context, child) => Scaffold(
-          backgroundColor: Colors.white,
           appBar: AppBar(title: const Text('角色管理')),
           body: Column(
             children: [
@@ -177,8 +176,9 @@ class _ArchivedCharactersSection extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.soft,
-        border: Border.all(color: AppTheme.line),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Column(
@@ -241,8 +241,9 @@ class _BatchToolbar extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 14),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xfff7f9f9),
-          border: Border.all(color: AppTheme.line),
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Wrap(
@@ -390,8 +391,13 @@ class _CharacterCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xffeef6f4) : Colors.white,
-          border: Border.all(color: selected ? AppTheme.accent : AppTheme.line),
+          color: selected
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surface,
+          border: Border.all(
+              color: selected
+                  ? AppTheme.accent
+                  : Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Column(

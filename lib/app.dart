@@ -38,6 +38,8 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
         title: 'JX3 Tasks',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: state.themeMode,
         scrollBehavior: const _DesktopScrollBehavior(),
         home: HomeShell(state: state),
       ),

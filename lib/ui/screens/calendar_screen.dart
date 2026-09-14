@@ -175,13 +175,13 @@ class _CalendarGrid extends StatelessWidget {
             padding: EdgeInsets.all(compact ? 6 : 8),
             decoration: BoxDecoration(
                 border: Border.all(
-                    color: isSelected ? AppTheme.accent : AppTheme.line,
+                    color: isSelected
+                        ? AppTheme.accent
+                        : Theme.of(context).colorScheme.outlineVariant,
                     width: isSelected ? 2 : 1),
-                color: isSelected
-                    ? const Color(0xffe8f3f0)
-                    : isToday
-                        ? const Color(0xfff2f8f6)
-                        : Colors.white),
+                color: isSelected || isToday
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : Theme.of(context).colorScheme.surface),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('$day',
@@ -191,7 +191,7 @@ class _CalendarGrid extends StatelessWidget {
                           isToday || isSelected ? FontWeight.w700 : FontWeight.w400,
                       color: isToday || isSelected
                           ? AppTheme.accent
-                          : AppTheme.ink)),
+                          : Theme.of(context).colorScheme.onSurface)),
               const Spacer(),
               if (compact && (done > 0 || dateTasks.isNotEmpty))
                 Row(children: [
@@ -309,7 +309,9 @@ class _InteractiveTaskTile extends StatelessWidget {
         task.title,
         style: TextStyle(
           fontSize: 13,
-          color: checked ? AppTheme.muted : AppTheme.ink,
+          color: checked
+              ? AppTheme.muted
+              : Theme.of(context).colorScheme.onSurface,
           decoration: checked ? TextDecoration.lineThrough : null,
         ),
       ),

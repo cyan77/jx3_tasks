@@ -43,7 +43,11 @@ class GameManagementScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         border: Border.all(
                             color:
-                                selected ? Color(game.color) : AppTheme.line),
+                                selected
+                                    ? Color(game.color)
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Row(

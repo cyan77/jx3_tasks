@@ -5,49 +5,76 @@ import '../../theme/app_theme.dart';
 
 class PageHeader extends StatelessWidget {
   const PageHeader(
-      {required this.title, this.subtitle, this.action, super.key});
+      {required this.title,
+      this.subtitle,
+      this.titleAction,
+      this.action,
+      super.key});
   final String title;
   final String? subtitle;
+  final Widget? titleAction;
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 560;
-          final heading = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(subtitle!,
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 560;
+            final heading = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      textAlign: TextAlign.left,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    if (titleAction != null) ...[
+                      const SizedBox(width: 8),
+                      Flexible(child: titleAction!),
+                    ],
+                  ],
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle!,
+                    textAlign: TextAlign.left,
                     style: const TextStyle(
-                        fontSize: 12, color: AppTheme.muted)),
-              ],
-            ],
-          );
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
-            child: compact
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      heading,
-                      if (action != null) ...[
-                        const SizedBox(height: 12),
-                        action!,
-                      ],
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(child: heading),
-                      if (action != null) action!,
-                    ],
+                      fontSize: 12,
+                      color: AppTheme.muted,
+                    ),
                   ),
-          );
-        },
+                ],
+              ],
+            );
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+              child: compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        heading,
+                        if (action != null) ...[
+                          const SizedBox(height: 12),
+                          action!,
+                        ],
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(child: heading),
+                        if (action != null) action!,
+                      ],
+                    ),
+            );
+          },
+        ),
       );
 }
 
@@ -76,7 +103,8 @@ class ProgressLine extends StatelessWidget {
         child: LinearProgressIndicator(
             value: value.clamp(0, 1),
             minHeight: 5,
-            backgroundColor: const Color(0xffedf0f1),
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             color: color),
       );
 }
@@ -118,7 +146,9 @@ class TaskCheck extends StatelessWidget {
           width: 20,
           height: 20,
           decoration: BoxDecoration(
-              color: checked ? AppTheme.accent : Colors.white,
+              color: checked
+                  ? AppTheme.accent
+                  : Theme.of(context).colorScheme.surface,
               border: Border.all(
                   color: checked ? AppTheme.accent : const Color(0xffb9c2c8)),
               borderRadius: BorderRadius.circular(4)),

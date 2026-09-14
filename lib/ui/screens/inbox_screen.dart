@@ -89,10 +89,10 @@ class _InboxTaskCard extends StatelessWidget {
     ];
     if (task.subtasks.isNotEmpty) details.add('${task.subtasks.length} 个子任务');
     return Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: AppTheme.line),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),

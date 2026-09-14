@@ -11,16 +11,18 @@ Future<void> showTaskEditor(
   TaskRecord? task,
   bool syncAll = false,
   bool createInInbox = false,
+  bool preselectCurrentCharacter = true,
 }) async {
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => _TaskEditor(
           state: state,
           task: task,
           syncAll: syncAll,
-          createInInbox: createInInbox));
+          createInInbox: createInInbox,
+          preselectCurrentCharacter: preselectCurrentCharacter));
 }
 
 Future<void> showCharacterEditor(
@@ -39,11 +41,13 @@ class _TaskEditor extends StatefulWidget {
     this.task,
     this.syncAll = false,
     this.createInInbox = false,
+    this.preselectCurrentCharacter = true,
   });
   final AppState state;
   final TaskRecord? task;
   final bool syncAll;
   final bool createInInbox;
+  final bool preselectCurrentCharacter;
   @override
   State<_TaskEditor> createState() => _TaskEditorState();
 }
@@ -105,6 +109,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     selected = task == null
         ? {
             if (!widget.createInInbox &&
+                widget.preselectCurrentCharacter &&
                 widget.state.selectedCharacterId != null)
               widget.state.selectedCharacterId!
           }
@@ -210,7 +215,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppTheme.soft,
+                        color: Theme.of(context).colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: const Text('没有可以继续分配的任务',
