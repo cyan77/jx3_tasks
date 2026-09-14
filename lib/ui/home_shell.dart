@@ -111,7 +111,7 @@ class _SideRail extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-                padding: EdgeInsets.only(left: 10, bottom: 26),
+                padding: const EdgeInsets.only(left: 10, bottom: 26),
                 child: Text('JX3 Tasks',
                     style: TextStyle(
                         fontSize: 18,

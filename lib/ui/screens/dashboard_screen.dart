@@ -120,9 +120,9 @@ class DashboardScreen extends StatelessWidget {
                     tasks: todayTasks,
                     date: today)),
             const SizedBox(height: 26),
-            Padding(
+            const Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: const SectionTitle('周期任务',
+                child: SectionTitle('周期任务',
                     trailing: Text('按当前周期',
                         style: TextStyle(
                             fontSize: 12, color: AppTheme.muted)))),
@@ -266,7 +266,7 @@ class _SummaryCard extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
         const SizedBox(height: 7),
         Text(value,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface)),
