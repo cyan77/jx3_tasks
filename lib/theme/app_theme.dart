@@ -5,7 +5,7 @@ class AppTheme {
   static const muted = Color(0xff7c8790);
   static const line = Color(0xffe6eaed);
   static const soft = Color(0xfff7f8f8);
-  static const accent = Color(0xff2f7d72);
+  static const accent = Color(0xff4d7180);
 
   static ThemeData get light => ThemeData(
         useMaterial3: true,

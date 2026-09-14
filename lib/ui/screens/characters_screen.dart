@@ -452,10 +452,10 @@ class _CharacterCard extends StatelessWidget {
                   ),
               ],
             ),
-            if (character.occupation.isNotEmpty) ...[
+            if (character.metadataSummary(game).isNotEmpty) ...[
               const SizedBox(height: 7),
-              Text('职业：${character.occupation}',
-                  maxLines: 1,
+              Text(character.metadataSummary(game),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
             ],

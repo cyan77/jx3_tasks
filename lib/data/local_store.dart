@@ -38,6 +38,9 @@ class LocalStore {
         .map((item) =>
             TaskRecord.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
+    _migrateCharacterMetadata(
+      legacyGames: gamesJson != null && !gamesJson.contains('"metadataFields"'),
+    );
     _migrateInboxGames();
   }
 
@@ -53,7 +56,7 @@ class LocalStore {
 
   String exportJson() {
     final payload = {
-      'schemaVersion': 2,
+      'schemaVersion': 3,
       'app': 'JX3 Tasks',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'games': games.map((item) => item.toJson()).toList(),
@@ -81,12 +84,39 @@ class LocalStore {
         .map((item) =>
             Character.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
+    _migrateCharacterMetadata(
+      legacyGames: decoded['games'] is! List ||
+          !(decoded['games'] as List).every((item) =>
+              item is Map && item.containsKey('metadataFields')),
+    );
     tasks = (decoded['tasks'] as List)
         .map((item) =>
             TaskRecord.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
     _migrateInboxGames();
     await save();
+  }
+
+  void _migrateCharacterMetadata({required bool legacyGames}) {
+    if (!legacyGames) return;
+    final gameIdsWithOccupation = characters
+        .where((character) => character.occupation.trim().isNotEmpty)
+        .map((character) => character.gameId)
+        .toSet();
+    games = games
+        .map((game) => gameIdsWithOccupation.contains(game.id) &&
+                game.metadataFields.isEmpty
+            ? game.copyWith(metadataFields: const [legacyOccupationMetadataField])
+            : game)
+        .toList();
+    characters = characters
+        .map((character) => character.occupation.trim().isNotEmpty &&
+                character.metadataValues.isEmpty
+            ? character.copyWith(metadataValues: {
+                legacyOccupationMetadataField.id: character.occupation,
+              })
+            : character)
+        .toList();
   }
 
   void _migrateInboxGames() {

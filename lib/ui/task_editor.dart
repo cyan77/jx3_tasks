@@ -789,47 +789,59 @@ class _CharacterEditor extends StatefulWidget {
 class _CharacterEditorState extends State<_CharacterEditor> {
   final nameController = TextEditingController();
   final accountController = TextEditingController();
-  final occupationController = TextEditingController();
+  final controllers = <String, TextEditingController>{};
+  final choiceValues = <String, String?>{};
   String? selectedGameId;
   String? validationMessage;
+
+  Game? get selectedGame => widget.state.games
+      .where((item) => item.id == selectedGameId)
+      .firstOrNull;
 
   @override
   void initState() {
     super.initState();
     nameController.text = widget.character?.name ?? '';
     accountController.text = widget.character?.account ?? '';
-    occupationController.text = widget.character?.occupation ?? '';
     selectedGameId = widget.character?.gameId ??
         widget.state.selectedGameId ??
         widget.state.games.firstOrNull?.id;
+    _prepareFields();
   }
 
-  bool get needsOccupation {
-    final game = widget.state.games
-        .where((item) => item.id == selectedGameId)
-        .firstOrNull;
-    return game?.id == 'game-jx3' || game?.name == '剑网3';
+  void _prepareFields() {
+    final values = widget.character?.metadataValues ?? const <String, String>{};
+    for (final field in selectedGame?.metadataFields ?? const <GameMetadataField>[]) {
+      final value = values[field.id] ?? '';
+      if (field.type == MetadataFieldType.choice) {
+        choiceValues[field.id] = field.options.contains(value) ? value : null;
+      } else {
+        controllers.putIfAbsent(field.id, () => TextEditingController())
+          ..text = value;
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-          title: Text(widget.character == null ? '添加角色' : '编辑角色',
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
-                controller: nameController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                    labelText: '角色名称', hintText: '例如：奶歌')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: accountController,
-                decoration: const InputDecoration(
-                    labelText: '账号', hintText: '例如：主账号 / 小号账号')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+        title: Text(widget.character == null ? '添加角色' : '编辑角色',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: SizedBox(
+          width: 430,
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                      labelText: '角色名称', hintText: '例如：奶歌')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: accountController,
+                  decoration: const InputDecoration(
+                      labelText: '账号', hintText: '例如：主账号 / 小号账号')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
                 initialValue: selectedGameId,
                 decoration: const InputDecoration(labelText: '所属游戏'),
                 items: widget.state.games
@@ -842,32 +854,61 @@ class _CharacterEditorState extends State<_CharacterEditor> {
                   if (value == null) return;
                   setState(() {
                     selectedGameId = value;
-                    if (!needsOccupation) occupationController.clear();
+                    _prepareFields();
                   });
-                }),
-            if (needsOccupation) ...[
-              const SizedBox(height: 12),
-              TextField(
-                  controller: occupationController,
-                  decoration: const InputDecoration(
-                      labelText: '职业 / 心法', hintText: '例如：奶歌')),
-            ],
-            if (validationMessage != null) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(validationMessage!,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xffb94a48))),
+                },
               ),
-            ],
-          ])),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('取消')),
-            FilledButton(onPressed: _save, child: const Text('保存'))
-          ]);
+              for (final field in selectedGame?.metadataFields ??
+                  const <GameMetadataField>[]) ...[
+                const SizedBox(height: 12),
+                if (field.type == MetadataFieldType.choice)
+                  DropdownButtonFormField<String?>(
+                    initialValue: choiceValues[field.id],
+                    decoration: InputDecoration(labelText: field.name),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                          value: null, child: Text('未设置')),
+                      ...field.options.map((option) =>
+                          DropdownMenuItem<String?>(
+                              value: option, child: Text(option))),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => choiceValues[field.id] = value),
+                  )
+                else
+                  TextField(
+                    controller: controllers.putIfAbsent(
+                        field.id, () => TextEditingController()),
+                    keyboardType: field.type == MetadataFieldType.number
+                        ? const TextInputType.numberWithOptions(decimal: true)
+                        : TextInputType.text,
+                    decoration: InputDecoration(
+                      labelText: field.name,
+                      hintText: field.type == MetadataFieldType.number
+                          ? '请输入数字'
+                          : null,
+                    ),
+                  ),
+              ],
+              if (validationMessage != null) ...[
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(validationMessage!,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xffb94a48))),
+                ),
+              ],
+            ]),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消')),
+          FilledButton(onPressed: _save, child: const Text('保存')),
+        ],
+      );
 
   Future<void> _save() async {
     final name = nameController.text.trim();
@@ -876,23 +917,39 @@ class _CharacterEditorState extends State<_CharacterEditor> {
       setState(() => validationMessage = '请填写角色名称、账号并选择所属游戏');
       return;
     }
-    final occupation =
-        needsOccupation && occupationController.text.trim().isNotEmpty
-            ? occupationController.text.trim()
-            : '';
+    final values = <String, String>{};
+    for (final field in selectedGame?.metadataFields ??
+        const <GameMetadataField>[]) {
+      final value = field.type == MetadataFieldType.choice
+          ? choiceValues[field.id] ?? ''
+          : controllers[field.id]?.text.trim() ?? '';
+      if (field.type == MetadataFieldType.number &&
+          value.isNotEmpty &&
+          num.tryParse(value) == null) {
+        setState(() => validationMessage = '“${field.name}”需要填写数字');
+        return;
+      }
+      if (value.isNotEmpty) values[field.id] = value;
+    }
+    final legacyOccupation =
+        values[legacyOccupationMetadataField.id] ?? '';
     if (widget.character == null) {
       await widget.state.addCharacter(
-          name: name,
-          account: account,
-          occupation: occupation,
-          gameId: selectedGameId!);
+        name: name,
+        account: account,
+        occupation: legacyOccupation,
+        gameId: selectedGameId!,
+        metadataValues: values,
+      );
     } else {
       await widget.state.updateCharacter(
-          character: widget.character!,
-          gameId: selectedGameId!,
-          account: account,
-          name: name,
-          occupation: occupation);
+        character: widget.character!,
+        gameId: selectedGameId!,
+        account: account,
+        name: name,
+        occupation: legacyOccupation,
+        metadataValues: values,
+      );
     }
     if (mounted) Navigator.pop(context);
   }
@@ -901,7 +958,9 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   void dispose() {
     nameController.dispose();
     accountController.dispose();
-    occupationController.dispose();
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 }
