@@ -16,6 +16,77 @@ void main() {
     expect(startOfMonth(date), DateTime(2026, 9));
   });
 
+  test('game reset time defines its task day and survives backup data', () {
+    const game = Game(
+      id: 'game-jx3',
+      name: '剑网3',
+      dailyResetMinutes: 7 * 60,
+    );
+
+    expect(game.taskDayAt(DateTime(2026, 9, 14, 6, 59)),
+        DateTime(2026, 9, 13));
+    expect(game.taskDayAt(DateTime(2026, 9, 14, 7)),
+        DateTime(2026, 9, 14));
+    expect(Game.fromJson(game.toJson()).dailyResetMinutes, 7 * 60);
+
+    const lateReset = Game(
+      id: 'game-hsr',
+      name: '崩坏：星穹铁道',
+      dailyResetMinutes: 23 * 60,
+    );
+    expect(lateReset.taskDayAt(DateTime(2026, 9, 14, 22, 59)),
+        DateTime(2026, 9, 13));
+    expect(lateReset.taskDayAt(DateTime(2026, 9, 14, 23)),
+        DateTime(2026, 9, 14));
+  });
+
+  test('task state resolves the reset time from the task game', () {
+    SharedPreferences.setMockInitialValues({});
+    final task = TaskRecord(
+      id: 'daily-1',
+      templateId: 'daily-1',
+      title: '每日任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.daily,
+      createdAt: DateTime(2026, 9, 14),
+    );
+    final weeklyTask = TaskRecord(
+      id: 'weekly-1',
+      templateId: 'weekly-1',
+      title: '每周任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weekly,
+      createdAt: DateTime(2026, 9, 14, 6, 30),
+    );
+    final store = LocalStore()
+      ..games = const [
+        Game(
+          id: 'game-jx3',
+          name: '剑网3',
+          dailyResetMinutes: 7 * 60,
+        ),
+      ]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [task, weeklyTask];
+    final state = AppState(store);
+
+    expect(state.taskDateFor(task, DateTime(2026, 9, 14, 6, 30)),
+        DateTime(2026, 9, 13));
+    expect(state.taskDateFor(task, DateTime(2026, 9, 14, 7, 30)),
+        DateTime(2026, 9, 14));
+    expect(state.isTaskScheduledOn(weeklyTask, DateTime(2026, 9, 13)), isTrue);
+    expect(state.isTaskScheduledOn(weeklyTask, DateTime(2026, 9, 14)), isFalse);
+  });
+
   test('count task tracks completions independently', () {
     final task = TaskRecord(
       id: '1',
@@ -249,6 +320,7 @@ void main() {
 
     await state.addInboxTask(
       title: '想做的新任务',
+      dueDate: DateTime(2026, 9, 18),
       subtasks: const [TaskSubtask(id: 'subtask-1', title: '先查攻略')],
       note: '稍后安排',
     );
@@ -256,19 +328,38 @@ void main() {
     expect(state.inboxTasks, hasLength(1));
     expect(state.tasks, isEmpty);
     expect(state.inboxTasks.single.isInbox, isTrue);
-    expect(state.inboxTasks.single.dueDate, isNull);
+    expect(state.inboxTasks.single.hasConfiguredFrequency, isFalse);
+    expect(state.inboxTasks.single.dueDate, DateTime(2026, 9, 18));
 
     final inboxTask = state.inboxTasks.single;
-    await state.assignInboxTask(
+    await state.updateInboxTask(
       source: inboxTask,
       title: inboxTask.title,
-      characterIds: {'char-1', 'char-2'},
       frequency: TaskFrequency.weekly,
       dueDate: DateTime(2026, 9, 20),
-      targetCount: 1,
       weeklyDays: const [6],
       subtasks: inboxTask.subtasks,
       note: inboxTask.note,
+    );
+
+    final scheduledInboxTask = state.inboxTasks.single;
+    expect(scheduledInboxTask.hasConfiguredFrequency, isTrue);
+    expect(scheduledInboxTask.frequency, TaskFrequency.weekly);
+    expect(scheduledInboxTask.dueDate, DateTime(2026, 9, 20));
+    final restoredInboxTask = TaskRecord.fromJson(scheduledInboxTask.toJson());
+    expect(restoredInboxTask.hasConfiguredFrequency, isTrue);
+    expect(restoredInboxTask.dueDate, DateTime(2026, 9, 20));
+
+    await state.assignInboxTask(
+      source: scheduledInboxTask,
+      title: scheduledInboxTask.title,
+      characterIds: {'char-1', 'char-2'},
+      frequency: scheduledInboxTask.frequency,
+      dueDate: scheduledInboxTask.dueDate,
+      targetCount: 1,
+      weeklyDays: scheduledInboxTask.weeklyDays,
+      subtasks: scheduledInboxTask.subtasks,
+      note: scheduledInboxTask.note,
     );
 
     expect(state.inboxTasks, isEmpty);
@@ -291,6 +382,8 @@ void main() {
           characterId: characterId,
           frequency: TaskFrequency.weekly,
           createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 30),
+          weeklyDays: const [3, 6],
           completedDates: const ['2026-09-13'],
           subtasks: const [
             TaskSubtask(id: 'subtask-1', title: '保留子任务名称'),
@@ -325,7 +418,10 @@ void main() {
     expect(state.inboxTasks, hasLength(1));
     expect(state.tasks, hasLength(1));
     expect(state.tasks.single.characterId, 'char-2');
-    expect(state.inboxTasks.single.frequency, TaskFrequency.once);
+    expect(state.inboxTasks.single.hasConfiguredFrequency, isTrue);
+    expect(state.inboxTasks.single.frequency, TaskFrequency.weekly);
+    expect(state.inboxTasks.single.dueDate, DateTime(2026, 9, 30));
+    expect(state.inboxTasks.single.weeklyDays, [3, 6]);
     expect(state.inboxTasks.single.completedDates, isEmpty);
     expect(state.inboxTasks.single.subtasks.single.title, '保留子任务名称');
     expect(state.inboxTasks.single.note, '保留备注');
@@ -486,6 +582,7 @@ void main() {
 
     expect(find.text('今日待办'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('unfinished once task stays visible before its due date',
@@ -521,5 +618,100 @@ void main() {
 
     expect(find.text('截止日前持续显示'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test('calendar includes every active game and supports game filtering', () {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [
+        Game(id: 'game-jx3', name: '剑网3'),
+        Game(id: 'game-hsr', name: '崩坏：星穹铁道'),
+      ]
+      ..characters = const [
+        Character(
+          id: 'char-jx3',
+          gameId: 'game-jx3',
+          account: '',
+          name: '剑网3角色',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-hsr',
+          gameId: 'game-hsr',
+          account: '',
+          name: '崩铁角色',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+        Character(
+          id: 'char-archived',
+          gameId: 'game-hsr',
+          account: '',
+          name: '已归档角色',
+          occupation: '',
+          color: 0xff8b6e54,
+          archived: true,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'task-jx3',
+          templateId: 'task-jx3',
+          title: '剑网3任务',
+          characterId: 'char-jx3',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'task-hsr',
+          templateId: 'task-hsr',
+          title: '崩铁任务',
+          characterId: 'char-hsr',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'task-archived',
+          templateId: 'task-archived',
+          title: '归档任务',
+          characterId: 'char-archived',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'task-inbox',
+          templateId: 'task-inbox',
+          title: '收集箱任务',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          inboxGameId: 'game-hsr',
+        ),
+      ];
+    final state = AppState(store);
+
+    expect(state.calendarTasks().map((task) => task.title).toSet(),
+        {'剑网3任务', '崩铁任务'});
+    expect(state.calendarTasks(gameId: 'game-hsr').single.title, '崩铁任务');
+  });
+
+  testWidgets('game bar shows the last successful sync time', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'webdav.lastSyncAt': '2026-09-14T20:35:12',
+    });
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+
+    await tester.pumpWidget(Jx3TasksApp(store: store));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('上次成功 09/14 20:35'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

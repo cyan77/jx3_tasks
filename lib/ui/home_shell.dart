@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/task_models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'screens/calendar_screen.dart';
@@ -151,6 +152,8 @@ class _GameBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = state.selectedGame;
+    final lastSyncAt = state.lastSyncAt?.toLocal();
+    final compact = MediaQuery.sizeOf(context).width < 520;
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -216,6 +219,23 @@ class _GameBar extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.restore, size: 20),
+            ),
+          if (lastSyncAt != null)
+            Tooltip(
+              message: '上次成功同步：${_fullSyncTime(lastSyncAt)}',
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6, right: 2),
+                child: Text(
+                  compact
+                      ? '上次 ${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}'
+                      : '上次成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
+                          '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.muted,
+                  ),
+                ),
+              ),
             ),
           IconButton(
             tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
@@ -289,6 +309,10 @@ class _GameBar extends StatelessWidget {
     }
   }
 }
+
+String _fullSyncTime(DateTime date) =>
+    '${date.year}/${twoDigits(date.month)}/${twoDigits(date.day)} '
+    '${twoDigits(date.hour)}:${twoDigits(date.minute)}:${twoDigits(date.second)}';
 
 class _RailItem extends StatelessWidget {
   const _RailItem(

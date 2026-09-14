@@ -53,6 +53,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late final TextEditingController noteController;
   late final Set<String> selected;
   late TaskFrequency frequency;
+  late bool frequencyConfigured;
   DateTime? dueDate;
   late int targetCount;
   late final Set<int> weeklyDays;
@@ -77,6 +78,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     if (widget.createInInbox) return '放入收集箱';
     if (isInboxEditing && selected.isNotEmpty) return '分配并移出收集箱';
     if (isEditing) return '保存修改';
+    if (!assignExisting && selected.isEmpty) return '放入收集箱';
     return assignExisting ? '分配任务' : '创建任务';
   }
 
@@ -87,6 +89,9 @@ class _TaskEditorState extends State<_TaskEditor> {
     titleController = TextEditingController(text: task?.title ?? '');
     noteController = TextEditingController(text: task?.note ?? '');
     frequency = task?.frequency ?? TaskFrequency.daily;
+    frequencyConfigured = task == null
+        ? !widget.createInInbox
+        : task.hasConfiguredFrequency;
     dueDate = task?.dueDate;
     targetCount = task?.targetCount ?? 5;
     weeklyDays = {...?task?.weeklyDays};
@@ -132,15 +137,30 @@ class _TaskEditorState extends State<_TaskEditor> {
       .where((task) => task.templateId == existingTemplateId)
       .firstOrNull;
 
+  String? get editorGameId {
+    final task = widget.task;
+    if (task == null) return widget.state.selectedGameId;
+    if (task.isInbox) return task.inboxGameId;
+    return widget.state.store.characters
+        .where((character) => character.id == task.characterId)
+        .firstOrNull
+        ?.gameId;
+  }
+
+  List<Character> get editorCharacters => widget.state.store.characters
+      .where((character) =>
+          !character.archived && character.gameId == editorGameId)
+      .toList();
+
   List<Character> get availableCharacters {
     final task = existingTask;
-    if (!assignExisting) return widget.state.characters;
+    if (!assignExisting) return editorCharacters;
     if (task == null) return const [];
     final assignedIds = widget.state
         .tasksForTemplate(task.templateId)
         .map((item) => item.characterId)
         .toSet();
-    return widget.state.characters
+    return editorCharacters
         .where((character) => !assignedIds.contains(character.id))
         .toList();
   }
@@ -269,38 +289,56 @@ class _TaskEditorState extends State<_TaskEditor> {
                   ),
                 ],
                 if (!assignExisting) ...[
-                  if (!widget.createInInbox &&
-                      (!isInboxEditing || selected.isNotEmpty)) ...[
+                  if (widget.createInInbox || isInboxEditing) ...[
                     const SizedBox(height: 18),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('设置周期',
+                          style: TextStyle(fontSize: 13)),
+                      subtitle: const Text('可选；不设置也可以留在收集箱',
+                          style:
+                              TextStyle(fontSize: 11, color: AppTheme.muted)),
+                      value: frequencyConfigured,
+                      onChanged: (value) =>
+                          setState(() => frequencyConfigured = value),
+                    ),
+                  ],
+                  if ((!widget.createInInbox && !isInboxEditing) ||
+                      frequencyConfigured) ...[
+                    if (!widget.createInInbox && !isInboxEditing)
+                      const SizedBox(height: 18),
                     DropdownButtonFormField<TaskFrequency>(
-                    initialValue: frequency,
-                    decoration: const InputDecoration(labelText: '周期'),
-                    items: TaskFrequency.values
-                        .map((item) => DropdownMenuItem(
-                            value: item, child: Text(item.label)))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) setState(() => frequency = value);
-                    }),
+                      initialValue: frequency,
+                      decoration: const InputDecoration(labelText: '周期'),
+                      items: TaskFrequency.values
+                          .map((item) => DropdownMenuItem(
+                              value: item, child: Text(item.label)))
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) setState(() => frequency = value);
+                      },
+                    ),
                     if (frequency == TaskFrequency.weeklyCount ||
                         frequency == TaskFrequency.monthlyCount) ...[
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      const Text('目标次数', style: TextStyle(fontSize: 13)),
-                      const SizedBox(width: 16),
-                      IconButton(
-                          onPressed: targetCount > 1
-                              ? () => setState(() => targetCount--)
-                              : null,
-                          icon: const Icon(Icons.remove_circle_outline,
-                              size: 19)),
-                      Text('$targetCount',
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      IconButton(
-                          onPressed: () => setState(() => targetCount++),
-                          icon:
-                              const Icon(Icons.add_circle_outline, size: 19))
-                    ]),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        const Text('目标次数', style: TextStyle(fontSize: 13)),
+                        const SizedBox(width: 16),
+                        IconButton(
+                            onPressed: targetCount > 1
+                                ? () => setState(() => targetCount--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle_outline,
+                                size: 19)),
+                        Text('$targetCount',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        IconButton(
+                            onPressed: () => setState(() => targetCount++),
+                            icon: const Icon(Icons.add_circle_outline,
+                                size: 19))
+                      ]),
                     ],
                     if (frequency == TaskFrequency.weekly ||
                         frequency == TaskFrequency.weeklyCount) ...[
@@ -330,8 +368,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                         }),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    ListTile(
+                  ],
+                  const SizedBox(height: 12),
+                  ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     leading: const Icon(Icons.event_outlined,
@@ -346,20 +385,22 @@ class _TaskEditorState extends State<_TaskEditor> {
                         onPressed: _pickDate,
                         child: Text(dueDate == null ? '选择' : '修改')),
                   ),
-                    if (dueDate != null)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => setState(() => dueDate = null),
-                          child: const Text('清除截止日期'),
-                        ),
+                  if (dueDate != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() => dueDate = null),
+                        child: const Text('清除截止日期'),
                       ),
-                  ] else if (isInboxEditing) ...[
+                    ),
+                  if (isInboxEditing && selected.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const Text(
-                        '选择至少一个当前游戏角色后，即可设置周期和截止日期；不选择则继续留在收集箱。',
+                    Text(
+                        frequencyConfigured
+                            ? '保存后会分配给所选角色，并移出收集箱。'
+                            : '分配给角色前需要先设置周期。',
                         style:
-                            TextStyle(fontSize: 12, color: AppTheme.muted)),
+                            const TextStyle(fontSize: 12, color: AppTheme.muted)),
                   ],
                   const SizedBox(height: 10),
                   Row(
@@ -477,11 +518,15 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final editorGame = widget.state.games
+        .where((game) => game.id == editorGameId)
+        .firstOrNull;
     final date = await showDatePicker(
         context: context,
         firstDate: DateTime(2000),
         lastDate: DateTime(2100),
-        initialDate: dueDate ?? DateTime.now());
+        initialDate: dueDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => dueDate = date);
   }
 
@@ -510,6 +555,10 @@ class _TaskEditorState extends State<_TaskEditor> {
     if (widget.createInInbox) {
       await widget.state.addInboxTask(
         title: title,
+        frequency: frequencyConfigured ? frequency : null,
+        dueDate: dueDate,
+        targetCount: targetCount,
+        weeklyDays: weeklyDays.toList()..sort(),
         subtasks: _subtasks(),
         note: noteController.text.trim(),
       );
@@ -518,10 +567,18 @@ class _TaskEditorState extends State<_TaskEditor> {
         await widget.state.updateInboxTask(
           source: widget.task!,
           title: title,
+          frequency: frequencyConfigured ? frequency : null,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           note: noteController.text.trim(),
         );
       } else {
+        if (!frequencyConfigured) {
+          _showValidation('分配给角色前请先设置周期');
+          return;
+        }
         await widget.state.assignInboxTask(
           source: widget.task!,
           title: title,
@@ -565,18 +622,26 @@ class _TaskEditorState extends State<_TaskEditor> {
       }
     } else {
       if (selected.isEmpty) {
-        _showValidation('请至少选择一个角色');
-        return;
+        await widget.state.addInboxTask(
+          title: title,
+          frequency: frequency,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          note: noteController.text.trim(),
+        );
+      } else {
+        await widget.state.addTask(
+          title: title,
+          characterIds: selected.toList(),
+          frequency: frequency,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          note: noteController.text.trim());
       }
-      await widget.state.addTask(
-        title: title,
-        characterIds: selected.toList(),
-        frequency: frequency,
-        dueDate: dueDate,
-        targetCount: targetCount,
-        weeklyDays: weeklyDays.toList()..sort(),
-        subtasks: _subtasks(),
-        note: noteController.text.trim());
     }
     if (mounted) Navigator.pop(context);
   }
@@ -626,8 +691,8 @@ class _TaskEditorState extends State<_TaskEditor> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('移到收集箱？'),
         content: Text(allLinked
-            ? '所有已分配角色的“${task.title}”将合并为一条收集箱任务，原有计划和完成记录会清除。'
-            : '“${task.title}”将取消当前角色的分配并进入收集箱，原有计划和完成记录会清除。'),
+            ? '所有已分配角色的“${task.title}”将合并为一条收集箱任务，保留周期和截止日期，完成记录会清除。'
+            : '“${task.title}”将取消当前角色的分配并进入收集箱，保留周期和截止日期，完成记录会清除。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),

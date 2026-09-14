@@ -21,6 +21,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final taskDate = state.currentTaskDate;
     final templates = <String, List<TaskRecord>>{};
     for (final task in state.tasks) {
       templates.putIfAbsent(task.templateId, () => []).add(task);
@@ -88,11 +89,11 @@ class _MatrixScreenState extends State<MatrixScreen> {
                                       (task.isCountTask
                                           ? task.countInRange(
                                                   taskPeriodStart(
-                                                      task, DateTime.now()),
+                                                      task, taskDate),
                                                   taskPeriodEnd(
-                                                      task, DateTime.now())) >=
+                                                      task, taskDate)) >=
                                               task.targetCount
-                                          : task.isCompletedOn(DateTime.now()));
+                                          : task.isCompletedOn(taskDate));
                                   return DataCell(task == null
                                       ? const Text('—',
                                           style:

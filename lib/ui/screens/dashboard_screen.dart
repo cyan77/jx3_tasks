@@ -20,21 +20,21 @@ class DashboardScreen extends StatelessWidget {
         _EmptyState(onAdd: () => showCharacterEditor(context, state))
       ]);
     }
-    final today = startOfDay(DateTime.now());
+    final today = state.currentTaskDate;
     final allTasks = state.selectedTasks;
     final todayTasks = allTasks.where((task) {
       if (task.frequency == TaskFrequency.daily) return true;
       if (task.frequency != TaskFrequency.once) return false;
       return task.isVisibleOn(today);
     }).toList()
-      ..sort(_compareTasks);
+      ..sort((a, b) => _compareTasks(a, b, today));
     final periodTasks = allTasks
         .where((task) =>
             task.frequency == TaskFrequency.weekly ||
             task.frequency == TaskFrequency.monthly ||
             task.isCountTask)
         .toList()
-      ..sort(_compareTasks);
+      ..sort((a, b) => _compareTasks(a, b, today));
     final doneToday =
         todayTasks.where((task) => task.isCompletedOn(today)).length;
     final periodDone =
@@ -521,9 +521,9 @@ class _TaskList extends StatelessWidget {
   }
 }
 
-int _compareTasks(TaskRecord a, TaskRecord b) {
-  final aDone = a.isCompletedOn(DateTime.now());
-  final bDone = b.isCompletedOn(DateTime.now());
+int _compareTasks(TaskRecord a, TaskRecord b, DateTime taskDate) {
+  final aDone = a.isCompletedOn(taskDate);
+  final bDone = b.isCompletedOn(taskDate);
   if (aDone != bDone) return aDone ? 1 : -1;
   if (a.dueDate == null && b.dueDate != null) return 1;
   if (a.dueDate != null && b.dueDate == null) return -1;

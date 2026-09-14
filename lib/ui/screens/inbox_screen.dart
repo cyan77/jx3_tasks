@@ -23,7 +23,7 @@ class InboxScreen extends StatelessWidget {
             PageHeader(
               title: '收集箱',
               subtitle:
-                  '${state.selectedGame?.name ?? '当前游戏'} · 先记下来，之后再分配角色、设置周期和截止日期',
+                  '${state.selectedGame?.name ?? '当前游戏'} · 未分配角色的任务，可提前设置周期和截止日期',
               action: FilledButton.icon(
                 onPressed: () =>
                     showTaskEditor(context, state, createInInbox: true),
@@ -82,7 +82,11 @@ class _InboxTaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final details = <String>['未分配角色', '未设置计划'];
+    final details = <String>[
+      '未分配角色',
+      task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
+      task.dueDate == null ? '未设置截止日期' : dueLabel(task.dueDate),
+    ];
     if (task.subtasks.isNotEmpty) details.add('${task.subtasks.length} 个子任务');
     return Material(
       color: Colors.white,
