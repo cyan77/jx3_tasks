@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.2.0 build 5
+# Release v0.2.1 build 6
 
 on:
   workflow_dispatch:
@@ -74,6 +74,25 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Configure fixed Android release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_STORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/jx3_tasks-release.jks
+          printf 'storeFile=jx3_tasks-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$ANDROID_STORE_PASSWORD" \
+            "$ANDROID_KEY_ALIAS" \
+            "$ANDROID_KEY_PASSWORD" > android/key.properties
+
       - name: Build Android APK
         run: flutter build apk --release
 
@@ -134,41 +153,15 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.0
+          tag_name: v0.2.1
           files: release-assets/*
           body: |
-            v0.2.0 任务管理与同步体验更新
+            v0.2.1 Android 固定签名与一次性任务修复
 
-            任务与周期
-            - 已有任务支持编辑名称、频率、截止日期、目标次数、星期、备注和子任务
-            - 支持仅修改当前角色，或同步修改所有已分配角色的同一任务
-            - 支持把已有任务继续分配给尚未分配的角色
-            - 支持添加子任务；编辑共享任务时同步子任务定义，单独编辑角色任务时互不影响
-            - 完成全部子任务后自动完成主任务
-            - 支持删除单个/全部角色任务，以及将任务移动回收集箱
-            - 修复一次性任务完成后次日重新出现的问题
-            - 修复每周、每月及目标次数任务的周期完成与重置逻辑
-
-            多角色与收集箱
-            - 新增角色批量选择、归档、删除及归档恢复
-            - 同一任务支持选择多个角色批量记录完成
-            - 收集箱用于保存暂未分配角色、日期和频率的任务，并按游戏分别显示
-            - 修复切换游戏或新增其他游戏角色后首页仍显示旧任务的问题
-            - 任务矩阵按真实任务模板分组，避免同名任务被错误合并，并新增搜索
-
-            首页、日历与界面
-            - 桌面版角色列表支持鼠标拖动和滚轮横向滚动
-            - 日历日期和任务均可点击，按每日、每周、每月及目标次数规则显示计划
-            - 首页区分今日任务和周期任务，未来的一次性任务不会提前出现
-            - 增加任务排序、逾期提示，并优化手机窄屏布局
-            - 移除游戏切换控件阴影
-
-            WebDAV 备份
-            - 配置 WebDAV 后，本地修改会自动备份，退出应用前会等待未同步修改上传
-            - 启动和返回应用时检测更新的云端备份，发现后在右上角显示恢复按钮
-            - 修复刚完成本地上传就误报“云端有更新”的问题
-            - 检测到云端更新时暂停延迟自动上传，避免覆盖更新备份
-            - 恢复云端备份前自动创建当前本地数据的安全备份
-            - 本地导入备份后也会自动同步到 WebDAV
-
+            - Android Release 改用永久固定发布签名，后续版本支持直接覆盖安装
+            - 构建时缺少签名配置会直接失败，不再退回临时 debug 签名
+            - 未完成的一次性任务从创建后持续显示，不会等到截止日才出现
+            - 一次性任务超过截止日期仍继续显示，并标记为已逾期
+            - 一次性任务完成当天保留完成状态，次日从今日待办隐藏
+            - 首次从 v0.2.0 或更早 Android 版升级，需要备份数据后卸载旧版一次
             - 提供 Windows、Android 和 macOS 客户端
