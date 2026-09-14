@@ -39,33 +39,59 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final leading = firstDay.weekday - 1;
     return Column(
       children: [
-        PageHeader(
-          title: '日历 / 时间线',
-          subtitle: '汇总所有角色的任务，可按游戏筛选',
-          action: SizedBox(
-            width: 180,
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: validGameFilter,
-                isExpanded: true,
-                icon: const Icon(Icons.filter_list, size: 18),
-                items: [
-                  const DropdownMenuItem(
-                    value: _allGames,
-                    child: Text('全部游戏'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '日历 / 时间线',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                   ),
-                  ...state.games.map((game) => DropdownMenuItem(
-                        value: game.id,
-                        child: Text(game.name),
-                      )),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 150,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: validGameFilter,
+                        isExpanded: true,
+                        icon: const Icon(Icons.filter_list, size: 18),
+                        items: [
+                          const DropdownMenuItem(
+                            value: _allGames,
+                            child: Text('全部游戏'),
+                          ),
+                          ...state.games.map((game) => DropdownMenuItem(
+                                value: game.id,
+                                child: Text(
+                                  game.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _gameFilterId = value);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
                 ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _gameFilterId = value);
-                  }
-                },
               ),
-            ),
+              const SizedBox(height: 4),
+              const Text(
+                '汇总所有角色的任务，可按游戏筛选',
+                textAlign: TextAlign.left,
+                style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
           ),
         ),
         Padding(
