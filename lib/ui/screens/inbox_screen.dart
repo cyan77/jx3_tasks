@@ -17,7 +17,7 @@ class InboxScreen extends StatelessWidget {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
+        constraints: const BoxConstraints(maxWidth: 1400),
         child: Column(
           children: [
             PageHeader(

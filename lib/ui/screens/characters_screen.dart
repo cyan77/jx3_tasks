@@ -298,7 +298,7 @@ class _GameCharacterSection extends StatelessWidget {
           const minimumCardWidth = 180.0;
           final desiredColumns =
               (constraints.maxWidth / (minimumCardWidth + gap)).floor();
-          final columns = desiredColumns.clamp(1, 3).toInt();
+          final columns = desiredColumns.clamp(1, 5).toInt();
           final cardWidth =
               (constraints.maxWidth - gap * (columns - 1)) / columns;
 
