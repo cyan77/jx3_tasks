@@ -47,7 +47,12 @@ void main() {
       ..tasks = const [];
     final state = AppState(store)..setTab(4);
 
-    await tester.pumpWidget(MaterialApp(home: HomeShell(state: state)));
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(home: HomeShell(state: state)),
+      ),
+    );
     expect(state.currentTab, 4);
 
     await tester.binding.handlePopRoute();

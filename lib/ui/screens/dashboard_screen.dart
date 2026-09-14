@@ -121,7 +121,7 @@ class DashboardScreen extends StatelessWidget {
                     date: today)),
             const SizedBox(height: 26),
             const Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: EdgeInsets.symmetric(horizontal: 24),
                 child: SectionTitle('周期任务',
                     trailing: Text('按当前周期',
                         style: TextStyle(
