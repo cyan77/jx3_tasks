@@ -876,6 +876,7 @@ class AppState extends ChangeNotifier {
     required String account,
     required String occupation,
     required String gameId,
+    Map<String, String> metadataValues = const {},
   }) async {
     final colors = [0xff2f7d72, 0xff5a78aa, 0xff8b6e54, 0xff98734a, 0xff6e6292];
     final character = Character(
@@ -886,6 +887,7 @@ class AppState extends ChangeNotifier {
       account: account,
       name: name,
       occupation: occupation,
+      metadataValues: metadataValues,
       color: colors[store.characters.length % colors.length],
     );
     // Replace the collection so this also works with immutable seed data
@@ -896,11 +898,16 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
-  Future<void> addGame(String name, {int dailyResetMinutes = 0}) async {
+  Future<void> addGame(
+    String name, {
+    int dailyResetMinutes = 0,
+    List<GameMetadataField> metadataFields = const [],
+  }) async {
     final game = Game(
       id: 'game-${DateTime.now().microsecondsSinceEpoch}',
       name: name,
       dailyResetMinutes: dailyResetMinutes,
+      metadataFields: metadataFields,
       color: const [
         0xff2f7d72,
         0xff5a78aa,
@@ -919,13 +926,33 @@ class AppState extends ChangeNotifier {
     Game game,
     String name, {
     required int dailyResetMinutes,
+    List<GameMetadataField>? metadataFields,
   }) async {
     final index = store.games.indexWhere((item) => item.id == game.id);
     if (index < 0) return;
     store.games[index] = game.copyWith(
       name: name,
       dailyResetMinutes: dailyResetMinutes,
+      metadataFields: metadataFields,
     );
+    if (metadataFields != null) {
+      final fields = {for (final field in metadataFields) field.id: field};
+      for (var i = 0; i < store.characters.length; i++) {
+        final character = store.characters[i];
+        if (character.gameId != game.id) continue;
+        final values = <String, String>{};
+        for (final entry in character.metadataValues.entries) {
+          final field = fields[entry.key];
+          if (field == null) continue;
+          if (field.type == MetadataFieldType.number &&
+              num.tryParse(entry.value) == null) continue;
+          if (field.type == MetadataFieldType.choice &&
+              !field.options.contains(entry.value)) continue;
+          values[entry.key] = entry.value;
+        }
+        store.characters[i] = character.copyWith(metadataValues: values);
+      }
+    }
     _scheduleTaskDayRefresh();
     await _saveDataChange();
   }
@@ -955,6 +982,7 @@ class AppState extends ChangeNotifier {
     required String account,
     required String name,
     required String occupation,
+    Map<String, String>? metadataValues,
   }) async {
     final index =
         store.characters.indexWhere((item) => item.id == character.id);
@@ -964,6 +992,7 @@ class AppState extends ChangeNotifier {
       account: account,
       name: name,
       occupation: occupation,
+      metadataValues: metadataValues,
     );
     if (selectedCharacterId == character.id) {
       selectedGameId = gameId;

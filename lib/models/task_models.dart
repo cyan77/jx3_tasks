@@ -11,24 +11,76 @@ extension TaskFrequencyLabel on TaskFrequency {
       };
 }
 
+enum MetadataFieldType { text, number, choice }
+
+extension MetadataFieldTypeLabel on MetadataFieldType {
+  String get label => switch (this) {
+        MetadataFieldType.text => '文本',
+        MetadataFieldType.number => '数字',
+        MetadataFieldType.choice => '选项',
+      };
+}
+
+class GameMetadataField {
+  const GameMetadataField({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.options = const [],
+  });
+
+  final String id;
+  final String name;
+  final MetadataFieldType type;
+  final List<String> options;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'type': type.name,
+        'options': options,
+      };
+
+  factory GameMetadataField.fromJson(Map<String, dynamic> json) =>
+      GameMetadataField(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        type: MetadataFieldType.values.byName(json['type'] as String? ?? 'text'),
+        options: List<String>.from(json['options'] as List? ?? const []),
+      );
+}
+
+const legacyOccupationMetadataField = GameMetadataField(
+  id: 'legacy-occupation',
+  name: '门派/心法',
+  type: MetadataFieldType.text,
+);
+
 class Game {
   const Game({
     required this.id,
     required this.name,
     this.color = 0xff2f7d72,
     this.dailyResetMinutes = 0,
+    this.metadataFields = const [],
   }) : assert(dailyResetMinutes >= 0 && dailyResetMinutes < 24 * 60);
 
   final String id;
   final String name;
   final int color;
   final int dailyResetMinutes;
+  final List<GameMetadataField> metadataFields;
 
-  Game copyWith({String? name, int? dailyResetMinutes}) => Game(
+  Game copyWith({
+    String? name,
+    int? dailyResetMinutes,
+    List<GameMetadataField>? metadataFields,
+  }) => Game(
         id: id,
         name: name ?? this.name,
         color: color,
         dailyResetMinutes: dailyResetMinutes ?? this.dailyResetMinutes,
+        metadataFields: metadataFields ?? this.metadataFields,
       );
 
   DateTime taskDayAt(DateTime moment) => startOfDay(
@@ -40,6 +92,7 @@ class Game {
         'name': name,
         'color': color,
         'dailyResetMinutes': dailyResetMinutes,
+        'metadataFields': metadataFields.map((item) => item.toJson()).toList(),
       };
 
   factory Game.fromJson(Map<String, dynamic> json) => Game(
@@ -47,6 +100,10 @@ class Game {
         name: json['name'] as String,
         color: json['color'] as int? ?? 0xff2f7d72,
         dailyResetMinutes: _readDailyResetMinutes(json['dailyResetMinutes']),
+        metadataFields: (json['metadataFields'] as List? ?? const [])
+            .map((item) => GameMetadataField.fromJson(
+                Map<String, dynamic>.from(item as Map)))
+            .toList(),
       );
 }
 
@@ -64,6 +121,7 @@ class Character {
     required this.occupation,
     required this.color,
     this.archived = false,
+    this.metadataValues = const {},
   });
 
   final String id;
@@ -73,6 +131,15 @@ class Character {
   final String occupation;
   final int color;
   final bool archived;
+  final Map<String, String> metadataValues;
+
+  String metadataSummary(Game game) => game.metadataFields
+      .map((field) {
+        final value = metadataValues[field.id]?.trim() ?? '';
+        return value.isEmpty ? '' : '${field.name}：$value';
+      })
+      .where((value) => value.isNotEmpty)
+      .join(' · ');
 
   Character copyWith({
     String? gameId,
@@ -80,6 +147,7 @@ class Character {
     String? name,
     String? occupation,
     bool? archived,
+    Map<String, String>? metadataValues,
   }) =>
       Character(
         id: id,
@@ -89,6 +157,7 @@ class Character {
         occupation: occupation ?? this.occupation,
         color: color,
         archived: archived ?? this.archived,
+        metadataValues: metadataValues ?? this.metadataValues,
       );
 
   Map<String, dynamic> toJson() => {
@@ -99,6 +168,7 @@ class Character {
         'occupation': occupation,
         'color': color,
         'archived': archived,
+        'metadataValues': metadataValues,
       };
 
   factory Character.fromJson(Map<String, dynamic> json) => Character(
@@ -109,6 +179,8 @@ class Character {
         occupation: json['occupation'] as String? ?? '未分类',
         color: json['color'] as int? ?? 0xff2f7d72,
         archived: json['archived'] as bool? ?? false,
+        metadataValues: Map<String, String>.from(
+            json['metadataValues'] as Map? ?? const {}),
       );
 }
 
