@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/update_service.dart';
+import '../../data/theme_settings.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -19,6 +22,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+  final UpdateService _updateService = UpdateService();
+  bool _checkingForUpdates = false;
 
   AppState get state => widget.state;
 
@@ -47,6 +52,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     _SettingCard(
+                      icon: Icons.dark_mode_outlined,
+                      title: '外观模式',
+                      subtitle: '浅色、深色，或自动跟随系统设置',
+                      onTap: _selectThemeMode,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            themeModeLabel(state.themeMode),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 20,
+                            color: AppTheme.muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _SettingCard(
                       icon: Icons.cloud_sync_outlined,
                       title: '同步与备份',
                       subtitle: '一次同步所有游戏、角色、任务和完成记录',
@@ -67,6 +97,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle: '管理当前游戏下的角色和角色任务',
                       onTap: () =>
                           _open(context, CharactersScreen(state: state)),
+                    ),
+                    const SizedBox(height: 10),
+                    _SettingCard(
+                      icon: Icons.system_update_outlined,
+                      title: '检查更新',
+                      subtitle: _checkingForUpdates
+                          ? '正在查询 GitHub Release…'
+                          : '查询新版本并下载当前平台安装包',
+                      onTap: _checkingForUpdates ? null : _checkForUpdates,
+                      trailing: _checkingForUpdates
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 18),
                     Align(
@@ -108,6 +154,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _checkingForUpdates = true);
+    try {
+      final results = await Future.wait([
+        _packageInfo,
+        _updateService.fetchLatestRelease(),
+      ]);
+      final packageInfo = results[0] as PackageInfo;
+      final release = results[1] as AppRelease;
+      if (!mounted) return;
+      setState(() => _checkingForUpdates = false);
+      if (!isVersionNewer(release.version, packageInfo.version)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('当前已是最新版本 v${packageInfo.version}')),
+        );
+        return;
+      }
+      await _showUpdateDialog(release, packageInfo.version);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _checkingForUpdates = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('检查更新失败：$error')),
+      );
+    }
+  }
+
+  Future<void> _selectThemeMode() async {
+    final selected = await showDialog<ThemeMode>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('外观模式'),
+        children: ThemeMode.values
+            .map(
+              (mode) => RadioListTile<ThemeMode>(
+                value: mode,
+                groupValue: state.themeMode,
+                title: Text(themeModeLabel(mode)),
+                subtitle: mode == ThemeMode.system
+                    ? const Text('随设备的浅色或深色模式自动切换')
+                    : null,
+                onChanged: (value) => Navigator.pop(dialogContext, value),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (selected != null) await state.setThemeMode(selected);
+  }
+
+  Future<void> _showUpdateDialog(
+    AppRelease release,
+    String currentVersion,
+  ) async {
+    final download = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('发现新版本 v${release.version}'),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '当前版本 v$currentVersion · 最新版本 v${release.version}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.muted),
+                ),
+                if (release.notes.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text('更新内容',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 7),
+                  SelectableText(
+                    release.notes.trim(),
+                    style: const TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('稍后'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.download_outlined, size: 18),
+            label: const Text('下载更新'),
+          ),
+        ],
+      ),
+    );
+    if (download == true) await _openDownload(release.platformDownloadUri);
+  }
+
+  Future<void> _openDownload(Uri uri) async {
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法打开下载地址，请前往 GitHub Release 下载')),
+      );
+    }
+  }
 }
 
 class _SettingCard extends StatelessWidget {
@@ -116,12 +271,14 @@ class _SettingCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +289,7 @@ class _SettingCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          border: Border.all(color: AppTheme.line),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Row(
@@ -153,7 +310,12 @@ class _SettingCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: AppTheme.muted),
+            trailing ??
+                const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppTheme.muted,
+                ),
           ],
         ),
       ),

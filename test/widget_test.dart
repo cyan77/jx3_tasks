@@ -4,11 +4,151 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:jx3_tasks/data/local_store.dart';
 import 'package:jx3_tasks/data/sync_service.dart';
+import 'package:jx3_tasks/data/theme_settings.dart';
+import 'package:jx3_tasks/data/update_service.dart';
 import 'package:jx3_tasks/models/task_models.dart';
 import 'package:jx3_tasks/state/app_state.dart';
+import 'package:jx3_tasks/theme/app_theme.dart';
 import 'package:jx3_tasks/app.dart';
+import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
+import 'package:jx3_tasks/ui/home_shell.dart';
+import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  test('theme preference defaults to system and persists the selected mode',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = ThemeSettingsStore();
+
+    expect(await settings.load(), ThemeMode.system);
+    await settings.save(ThemeMode.dark);
+    expect(await settings.load(), ThemeMode.dark);
+  });
+
+  test('dark theme uses a dark color scheme', () {
+    expect(AppTheme.dark.brightness, Brightness.dark);
+    expect(AppTheme.dark.colorScheme.surface.computeLuminance(), lessThan(0.1));
+  });
+
+  test('release version comparison only accepts a newer semantic version', () {
+    expect(isVersionNewer('0.3.1', '0.3.0'), isTrue);
+    expect(isVersionNewer('v0.4.0', '0.3.9+7'), isTrue);
+    expect(isVersionNewer('0.3.0', '0.3.0'), isFalse);
+    expect(isVersionNewer('0.3.0+8', '0.3.0+7'), isFalse);
+    expect(isVersionNewer('0.2.9', '0.3.0'), isFalse);
+  });
+
+  testWidgets('system back returns a secondary tab to the todo home',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store)..setTab(4);
+
+    await tester.pumpWidget(MaterialApp(home: HomeShell(state: state)));
+    expect(state.currentTab, 4);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(state.currentTab, 0);
+    expect(find.text('今日待办'), findsOneWidget);
+    state.dispose();
+  });
+
+  testWidgets('top add starts unassigned while bottom add keeps current role',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '当前角色',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(MaterialApp(home: HomeShell(state: state)));
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '新建任务'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, isFalse);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    state.dispose();
+  });
+
+  testWidgets('page header title and subtitle are explicitly left aligned',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              PageHeader(title: '任务', subtitle: '查看所有角色任务'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<Text>(find.text('任务')).textAlign,
+      TextAlign.left,
+    );
+    expect(
+      tester.widget<Text>(find.text('查看所有角色任务')).textAlign,
+      TextAlign.left,
+    );
+    expect(
+      tester.getSize(find.byType(PageHeader)).width,
+      tester.getSize(find.byType(Scaffold)).width,
+    );
+  });
+
+  testWidgets('task search starts as an icon and expands in the title row',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: MatrixScreen(state: state)),
+      ),
+    );
+
+    expect(find.byTooltip('搜索任务'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.tap(find.byTooltip('搜索任务'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byTooltip('关闭搜索'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('关闭搜索'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    state.dispose();
+  });
+
   test('date helpers return stable calendar boundaries', () {
     final date = DateTime(2026, 9, 10, 14, 30);
     expect(dateKey(date), '2026-09-10');

@@ -28,24 +28,29 @@ class HomeShell extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 800;
-        return Scaffold(
-          body: SafeArea(
-            child: Row(
-              children: [
-                if (wide) _SideRail(state: state),
-                Expanded(
-                    child: Column(
-                  children: [
-                    _GameBar(state: state),
-                    Expanded(child: screens[state.currentTab]),
-                  ],
-                )),
-              ],
+        return PopScope(
+          canPop: state.currentTab == 0,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && state.currentTab != 0) state.setTab(0);
+          },
+          child: Scaffold(
+            body: SafeArea(
+              child: Row(
+                children: [
+                  if (wide) _SideRail(state: state),
+                  Expanded(
+                      child: Column(
+                    children: [
+                      _GameBar(state: state),
+                      Expanded(child: screens[state.currentTab]),
+                    ],
+                  )),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: wide
-              ? null
-              : NavigationBar(
+            bottomNavigationBar: wide
+                ? null
+                : NavigationBar(
                   selectedIndex: state.currentTab,
                   labelBehavior:
                       NavigationDestinationLabelBehavior.onlyShowSelected,
@@ -72,17 +77,18 @@ class HomeShell extends StatelessWidget {
                         selectedIcon: Icon(Icons.settings),
                         label: '设置'),
                   ],
-                ),
-          floatingActionButton: state.currentTab == 0
-              ? FloatingActionButton.extended(
-                  onPressed: () => showTaskEditor(context, state),
-                  backgroundColor: AppTheme.accent,
-                  foregroundColor: Colors.white,
-                  elevation: 1,
-                  icon: const Icon(Icons.add, size: 19),
-                  label: const Text('新建任务'),
-                )
-              : null,
+                  ),
+            floatingActionButton: state.currentTab == 0
+                ? FloatingActionButton.extended(
+                    onPressed: () => showTaskEditor(context, state),
+                    backgroundColor: AppTheme.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 1,
+                    icon: const Icon(Icons.add, size: 19),
+                    label: const Text('新建任务'),
+                  )
+                : null,
+          ),
         );
       },
     );
@@ -96,19 +102,21 @@ class _SideRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: 190,
-        decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: AppTheme.line))),
+        decoration: BoxDecoration(
+            border: Border(
+                right: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant))),
         padding: const EdgeInsets.fromLTRB(16, 22, 12, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
+            Padding(
                 padding: EdgeInsets.only(left: 10, bottom: 26),
                 child: Text('JX3 Tasks',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.ink))),
+                        color: Theme.of(context).colorScheme.onSurface))),
             _RailItem(
                 icon: Icons.task_alt_outlined,
                 label: '待办',
@@ -157,8 +165,10 @@ class _GameBar extends StatelessWidget {
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppTheme.line)),
+      decoration: BoxDecoration(
+        border: Border(
+            bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -174,13 +184,13 @@ class _GameBar extends StatelessWidget {
                 value: selected?.id,
                 isExpanded: true,
                 elevation: 0,
-                dropdownColor: Colors.white,
+                dropdownColor: Theme.of(context).colorScheme.surface,
                 focusColor: Colors.transparent,
                 icon: const Icon(Icons.unfold_more, size: 18),
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.ink),
+                    color: Theme.of(context).colorScheme.onSurface),
                 items: state.games
                     .map((game) => DropdownMenuItem(
                           value: game.id,
@@ -333,7 +343,7 @@ class _RailItem extends StatelessWidget {
       child: ListTile(
         dense: true,
         selected: selected,
-        selectedTileColor: const Color(0xffeaf3f1),
+        selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         leading: Icon(icon,
             size: 19, color: selected ? AppTheme.accent : AppTheme.muted),
@@ -341,7 +351,9 @@ class _RailItem extends StatelessWidget {
             style: TextStyle(
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? AppTheme.accent : AppTheme.ink)),
+                color: selected
+                    ? AppTheme.accent
+                    : Theme.of(context).colorScheme.onSurface)),
         onTap: () => state.setTab(index),
       ),
     );

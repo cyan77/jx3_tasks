@@ -50,7 +50,11 @@ class DashboardScreen extends StatelessWidget {
                 title: '今日待办',
                 subtitle: '${_dateText(today)} · ${character.name}',
                 action: OutlinedButton.icon(
-                    onPressed: () => showTaskEditor(context, state),
+                    onPressed: () => showTaskEditor(
+                          context,
+                          state,
+                          preselectCurrentCharacter: false,
+                        ),
                     icon: const Icon(Icons.add, size: 17),
                     label: const Text('新建任务'))),
             Padding(
@@ -199,9 +203,13 @@ class _CharacterStripState extends State<_CharacterStrip> {
                   width: 112,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: selected ? const Color(0xffeef6f4) : AppTheme.soft,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primaryContainer
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     border: Border.all(
-                        color: selected ? AppTheme.accent : AppTheme.line),
+                        color: selected
+                            ? AppTheme.accent
+                            : Theme.of(context).colorScheme.outlineVariant),
                     borderRadius: BorderRadius.circular(7),
                   ),
                   child: Row(
@@ -250,7 +258,8 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-          border: Border.all(color: AppTheme.line),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label,
@@ -260,7 +269,7 @@ class _SummaryCard extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.ink)),
+                color: Theme.of(context).colorScheme.onSurface)),
         if (showProgress) ...[
           const SizedBox(height: 9),
           ProgressLine(value: progress)
@@ -290,7 +299,8 @@ class _TaskList extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
-          border: Border.all(color: AppTheme.line),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7)),
       child: Column(
         children: tasks.map((task) {
@@ -314,7 +324,9 @@ class _TaskList extends StatelessWidget {
                         fontSize: 14,
                         decoration:
                             checked ? TextDecoration.lineThrough : null,
-                        color: checked ? AppTheme.muted : AppTheme.ink)),
+                        color: checked
+                            ? AppTheme.muted
+                            : Theme.of(context).colorScheme.onSurface)),
                 subtitle: Text(
                     task.isCountTask
                         ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
@@ -384,7 +396,7 @@ class _TaskList extends StatelessWidget {
                                   fontSize: 12,
                                   color: subtaskDone
                                       ? AppTheme.muted
-                                      : AppTheme.ink,
+                                      : Theme.of(context).colorScheme.onSurface,
                                   decoration: subtaskDone
                                       ? TextDecoration.lineThrough
                                       : null,

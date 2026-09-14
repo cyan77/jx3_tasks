@@ -233,12 +233,10 @@ class _SyncScreenState extends State<SyncScreen> {
   Widget build(BuildContext context) {
     if (loading) {
       return const Scaffold(
-        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(title: const Text('同步与备份')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 32),
@@ -520,7 +518,8 @@ class _Panel extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          border: Border.all(color: AppTheme.line),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Column(

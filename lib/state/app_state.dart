@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../data/local_store.dart';
 import '../data/sync_service.dart';
+import '../data/theme_settings.dart';
 import '../models/task_models.dart';
 
 class AppState extends ChangeNotifier {
@@ -11,11 +12,13 @@ class AppState extends ChangeNotifier {
     selectedGameId = store.games.firstOrNull?.id;
     selectedCharacterId = characters.firstOrNull?.id;
     _initializeSync();
+    _initializeTheme();
   }
 
   final LocalStore store;
   final SyncSettingsStore syncSettingsStore = SyncSettingsStore();
   final WebDavSyncService webDavSyncService = WebDavSyncService();
+  final ThemeSettingsStore themeSettingsStore = ThemeSettingsStore();
   Timer? _autoSyncTimer;
   Timer? _changeSyncTimer;
   Timer? _backupCheckRetryTimer;
@@ -36,6 +39,7 @@ class AppState extends ChangeNotifier {
   String? selectedGameId;
   String? selectedCharacterId;
   int currentTab = 0;
+  ThemeMode themeMode = ThemeMode.system;
   DateTime focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selectedCalendarDate = startOfDay(DateTime.now());
 
@@ -104,6 +108,18 @@ class AppState extends ChangeNotifier {
   void setTab(int index) {
     currentTab = index;
     notifyListeners();
+  }
+
+  Future<void> _initializeTheme() async {
+    themeMode = await themeSettingsStore.load();
+    notifyListeners();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (themeMode == mode) return;
+    themeMode = mode;
+    notifyListeners();
+    await themeSettingsStore.save(mode);
   }
 
   void setMonth(DateTime month) {

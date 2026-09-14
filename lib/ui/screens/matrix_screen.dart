@@ -15,7 +15,9 @@ class MatrixScreen extends StatefulWidget {
 
 class _MatrixScreenState extends State<MatrixScreen> {
   final searchController = TextEditingController();
+  final searchFocusNode = FocusNode();
   String query = '';
+  bool searchExpanded = false;
 
   AppState get state => widget.state;
 
@@ -36,16 +38,29 @@ class _MatrixScreenState extends State<MatrixScreen> {
       PageHeader(
         title: '任务',
         subtitle: '横向查看每个角色的完成情况',
-        action: SizedBox(
-          width: 230,
-          child: TextField(
-            controller: searchController,
-            onChanged: (value) => setState(() => query = value.trim()),
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search, size: 18),
-              hintText: '搜索任务',
-            ),
-          ),
+        titleAction: SizedBox(
+          width: searchExpanded ? 230 : 40,
+          child: searchExpanded
+              ? TextField(
+                  controller: searchController,
+                  focusNode: searchFocusNode,
+                  onChanged: (value) =>
+                      setState(() => query = value.trim()),
+                  decoration: InputDecoration(
+                    hintText: '搜索任务',
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    suffixIcon: IconButton(
+                      tooltip: '关闭搜索',
+                      onPressed: _closeSearch,
+                      icon: const Icon(Icons.close, size: 17),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  tooltip: '搜索任务',
+                  onPressed: _openSearch,
+                  icon: const Icon(Icons.search, size: 20),
+                ),
         ),
       ),
       Expanded(
@@ -106,12 +121,18 @@ class _MatrixScreenState extends State<MatrixScreen> {
                                               alignment: Alignment.center,
                                               decoration: BoxDecoration(
                                                   color: done
-                                                      ? const Color(0xffe5f1ee)
-                                                      : Colors.white,
+                                                      ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primaryContainer
+                                                      : Theme.of(context)
+                                                          .colorScheme
+                                                          .surface,
                                                   border: Border.all(
                                                       color: done
                                                           ? AppTheme.accent
-                                                          : AppTheme.line),
+                                                          : Theme.of(context)
+                                                              .colorScheme
+                                                              .outlineVariant),
                                                   borderRadius:
                                                       BorderRadius.circular(5)),
                                               child: Icon(
@@ -131,6 +152,23 @@ class _MatrixScreenState extends State<MatrixScreen> {
   @override
   void dispose() {
     searchController.dispose();
+    searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => searchExpanded = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) searchFocusNode.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    searchController.clear();
+    searchFocusNode.unfocus();
+    setState(() {
+      query = '';
+      searchExpanded = false;
+    });
   }
 }
