@@ -878,7 +878,7 @@ class AppState extends ChangeNotifier {
     required String gameId,
     Map<String, String> metadataValues = const {},
   }) async {
-    final colors = [0xff2f7d72, 0xff5a78aa, 0xff8b6e54, 0xff98734a, 0xff6e6292];
+    final colors = [0xff3c8c72, 0xff66a892, 0xff7fae9e, 0xff4f796c, 0xff91b9aa];
     final character = Character(
       id: 'char-${DateTime.now().microsecondsSinceEpoch}',
       gameId: games.any((game) => game.id == gameId)
@@ -909,10 +909,10 @@ class AppState extends ChangeNotifier {
       dailyResetMinutes: dailyResetMinutes,
       metadataFields: metadataFields,
       color: const [
-        0xff2f7d72,
-        0xff5a78aa,
-        0xff8b6e54,
-        0xff98734a
+        0xff3c8c72,
+        0xff66a892,
+        0xff7fae9e,
+        0xff4f796c
       ][store.games.length % 4],
     );
     store.games.add(game);
