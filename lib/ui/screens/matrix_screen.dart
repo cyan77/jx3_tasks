@@ -64,11 +64,14 @@ class _MatrixScreenState extends State<MatrixScreen> {
         ),
       ),
       Expanded(
-          child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
               child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: DataTable(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: DataTable(
                       headingRowHeight: 40,
                       dataRowMinHeight: 52,
                       dataRowMaxHeight: 58,
@@ -145,7 +148,12 @@ class _MatrixScreenState extends State<MatrixScreen> {
                                                       : AppTheme.muted))));
                                 })
                               ]))
-                          .toList()))))
+                          .toList()),
+              ),
+            ),
+          ),
+        ),
+      ),
     ]);
   }
 

@@ -129,7 +129,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1440),
+                constraints: const BoxConstraints(maxWidth: double.infinity),
                 child: Column(
                   children: [
                     _CalendarGrid(
