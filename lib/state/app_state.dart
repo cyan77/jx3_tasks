@@ -8,7 +8,14 @@ import '../data/theme_settings.dart';
 import '../models/task_models.dart';
 
 class AppState extends ChangeNotifier {
-  AppState(this.store) {
+  AppState(
+    this.store, {
+    SyncSettingsStore? syncSettingsStore,
+    WebDavSyncService? webDavSyncService,
+    ThemeSettingsStore? themeSettingsStore,
+  })  : syncSettingsStore = syncSettingsStore ?? SyncSettingsStore(),
+        webDavSyncService = webDavSyncService ?? WebDavSyncService(),
+        themeSettingsStore = themeSettingsStore ?? ThemeSettingsStore() {
     selectedGameId = store.games.firstOrNull?.id;
     selectedCharacterId = characters.firstOrNull?.id;
     _initializeSync();
@@ -16,9 +23,9 @@ class AppState extends ChangeNotifier {
   }
 
   final LocalStore store;
-  final SyncSettingsStore syncSettingsStore = SyncSettingsStore();
-  final WebDavSyncService webDavSyncService = WebDavSyncService();
-  final ThemeSettingsStore themeSettingsStore = ThemeSettingsStore();
+  final SyncSettingsStore syncSettingsStore;
+  final WebDavSyncService webDavSyncService;
+  final ThemeSettingsStore themeSettingsStore;
   Timer? _autoSyncTimer;
   Timer? _changeSyncTimer;
   Timer? _backupCheckRetryTimer;
@@ -366,9 +373,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final raw = await webDavSyncService.downloadBackup(config, backup);
-      final safetyBackup =
-          await webDavSyncService.upload(config, exportBackup());
-      _lastUploadedBackupPath = safetyBackup.path;
       await importBackup(raw, markAsLocalChange: false);
       _dataRevision = 0;
       _syncedRevision = 0;

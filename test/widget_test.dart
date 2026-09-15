@@ -38,6 +38,38 @@ void main() {
     expect(isVersionNewer('0.2.9', '0.3.0'), isFalse);
   });
 
+  test('restoring a cloud backup does not upload another backup', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'local-game', name: '本地游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService(
+      '''{
+        "schemaVersion": 3,
+        "app": "Role Schedule",
+        "games": [{"id": "remote-game", "name": "云端游戏"}],
+        "characters": [],
+        "tasks": []
+      }''',
+    );
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.restoreBackup(
+      const RemoteBackup(name: 'backup.json', path: '/backup.json'),
+    );
+
+    expect(webDav.downloadCount, 1);
+    expect(webDav.uploadCount, 0);
+    expect(store.games.single.name, '云端游戏');
+    expect(state.syncMessage, '已恢复 · backup.json');
+    state.dispose();
+  });
+
   testWidgets('system back returns a secondary tab to the todo home',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -913,5 +945,48 @@ void main() {
     expect(restoredCharacter.metadataSummary(game), contains('副本、休闲'));
     expect(restoredCharacter.metadataSummary(game), contains('主角色：是'));
   });
+}
 
+class _FakeSyncSettingsStore extends SyncSettingsStore {
+  static const config = SyncConfig(
+    url: 'https://example.com/dav/',
+    username: 'user',
+    password: 'password',
+    remotePath: '/RoleSchedule/backup.json',
+  );
+
+  @override
+  Future<SyncConfig> load() async => config;
+
+  @override
+  Future<DateTime?> loadLastSyncAt() async => null;
+
+  @override
+  Future<void> saveLastSyncAt(DateTime value) async {}
+}
+
+class _FakeWebDavSyncService extends WebDavSyncService {
+  _FakeWebDavSyncService(this.downloadPayload);
+
+  final String downloadPayload;
+  int downloadCount = 0;
+  int uploadCount = 0;
+
+  @override
+  Future<String> downloadBackup(
+    SyncConfig config,
+    RemoteBackup backup,
+  ) async {
+    downloadCount++;
+    return downloadPayload;
+  }
+
+  @override
+  Future<RemoteBackup> upload(SyncConfig config, String json) async {
+    uploadCount++;
+    return const RemoteBackup(name: 'new.json', path: '/new.json');
+  }
+
+  @override
+  Future<List<RemoteBackup>> listBackups(SyncConfig config) async => const [];
 }

@@ -145,7 +145,7 @@ class _SyncScreenState extends State<SyncScreen> {
   Future<void> _restoreBackup(RemoteBackup backup) async {
     final confirmed = await _confirm(
       '恢复这份备份？',
-      '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。恢复前会先自动保存一份当前数据的云端安全备份。',
+      '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。这次恢复不会在云端创建新备份；如需保留当前本地数据，请先手动上传备份。',
     );
     if (!confirmed) return;
     await _run(() async {
