@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.4.0 build 8
+# Release v0.4.1 build 9
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.4.0]')
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.4.1]')
     needs:
       - build-windows
       - build-android
@@ -179,29 +179,19 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.0
+          tag_name: v0.4.1
           target_commitish: ${{ github.sha }}
-          name: v0.4.0 任务编辑、元数据与多端体验更新
+          name: v0.4.1 正式更名为角色日程
           files: release-assets/*
           body: |
-            v0.4.0 任务编辑、元数据与多端体验更新
+            v0.4.1 正式更名为角色日程
 
-            - 已有任务支持编辑频率、截止日期、目标次数、执行星期、备注和子任务
-            - 编辑任务模板时可同步到所有已分配角色；仅编辑单个角色时不会影响其他角色
-            - 支持复制/分配已有任务给尚未分配的角色
-            - 相同任务支持一次选择多个角色并批量完成
-            - 新增收集箱；未分配角色的任务可选填频率和截止日期
-            - 已分配任务可移动到收集箱，也可删除单个角色任务或整组任务
-            - 修复一次性任务完成后次日重复显示，以及未完成任务在截止日前隐藏的问题
-            - 日历汇总所有游戏与角色任务，支持游戏筛选、日期选择及直接编辑/完成任务
-            - 每个游戏可设置独立的每日任务刷新时间
-            - 游戏支持自定义角色元数据，可新增、编辑和删除字段
-            - 元数据支持单行文本、长文本、数字、单选、多选、开关、日期、时间和链接
-            - WebDAV 在数据修改与退出前自动备份，启动时检测较新的云端备份
-            - 修复本地刚上传的备份被误报为云端更新
-            - 设置页新增检查更新，支持浅色、深色和跟随系统主题
-            - 优化导航返回、搜索入口、标题对齐和日历筛选布局
-            - 采用更柔和的灰绿配色，并优化桌面宽屏自适应和角色多列布局
-            - Windows 测试附件只需解压一次；正式版提供单层 ZIP
-            - macOS 正式版改为 DMG；Android 延续固定签名，可覆盖安装
-            - 提供 Windows、Android 和 macOS 客户端
+            - 应用名称由 JX3 Tasks 正式更改为“角色日程”
+            - Android 桌面、Windows 窗口和 macOS 应用显示名称同步更新
+            - 后续安装包统一使用“角色日程”命名
+            - Windows 正式包为单层 ZIP，解压一次即可运行
+            - macOS 正式包使用 DMG 格式
+            - 更新检查兼容新旧安装包名称
+            - 保留仓库地址、应用包标识和数据结构，不影响已有数据
+            - Android 延续固定发布签名，可直接覆盖安装 v0.4.0
+            - 包含 v0.4.0 的任务编辑、子任务、收集箱、元数据、WebDAV、主题及宽屏适配功能
