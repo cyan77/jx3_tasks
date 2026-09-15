@@ -112,7 +112,7 @@ class _SideRail extends StatelessWidget {
           children: [
             Padding(
                 padding: const EdgeInsets.only(left: 10, bottom: 26),
-                child: Text('JX3 Tasks',
+                child: Text('角色日程',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,

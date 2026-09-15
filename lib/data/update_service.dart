@@ -17,14 +17,25 @@ class AppRelease {
   final Map<String, Uri> assets;
 
   Uri get platformDownloadUri {
-    final assetName = Platform.isAndroid
-        ? 'jx3_tasks-android.apk'
+    final candidates = Platform.isAndroid
+        ? const ['角色日程-Android.apk', 'jx3_tasks-android.apk']
         : Platform.isWindows
-            ? 'jx3_tasks-windows-x64.zip'
+            ? const [
+                '角色日程-Windows-x64.zip',
+                'jx3_tasks-windows-x64.zip',
+              ]
             : Platform.isMacOS
-                ? 'jx3_tasks-macos.zip'
-                : null;
-    return assetName == null ? pageUri : assets[assetName] ?? pageUri;
+                ? const [
+                    '角色日程-macOS.dmg',
+                    'jx3_tasks-macos.dmg',
+                    'jx3_tasks-macos.zip',
+                  ]
+                : const <String>[];
+    for (final name in candidates) {
+      final uri = assets[name];
+      if (uri != null) return uri;
+    }
+    return pageUri;
   }
 }
 
@@ -40,7 +51,7 @@ class UpdateService {
       final request = await client.getUrl(_latestReleaseApi);
       request.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
-        ..set(HttpHeaders.userAgentHeader, 'JX3-Tasks-Update-Checker');
+        ..set(HttpHeaders.userAgentHeader, 'Role-Schedule-Update-Checker');
       final response = await request.close().timeout(const Duration(seconds: 12));
       final raw = await utf8.decoder.bind(response).join();
       if (response.statusCode != HttpStatus.ok) {

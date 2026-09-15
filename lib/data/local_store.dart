@@ -57,7 +57,7 @@ class LocalStore {
   String exportJson() {
     final payload = {
       'schemaVersion': 3,
-      'app': 'JX3 Tasks',
+      'app': '角色日程',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'games': games.map((item) => item.toJson()).toList(),
       'characters': characters.map((item) => item.toJson()).toList(),
@@ -71,7 +71,7 @@ class LocalStore {
     if (decoded is! Map ||
         decoded['characters'] is! List ||
         decoded['tasks'] is! List) {
-      throw const FormatException('不是有效的 JX3 Tasks 备份文件');
+      throw const FormatException('不是有效的 角色日程备份文件');
     }
     games = decoded['games'] is List
         ? (decoded['games'] as List)
