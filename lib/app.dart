@@ -35,7 +35,7 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
     return AnimatedBuilder(
       animation: state,
       builder: (context, child) => MaterialApp(
-        title: 'JX3 Tasks',
+        title: '角色日程',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,

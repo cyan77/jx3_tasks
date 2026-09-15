@@ -43,7 +43,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jx3_tasks-windows-x64
+          name: 角色日程-Windows-x64
           path: build/windows/x64/runner/Release/
           if-no-files-found: error
 
@@ -92,13 +92,13 @@ jobs:
         run: flutter build apk --release
 
       - name: Rename Android APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk jx3_tasks-android.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk 角色日程-Android.apk
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jx3_tasks-android
-          path: jx3_tasks-android.apk
+          name: 角色日程-Android
+          path: 角色日程-Android.apk
           if-no-files-found: error
 
   build-macos:
@@ -122,18 +122,20 @@ jobs:
 
       - name: Package macOS client as DMG
         run: |
+          mv build/macos/Build/Products/Release/jx3_tasks.app \
+            build/macos/Build/Products/Release/角色日程.app
           hdiutil create \
-            -volname "JX3 Tasks" \
-            -srcfolder build/macos/Build/Products/Release/jx3_tasks.app \
+            -volname "角色日程" \
+            -srcfolder build/macos/Build/Products/Release/角色日程.app \
             -ov \
             -format UDZO \
-            jx3_tasks-macos.dmg
+            角色日程-macOS.dmg
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jx3_tasks-macos
-          path: jx3_tasks-macos.dmg
+          name: 角色日程-macOS
+          path: 角色日程-macOS.dmg
           if-no-files-found: error
 
   publish-release:
@@ -149,19 +151,19 @@ jobs:
       - name: Download Windows files
         uses: actions/download-artifact@v4
         with:
-          name: jx3_tasks-windows-x64
+          name: 角色日程-Windows-x64
           path: release-input/windows
 
       - name: Download Android APK
         uses: actions/download-artifact@v4
         with:
-          name: jx3_tasks-android
+          name: 角色日程-Android
           path: release-input/android
 
       - name: Download macOS DMG
         uses: actions/download-artifact@v4
         with:
-          name: jx3_tasks-macos
+          name: 角色日程-macOS
           path: release-input/macos
 
       - name: Prepare release assets
@@ -169,10 +171,10 @@ jobs:
           mkdir -p release-assets
           (
             cd release-input/windows
-            zip -r ../../release-assets/jx3_tasks-windows-x64.zip .
+            zip -r ../../release-assets/角色日程-Windows-x64.zip .
           )
-          cp release-input/android/jx3_tasks-android.apk release-assets/
-          cp release-input/macos/jx3_tasks-macos.dmg release-assets/
+          cp release-input/android/角色日程-Android.apk release-assets/
+          cp release-input/macos/角色日程-macOS.dmg release-assets/
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

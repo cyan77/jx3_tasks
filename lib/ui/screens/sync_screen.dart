@@ -159,7 +159,7 @@ class _SyncScreenState extends State<SyncScreen> {
       final bytes =
           Uint8List.fromList(utf8.encode(widget.state.exportBackup()));
       final savedPath = await FilePicker.saveFile(
-        dialogTitle: '导出 JX3 Tasks 备份',
+        dialogTitle: '导出角色日程备份',
         fileName: 'game-tasks-backup.json',
         type: FileType.custom,
         allowedExtensions: const ['json'],
