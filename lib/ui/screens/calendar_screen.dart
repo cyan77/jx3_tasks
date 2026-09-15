@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -325,6 +326,12 @@ class _InteractiveTaskTile extends StatelessWidget {
         .where((item) => item.id == character?.gameId)
         .firstOrNull;
     final checked = task.isCompletedOn(date);
+    final expiry = taskExpiryStatus(task, state.taskDateFor(task));
+    final alertColor = expiry == TaskExpiryStatus.overdue
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.warningDark
+            : AppTheme.warning;
     final details = [
       if (game != null) game.name,
       if (character != null) character.name,
@@ -344,7 +351,9 @@ class _InteractiveTaskTile extends StatelessWidget {
           fontSize: 13,
           color: checked
               ? AppTheme.muted
-              : Theme.of(context).colorScheme.onSurface,
+              : expiry == TaskExpiryStatus.normal
+                  ? Theme.of(context).colorScheme.onSurface
+                  : alertColor,
           decoration: checked ? TextDecoration.lineThrough : null,
         ),
       ),
@@ -358,9 +367,9 @@ class _InteractiveTaskTile extends StatelessWidget {
               _deadlineLabel(state, task),
               style: TextStyle(
                 fontSize: 12,
-                color: _isOverdue(state, task)
-                    ? const Color(0xffb94a48)
-                    : AppTheme.muted,
+                color: expiry == TaskExpiryStatus.normal
+                    ? AppTheme.muted
+                    : alertColor,
               ),
             ),
           PopupMenuButton<String>(
@@ -446,14 +455,12 @@ String _calendarGridLabel(AppState state, TaskRecord task) {
   return character == null ? task.title : '${character.name} · ${task.title}';
 }
 
-bool _isOverdue(AppState state, TaskRecord task) {
-  final taskDate = state.taskDateFor(task);
-  return task.dueDate != null &&
-      startOfDay(task.dueDate!).isBefore(taskDate) &&
-      !task.isCompletedOn(taskDate);
+String _deadlineLabel(AppState state, TaskRecord task) {
+  return switch (taskExpiryStatus(task, state.taskDateFor(task))) {
+    TaskExpiryStatus.overdue =>
+      '${task.dueDate!.month}/${task.dueDate!.day} 已逾期',
+    TaskExpiryStatus.expiringSoon =>
+      '${task.dueDate!.month}/${task.dueDate!.day} 即将过期',
+    TaskExpiryStatus.normal => dueLabel(task.dueDate),
+  };
 }
-
-String _deadlineLabel(AppState state, TaskRecord task) =>
-    _isOverdue(state, task)
-        ? '${task.dueDate!.month}/${task.dueDate!.day} 已逾期'
-        : dueLabel(task.dueDate);

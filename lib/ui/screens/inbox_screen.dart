@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -82,17 +83,34 @@ class _InboxTaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final expiry = taskExpiryStatus(task, state.currentTaskDate);
+    final alertColor = expiry == TaskExpiryStatus.overdue
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.warningDark
+            : AppTheme.warning;
+    final deadline = switch (expiry) {
+      TaskExpiryStatus.overdue =>
+        '${task.dueDate!.month}/${task.dueDate!.day} 已逾期',
+      TaskExpiryStatus.expiringSoon =>
+        '${task.dueDate!.month}/${task.dueDate!.day} 即将过期',
+      TaskExpiryStatus.normal =>
+        task.dueDate == null ? '未设置截止日期' : dueLabel(task.dueDate),
+    };
     final details = <String>[
       '未分配角色',
       task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
-      task.dueDate == null ? '未设置截止日期' : dueLabel(task.dueDate),
+      deadline,
     ];
     if (task.subtasks.isNotEmpty) details.add('${task.subtasks.length} 个子任务');
     return Material(
       color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        side: BorderSide(
+            color: expiry == TaskExpiryStatus.normal
+                ? Theme.of(context).colorScheme.outlineVariant
+                : alertColor),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -109,12 +127,19 @@ class _InboxTaskCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(task.title,
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: expiry == TaskExpiryStatus.normal
+                                ? null
+                                : alertColor)),
                     const SizedBox(height: 4),
                     Text(details.join(' · '),
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.muted)),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: expiry == TaskExpiryStatus.normal
+                                ? AppTheme.muted
+                                : alertColor)),
                     if (task.note.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(task.note,
