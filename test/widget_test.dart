@@ -6,6 +6,7 @@ import 'package:jx3_tasks/data/local_store.dart';
 import 'package:jx3_tasks/data/sync_service.dart';
 import 'package:jx3_tasks/data/theme_settings.dart';
 import 'package:jx3_tasks/data/update_service.dart';
+import 'package:jx3_tasks/models/task_expiry.dart';
 import 'package:jx3_tasks/models/task_models.dart';
 import 'package:jx3_tasks/state/app_state.dart';
 import 'package:jx3_tasks/theme/app_theme.dart';
@@ -36,6 +37,33 @@ void main() {
     expect(isVersionNewer('0.3.0', '0.3.0'), isFalse);
     expect(isVersionNewer('0.3.0+8', '0.3.0+7'), isFalse);
     expect(isVersionNewer('0.2.9', '0.3.0'), isFalse);
+  });
+
+  test('once task warns when no China rest day remains before deadline', () {
+    TaskRecord taskDue(DateTime dueDate) => TaskRecord(
+          id: 'once',
+          templateId: 'once',
+          title: '限时任务',
+          characterId: 'character',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: dueDate,
+        );
+
+    expect(
+      taskExpiryStatus(taskDue(DateTime(2026, 9, 19)), DateTime(2026, 9, 15)),
+      TaskExpiryStatus.expiringSoon,
+    );
+    expect(
+      taskExpiryStatus(taskDue(DateTime(2026, 9, 21)), DateTime(2026, 9, 15)),
+      TaskExpiryStatus.normal,
+    );
+    expect(
+      taskExpiryStatus(taskDue(DateTime(2026, 9, 25)), DateTime(2026, 9, 20)),
+      TaskExpiryStatus.expiringSoon,
+    );
+    expect(isChinaRestDay(DateTime(2026, 9, 20)), isFalse);
+    expect(isChinaRestDay(DateTime(2026, 9, 25)), isTrue);
   });
 
   test('restoring a cloud backup does not upload another backup', () async {

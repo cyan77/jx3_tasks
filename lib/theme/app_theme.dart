@@ -6,6 +6,8 @@ class AppTheme {
   static const line = Color(0xffe4eae7);
   static const soft = Color(0xfff7f9f8);
   static const accent = Color(0xff3c8c72);
+  static const warning = Color(0xffb56a18);
+  static const warningDark = Color(0xffffbd69);
 
   static ThemeData get light => ThemeData(
         useMaterial3: true,

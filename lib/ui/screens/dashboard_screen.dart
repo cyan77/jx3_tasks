@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -311,6 +312,14 @@ class _TaskList extends StatelessWidget {
           final checked = task.isCountTask
               ? count >= task.targetCount
               : task.isCompletedOn(date);
+          final expiry = taskExpiryStatus(task, date);
+          final expiringSoon = expiry == TaskExpiryStatus.expiringSoon;
+          final overdue = expiry == TaskExpiryStatus.overdue;
+          final alertColor = overdue
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.warningDark
+                  : AppTheme.warning;
           return Column(
             children: [
               ListTile(
@@ -326,13 +335,18 @@ class _TaskList extends StatelessWidget {
                             checked ? TextDecoration.lineThrough : null,
                         color: checked
                             ? AppTheme.muted
-                            : Theme.of(context).colorScheme.onSurface)),
+                            : expiringSoon || overdue
+                                ? alertColor
+                                : Theme.of(context).colorScheme.onSurface)),
                 subtitle: Text(
                     task.isCountTask
                         ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
                         : _taskMeta(task, date),
-                    style:
-                        const TextStyle(fontSize: 11, color: AppTheme.muted)),
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: expiringSoon || overdue
+                            ? alertColor
+                            : AppTheme.muted)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -552,12 +566,14 @@ String _taskMeta(TaskRecord task, DateTime date) {
     parts.add(task.weeklyDays.map((day) => '周${labels[day - 1]}').join('、'));
   }
   if (task.dueDate != null) {
-    final overdue = task.frequency == TaskFrequency.once &&
-        startOfDay(task.dueDate!).isBefore(startOfDay(date)) &&
-        !task.isCompletedOn(date);
-    parts.add(overdue
-        ? '${task.dueDate!.month}/${task.dueDate!.day} 已逾期'
-        : dueLabel(task.dueDate));
+    final expiry = taskExpiryStatus(task, date);
+    parts.add(switch (expiry) {
+      TaskExpiryStatus.overdue =>
+        '${task.dueDate!.month}/${task.dueDate!.day} 已逾期',
+      TaskExpiryStatus.expiringSoon =>
+        '${task.dueDate!.month}/${task.dueDate!.day} 即将过期',
+      TaskExpiryStatus.normal => dueLabel(task.dueDate),
+    });
   }
   return parts.join(' · ');
 }
