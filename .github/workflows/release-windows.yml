@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.4.1 build 9 — GitHub-safe asset filenames
+# Release v0.4.2 build 10 — cloud restore fix
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.4.1]')
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.4.2]')
     needs:
       - build-windows
       - build-android
@@ -178,11 +178,11 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove superseded v0.4.1 assets
+      - name: Remove superseded v0.4.2 assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/${{ github.repository }}/releases/tags/v0.4.1 \
+          gh api repos/${{ github.repository }}/releases/tags/v0.4.2 \
             --jq '.assets[].id' |
             while read -r asset_id; do
               gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
@@ -191,19 +191,17 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.1
+          tag_name: v0.4.2
           target_commitish: ${{ github.sha }}
-          name: v0.4.1 正式更名为角色日程
+          name: v0.4.2 修复云端恢复重复备份
           files: release-assets/*
           body: |
-            v0.4.1 正式更名为角色日程
+            v0.4.2 修复云端恢复重复生成备份
 
-            - 应用名称由 JX3 Tasks 正式更改为“角色日程”
-            - Android 桌面、Windows 窗口和 macOS 应用显示名称同步更新
-            - 安装包使用稳定的 RoleSchedule 文件名，应用内名称仍为“角色日程”
-            - Windows 正式包为单层 ZIP，解压一次即可运行
-            - macOS 正式包使用 DMG 格式
-            - 更新检查兼容新旧安装包名称
-            - 保留仓库地址、应用包标识和数据结构，不影响已有数据
-            - Android 延续固定发布签名，可直接覆盖安装 v0.4.0
-            - 包含 v0.4.0 的任务编辑、子任务、收集箱、元数据、WebDAV、主题及宽屏适配功能
+            - 修复从云端恢复到本地时立刻额外创建一份云端备份的问题
+            - 恢复操作现在只下载并替换本地数据，不再自动上传旧本地数据
+            - 恢复后的数据会保持为已同步状态，不会被自动同步再次上传
+            - 恢复确认提示已明确说明不会创建新云端备份
+            - 新增回归测试，验证恢复期间 WebDAV 上传次数为 0
+            - Android 延续固定发布签名，可直接覆盖安装 v0.4.1
+            - Windows 正式包保持单层 ZIP，macOS 使用 DMG
