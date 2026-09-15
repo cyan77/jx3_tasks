@@ -18,14 +18,20 @@ class AppRelease {
 
   Uri get platformDownloadUri {
     final candidates = Platform.isAndroid
-        ? const ['角色日程-Android.apk', 'jx3_tasks-android.apk']
+        ? const [
+            'RoleSchedule-Android.apk',
+            '角色日程-Android.apk',
+            'jx3_tasks-android.apk',
+          ]
         : Platform.isWindows
             ? const [
+                'RoleSchedule-Windows-x64.zip',
                 '角色日程-Windows-x64.zip',
                 'jx3_tasks-windows-x64.zip',
               ]
             : Platform.isMacOS
                 ? const [
+                    'RoleSchedule-macOS.dmg',
                     '角色日程-macOS.dmg',
                     'jx3_tasks-macos.dmg',
                     'jx3_tasks-macos.zip',

@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.4.1 build 9
+# Release v0.4.1 build 9 — GitHub-safe asset filenames
 
 on:
   workflow_dispatch:
@@ -171,10 +171,22 @@ jobs:
           mkdir -p release-assets
           (
             cd release-input/windows
-            zip -r ../../release-assets/角色日程-Windows-x64.zip .
+            zip -r ../../release-assets/RoleSchedule-Windows-x64.zip .
           )
-          cp release-input/android/角色日程-Android.apk release-assets/
-          cp release-input/macos/角色日程-macOS.dmg release-assets/
+          cp release-input/android/角色日程-Android.apk release-assets/RoleSchedule-Android.apk
+          cp release-input/macos/角色日程-macOS.dmg release-assets/RoleSchedule-macOS.dmg
+
+      # GitHub strips non-ASCII characters from the actual release asset name.
+      # Remove the superseded assets before re-uploading stable ASCII filenames.
+      - name: Remove superseded v0.4.1 assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/releases/tags/v0.4.1 \
+            --jq '.assets[].id' |
+            while read -r asset_id; do
+              gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
+            done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -188,7 +200,7 @@ jobs:
 
             - 应用名称由 JX3 Tasks 正式更改为“角色日程”
             - Android 桌面、Windows 窗口和 macOS 应用显示名称同步更新
-            - 后续安装包统一使用“角色日程”命名
+            - 安装包使用稳定的 RoleSchedule 文件名，应用内名称仍为“角色日程”
             - Windows 正式包为单层 ZIP，解压一次即可运行
             - macOS 正式包使用 DMG 格式
             - 更新检查兼容新旧安装包名称
