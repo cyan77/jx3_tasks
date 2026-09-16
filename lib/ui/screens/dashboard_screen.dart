@@ -14,30 +14,50 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final character = state.selectedCharacter;
-    if (character == null) {
+    if (state.characters.isEmpty) {
       return Column(children: [
         const PageHeader(title: '今日待办'),
         _EmptyState(onAdd: () => showCharacterEditor(context, state))
       ]);
     }
     final today = state.currentTaskDate;
-    final allTasks = state.selectedTasks;
-    final todayTasks = allTasks.where((task) {
-      if (task.frequency == TaskFrequency.daily) {
-        return state.hasTaskStartedBy(task, today);
-      }
-      if (task.frequency != TaskFrequency.once) return false;
-      return state.hasTaskStartedBy(task, today) && task.isVisibleOn(today);
-    }).toList()
+    final visibleCharacters = state.characters
+        .where((character) =>
+            _pendingTasksForCharacter(state, character, today).isNotEmpty)
+        .toList();
+    if (visibleCharacters.isEmpty) {
+      return Column(children: [
+        PageHeader(
+          title: '今日待办',
+          subtitle: _dateText(today),
+          action: OutlinedButton.icon(
+            onPressed: () => showTaskEditor(
+              context,
+              state,
+              preselectCurrentCharacter: false,
+            ),
+            icon: const Icon(Icons.add, size: 17),
+            label: const Text('新建任务'),
+          ),
+        ),
+        const _AllDoneState(),
+      ]);
+    }
+    final character = visibleCharacters
+            .where((item) => item.id == state.selectedCharacterId)
+            .firstOrNull ??
+        visibleCharacters.first;
+    if (character.id != state.selectedCharacterId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (state.selectedCharacterId != character.id) {
+          state.selectCharacter(character.id);
+        }
+      });
+    }
+    final allTasks = state.tasksForCharacter(character.id);
+    final todayTasks = _todayTasks(state, allTasks, today)
       ..sort((a, b) => _compareTasks(a, b, today));
-    final periodTasks = allTasks
-        .where((task) =>
-            state.hasTaskStartedBy(task, today) &&
-            (task.frequency == TaskFrequency.weekly ||
-                task.frequency == TaskFrequency.monthly ||
-                task.isCountTask))
-        .toList()
+    final periodTasks = _periodTasks(state, allTasks, today)
       ..sort((a, b) => _compareTasks(a, b, today));
     final doneToday =
         todayTasks.where((task) => task.isCompletedOn(today)).length;
@@ -63,7 +83,8 @@ class DashboardScreen extends StatelessWidget {
                     label: const Text('新建任务'))),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _CharacterStrip(state: state)),
+                child: _CharacterStrip(
+                    state: state, characters: visibleCharacters)),
             const SizedBox(height: 18),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -145,9 +166,48 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+List<TaskRecord> _todayTasks(
+  AppState state,
+  List<TaskRecord> tasks,
+  DateTime today,
+) =>
+    tasks.where((task) {
+      if (task.frequency == TaskFrequency.daily) {
+        return state.hasTaskStartedBy(task, today);
+      }
+      if (task.frequency != TaskFrequency.once) return false;
+      return state.hasTaskStartedBy(task, today) && task.isVisibleOn(today);
+    }).toList();
+
+List<TaskRecord> _periodTasks(
+  AppState state,
+  List<TaskRecord> tasks,
+  DateTime today,
+) =>
+    tasks
+        .where((task) =>
+            state.hasTaskStartedBy(task, today) &&
+            (task.frequency == TaskFrequency.weekly ||
+                task.frequency == TaskFrequency.monthly ||
+                task.isCountTask))
+        .toList();
+
+List<TaskRecord> _pendingTasksForCharacter(
+  AppState state,
+  Character character,
+  DateTime today,
+) {
+  final tasks = state.tasksForCharacter(character.id);
+  return [
+    ..._todayTasks(state, tasks, today),
+    ..._periodTasks(state, tasks, today),
+  ].where((task) => !task.isCompletedOn(today)).toList();
+}
+
 class _CharacterStrip extends StatefulWidget {
-  const _CharacterStrip({required this.state});
+  const _CharacterStrip({required this.state, required this.characters});
   final AppState state;
+  final List<Character> characters;
 
   @override
   State<_CharacterStrip> createState() => _CharacterStripState();
@@ -187,17 +247,17 @@ class _CharacterStripState extends State<_CharacterStrip> {
           child: ListView.separated(
             controller: _controller,
             scrollDirection: Axis.horizontal,
-            itemCount: widget.state.characters.length + 1,
+            itemCount: widget.characters.length + 1,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
-              if (index == widget.state.characters.length) {
+              if (index == widget.characters.length) {
                 return OutlinedButton.icon(
                   onPressed: () => showCharacterEditor(context, widget.state),
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('添加角色'),
                 );
               }
-              final character = widget.state.characters[index];
+              final character = widget.characters[index];
               final selected =
                   character.id == widget.state.selectedCharacterId;
               return InkWell(
@@ -231,7 +291,7 @@ class _CharacterStripState extends State<_CharacterStrip> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),
                             Text(
-                                '${widget.state.tasksForCharacter(character.id).length} 个任务',
+                                '${_pendingTasksForCharacter(widget.state, character, widget.state.currentTaskDate).length} 个待办',
                                 style: const TextStyle(
                                     fontSize: 10, color: AppTheme.muted)),
                           ],
@@ -600,6 +660,29 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.add, size: 17),
             label: const Text('添加角色'))
       ])));
+}
+
+class _AllDoneState extends StatelessWidget {
+  const _AllDoneState();
+
+  @override
+  Widget build(BuildContext context) => const Expanded(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.done_all, size: 42, color: AppTheme.accent),
+              SizedBox(height: 12),
+              Text('今天的任务都完成了',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              SizedBox(height: 6),
+              Text('有新的待办或进入下一个周期时，角色会重新显示',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: AppTheme.muted)),
+            ],
+          ),
+        ),
+      );
 }
 
 String _dateText(DateTime date) => '${date.year}年${date.month}月${date.day}日 ${[
