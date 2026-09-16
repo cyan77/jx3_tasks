@@ -49,7 +49,7 @@ class AppState extends ChangeNotifier {
   String? selectedGameId;
   String? selectedCharacterId;
   int currentTab = 0;
-  ThemeMode themeMode = ThemeMode.system;
+  ThemeMode themeMode = ThemeMode.light;
   DateTime focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selectedCalendarDate = startOfDay(DateTime.now());
 
