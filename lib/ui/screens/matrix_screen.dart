@@ -513,7 +513,6 @@ class _FilterBar extends StatelessWidget {
     required this.gameId,
     required this.characterId,
     required this.completion,
-    required this.completedTaskIds,
     required this.onGameChanged,
     required this.onCharacterChanged,
     required this.onCompletionChanged,
