@@ -695,15 +695,19 @@ class _FilterDropdown<T> extends StatelessWidget {
   final ValueChanged<T?> onChanged;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    return Tooltip(
         message: tooltip,
         child: Container(
-          height: 38,
-          padding: const EdgeInsets.only(left: 8, right: 4),
+          key: ValueKey('task-filter-$tooltip'),
+          height: 40,
+          padding: const EdgeInsets.only(left: 10, right: 5),
           decoration: BoxDecoration(
-            border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(7),
+            color: fill.withValues(alpha: 0.78),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.20)),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
@@ -711,14 +715,15 @@ class _FilterDropdown<T> extends StatelessWidget {
               isExpanded: true,
               isDense: true,
               elevation: 0,
-              dropdownColor: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: fill,
               focusColor: Colors.transparent,
               icon: const Icon(Icons.expand_more,
-                  size: 15, color: AppTheme.muted),
+                  size: 16, color: AppTheme.accent),
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w400,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: scheme.onSurfaceVariant,
               ),
               items: items
                   .map((item) => DropdownMenuItem<T>(
@@ -737,6 +742,7 @@ class _FilterDropdown<T> extends StatelessWidget {
           ),
         ),
       );
+  }
 }
 
 class _SelectionBar extends StatelessWidget {

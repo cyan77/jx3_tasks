@@ -58,11 +58,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   const SizedBox(width: 12),
                   SizedBox(
                     width: 150,
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
+                    child: Container(
+                      key: const ValueKey('calendar-game-filter'),
+                      height: 40,
+                      padding: const EdgeInsets.only(left: 10, right: 6),
+                      decoration: BoxDecoration(
+                        color: Color.lerp(
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context).colorScheme.primaryContainer,
+                          0.42,
+                        )!
+                            .withValues(alpha: 0.78),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.20),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
                         value: validGameFilter,
                         isExpanded: true,
                         alignment: Alignment.centerRight,
+                        elevation: 0,
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: Color.lerp(
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context).colorScheme.primaryContainer,
+                          0.42,
+                        ),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
@@ -72,7 +98,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         icon: const Padding(
                           padding: EdgeInsets.only(left: 8),
                           child: Icon(Icons.filter_list,
-                              size: 17, color: AppTheme.muted),
+                              size: 17, color: AppTheme.accent),
                         ),
                         items: [
                           const DropdownMenuItem(
@@ -95,6 +121,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             setState(() => _gameFilterId = value);
                           }
                         },
+                      ),
                       ),
                     ),
                   ),
