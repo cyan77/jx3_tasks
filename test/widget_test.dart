@@ -1410,6 +1410,13 @@ void main() {
       (navigationContainer.decoration! as BoxDecoration).borderRadius,
       BorderRadius.circular(24),
     );
+    final navigationSurface = tester.widget<Container>(
+      find.byKey(const ValueKey('glass-bottom-navigation-surface')),
+    );
+    expect(
+      (navigationSurface.decoration! as BoxDecoration).color,
+      isNot(AppTheme.light.colorScheme.surface),
+    );
     final glassCreateButton = find.byKey(
       const ValueKey('glass-create-task-button'),
     );
@@ -1425,6 +1432,10 @@ void main() {
       find.byType(FloatingActionButton),
     );
     expect(createButton.elevation, 0);
+    expect(
+      createButton.backgroundColor,
+      isNot(AppTheme.light.colorScheme.surface),
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

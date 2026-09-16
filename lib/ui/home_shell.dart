@@ -170,6 +170,11 @@ class _GlassCreateButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final glassColor = Color.lerp(
+      scheme.surface,
+      scheme.primaryContainer,
+      dark ? 0.34 : 0.62,
+    )!;
     return Container(
       key: const ValueKey('glass-create-task-button'),
       decoration: BoxDecoration(
@@ -191,7 +196,7 @@ class _GlassCreateButton extends StatelessWidget {
             elevation: 0,
             highlightElevation: 0,
             backgroundColor:
-                scheme.surface.withValues(alpha: dark ? 0.80 : 0.88),
+                glassColor.withValues(alpha: dark ? 0.84 : 0.90),
             foregroundColor: scheme.primary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
@@ -217,6 +222,11 @@ class _GlassBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final glassColor = Color.lerp(
+      scheme.surface,
+      scheme.primaryContainer,
+      dark ? 0.34 : 0.62,
+    )!;
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Container(
@@ -236,8 +246,9 @@ class _GlassBottomNavigation extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
+              key: const ValueKey('glass-bottom-navigation-surface'),
               decoration: BoxDecoration(
-                color: scheme.surface.withValues(alpha: dark ? 0.78 : 0.86),
+                color: glassColor.withValues(alpha: dark ? 0.82 : 0.88),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: scheme.outlineVariant.withValues(alpha: 0.72),
@@ -248,7 +259,12 @@ class _GlassBottomNavigation extends StatelessWidget {
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
-              indicatorColor: scheme.primaryContainer.withValues(alpha: 0.72),
+              indicatorColor: Color.lerp(
+                scheme.primaryContainer,
+                scheme.primary,
+                dark ? 0.20 : 0.12,
+              )!
+                  .withValues(alpha: 0.78),
               selectedIndex: state.currentTab,
               labelBehavior:
                   NavigationDestinationLabelBehavior.onlyShowSelected,
