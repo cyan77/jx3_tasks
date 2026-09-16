@@ -379,9 +379,12 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
     expect(find.text('任务一'), findsOneWidget);
     expect(find.text('任务二'), findsOneWidget);
-    await tester.tap(find.byType(Checkbox).at(0));
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('批量分配'), findsNothing);
+    expect(find.text('长按或向右滑动任务进行管理'), findsOneWidget);
+    await tester.longPress(find.text('任务一'));
     await tester.pump();
-    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.longPress(find.text('任务二'));
     await tester.pump();
     expect(find.text('已选 2 项'), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
@@ -567,6 +570,7 @@ void main() {
       matching: find.byType(InkWell),
     );
     expect(characterTwoControl, findsOneWidget);
+    expect(tester.getSize(characterTwoControl).height, greaterThanOrEqualTo(40));
     tester.widget<InkWell>(characterTwoControl).onTap!();
     await tester.pumpAndSettle();
     final characterTwoTask =

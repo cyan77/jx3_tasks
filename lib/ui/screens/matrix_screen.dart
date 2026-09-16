@@ -144,10 +144,11 @@ class _MatrixScreenState extends State<MatrixScreen> {
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        padding: EdgeInsets.fromLTRB(20, 0, 20, selectedCount > 0 ? 12 : 6),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: _SelectionBar(
+          child: selectedCount > 0
+              ? _SelectionBar(
             selectedCount: selectedCount,
             allVisibleSelected: visibleIds.isNotEmpty &&
                 visibleIds.every(selectedTemplateIds.contains),
@@ -174,7 +175,11 @@ class _MatrixScreenState extends State<MatrixScreen> {
             showArchive: archiveFilter != _ArchiveFilter.archived,
             showRestore: archiveFilter != _ArchiveFilter.active,
             onDelete: selectedCount == 0 ? null : _deleteSelected,
-          ),
+                )
+              : const Text(
+                  '长按或向右滑动任务进行管理',
+                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                ),
         ),
       ),
       Expanded(
@@ -200,7 +205,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
                         .toSet(),
                     expiry: _expiryFor(tasks),
                     selected: selectedTemplateIds.contains(templateId),
-                    onSelected: (value) => _setSelected(templateId, value),
+                    onSelect: () => _setSelected(
+                      templateId,
+                      !selectedTemplateIds.contains(templateId),
+                    ),
                     onToggleTask: (task) => state.setTaskCompleted(
                       task,
                       completed:
@@ -801,7 +809,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.completedTaskIds,
     required this.expiry,
     required this.selected,
-    required this.onSelected,
+    required this.onSelect,
     required this.onToggleTask,
     required this.onEdit,
     required this.onMoveToInbox,
@@ -816,7 +824,7 @@ class _TaskManagementTile extends StatelessWidget {
   final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
   final bool selected;
-  final ValueChanged<bool> onSelected;
+  final VoidCallback onSelect;
   final ValueChanged<TaskRecord> onToggleTask;
   final VoidCallback onEdit;
   final VoidCallback onMoveToInbox;
@@ -853,20 +861,21 @@ class _TaskManagementTile extends StatelessWidget {
       if (task.dueDate != null) dueLabel(task.dueDate),
       if (task.isCountTask) '目标 ${task.targetCount} 次',
     ];
-    return Material(
-      color: cardColor,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: borderColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: onSelect,
+      onHorizontalDragEnd: (details) {
+        if ((details.primaryVelocity ?? 0) > 250) onSelect();
+      },
+      child: Material(
+        color: cardColor,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: borderColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Checkbox(
-              value: selected,
-              onChanged: (value) => onSelected(value ?? false),
-            ),
-            const SizedBox(width: 4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -963,6 +972,7 @@ class _TaskManagementTile extends StatelessWidget {
               ],
             ),
           ]),
+        ),
       ),
     );
   }
@@ -987,7 +997,8 @@ class _CharacterChip extends StatelessWidget {
     onTap: onTap,
     borderRadius: BorderRadius.circular(6),
     child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        constraints: const BoxConstraints(minHeight: 40, minWidth: 72),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(6),
@@ -997,13 +1008,13 @@ class _CharacterChip extends StatelessWidget {
             completed
                 ? Icons.check_circle_outline
                 : Icons.radio_button_unchecked,
-            size: 15,
+            size: 18,
             color: completed
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(width: 6),
-          Text(character.name, style: const TextStyle(fontSize: 11)),
+          const SizedBox(width: 8),
+          Text(character.name, style: const TextStyle(fontSize: 12)),
           if (character.archived) ...[
             const SizedBox(width: 4),
             const Text('已归档',
