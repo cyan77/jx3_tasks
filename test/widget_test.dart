@@ -1410,6 +1410,21 @@ void main() {
       (navigationContainer.decoration! as BoxDecoration).borderRadius,
       BorderRadius.circular(24),
     );
+    final glassCreateButton = find.byKey(
+      const ValueKey('glass-create-task-button'),
+    );
+    expect(glassCreateButton, findsOneWidget);
+    expect(
+      find.descendant(
+        of: glassCreateButton,
+        matching: find.byType(BackdropFilter),
+      ),
+      findsOneWidget,
+    );
+    final createButton = tester.widget<FloatingActionButton>(
+      find.byType(FloatingActionButton),
+    );
+    expect(createButton.elevation, 0);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
