@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../task_editor.dart';
 import '../widgets/common.dart';
 
-enum _CompletionFilter { all, incomplete, partial, complete }
+enum _CompletionFilter {
+  all,
+  incomplete,
+  partial,
+  complete,
+  expiringSoon,
+  overdue,
+}
 
 enum _TemplateCompletion { unassigned, incomplete, partial, complete }
 
@@ -153,6 +161,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                     characters: _charactersFor(tasks),
                     gameName: _gameNameFor(tasks),
                     completion: _completionFor(tasks),
+                    expiry: _expiryFor(tasks),
                     selected: selectedTemplateIds.contains(templateId),
                     onSelected: (value) => _setSelected(templateId, value),
                     onEdit: () => showTaskEditor(
@@ -216,6 +225,21 @@ class _MatrixScreenState extends State<MatrixScreen> {
     return _TemplateCompletion.partial;
   }
 
+  TaskExpiryStatus _expiryFor(List<TaskRecord> tasks) {
+    var status = TaskExpiryStatus.normal;
+    for (final task in tasks) {
+      final current = state.taskDateFor(task);
+      final taskStatus = taskExpiryStatus(task, current);
+      if (taskStatus == TaskExpiryStatus.overdue) {
+        return TaskExpiryStatus.overdue;
+      }
+      if (taskStatus == TaskExpiryStatus.expiringSoon) {
+        status = TaskExpiryStatus.expiringSoon;
+      }
+    }
+    return status;
+  }
+
   bool _matchesGame(List<TaskRecord> tasks) =>
       gameFilterId == null || _gameIdFor(tasks) == gameFilterId;
 
@@ -235,6 +259,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
         completion == _TemplateCompletion.incomplete,
       _CompletionFilter.partial => completion == _TemplateCompletion.partial,
       _CompletionFilter.complete => completion == _TemplateCompletion.complete,
+      _CompletionFilter.expiringSoon =>
+        _expiryFor(tasks) == TaskExpiryStatus.expiringSoon,
+      _CompletionFilter.overdue =>
+        _expiryFor(tasks) == TaskExpiryStatus.overdue,
     };
   }
 
@@ -537,6 +565,11 @@ class _FilterBar extends StatelessWidget {
                   value: _CompletionFilter.partial, child: Text('部分完成')),
               DropdownMenuItem(
                   value: _CompletionFilter.complete, child: Text('已完成')),
+              DropdownMenuItem(
+                  value: _CompletionFilter.expiringSoon,
+                  child: Text('即将过期')),
+              DropdownMenuItem(
+                  value: _CompletionFilter.overdue, child: Text('已逾期')),
             ],
             onChanged: (value) {
               if (value != null) onCompletionChanged(value);
@@ -667,6 +700,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.characters,
     required this.gameName,
     required this.completion,
+    required this.expiry,
     required this.selected,
     required this.onSelected,
     required this.onEdit,
@@ -678,6 +712,7 @@ class _TaskManagementTile extends StatelessWidget {
   final List<Character> characters;
   final String gameName;
   final _TemplateCompletion completion;
+  final TaskExpiryStatus expiry;
   final bool selected;
   final ValueChanged<bool> onSelected;
   final VoidCallback onEdit;
@@ -688,6 +723,22 @@ class _TaskManagementTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final task = tasks.first;
     final scheme = Theme.of(context).colorScheme;
+    final warningColor = Theme.of(context).brightness == Brightness.dark
+        ? AppTheme.warningDark
+        : AppTheme.warning;
+    final alertColor = expiry == TaskExpiryStatus.overdue
+        ? scheme.error
+        : warningColor;
+    final cardColor = selected
+        ? scheme.primaryContainer.withValues(alpha: 0.45)
+        : expiry == TaskExpiryStatus.normal
+            ? scheme.surface
+            : alertColor.withValues(alpha: 0.06);
+    final borderColor = selected
+        ? scheme.primary
+        : expiry == TaskExpiryStatus.normal
+            ? scheme.outlineVariant
+            : alertColor.withValues(alpha: 0.65);
     final details = <String>[
       task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
       if (task.startDate != null) '开始 ${dueLabel(task.startDate)}',
@@ -695,13 +746,9 @@ class _TaskManagementTile extends StatelessWidget {
       if (task.isCountTask) '目标 ${task.targetCount} 次',
     ];
     return Material(
-      color: selected
-          ? scheme.primaryContainer.withValues(alpha: 0.45)
-          : scheme.surface,
+      color: cardColor,
       shape: RoundedRectangleBorder(
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outlineVariant,
-        ),
+        side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
@@ -733,6 +780,8 @@ class _TaskManagementTile extends StatelessWidget {
                         label: gameName,
                       ),
                       _CompletionChip(completion: completion),
+                      if (expiry != TaskExpiryStatus.normal)
+                        _ExpiryChip(expiry: expiry),
                       Text(details.join(' · '),
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.muted)),
@@ -850,6 +899,34 @@ class _CompletionChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(fontSize: 11, color: color)),
+      ]),
+    );
+  }
+}
+
+class _ExpiryChip extends StatelessWidget {
+  const _ExpiryChip({required this.expiry});
+  final TaskExpiryStatus expiry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final warningColor = Theme.of(context).brightness == Brightness.dark
+        ? AppTheme.warningDark
+        : AppTheme.warning;
+    final (label, icon, color) = expiry == TaskExpiryStatus.overdue
+        ? ('已逾期', Icons.error_outline, scheme.error)
+        : ('即将过期', Icons.schedule_outlined, warningColor);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
