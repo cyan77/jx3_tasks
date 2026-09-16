@@ -63,9 +63,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         value: validGameFilter,
                         isExpanded: true,
                         alignment: Alignment.centerRight,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                         icon: const Padding(
                           padding: EdgeInsets.only(left: 8),
-                          child: Icon(Icons.filter_list, size: 18),
+                          child: Icon(Icons.filter_list,
+                              size: 17, color: AppTheme.muted),
                         ),
                         items: [
                           const DropdownMenuItem(
