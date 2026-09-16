@@ -69,6 +69,15 @@ class _MatrixScreenState extends State<MatrixScreen> {
         title: '全部任务',
         subtitle:
             '显示 ${visibleTemplates.length} / ${templates.length} 项 · 可单选或多选管理',
+        action: OutlinedButton.icon(
+          onPressed: () => showTaskEditor(
+            context,
+            state,
+            preselectCurrentCharacter: false,
+          ),
+          icon: const Icon(Icons.add, size: 17),
+          label: const Text('新建任务'),
+        ),
         titleAction: SizedBox(
           width: searchExpanded ? 230 : 40,
           child: searchExpanded
@@ -127,22 +136,20 @@ class _MatrixScreenState extends State<MatrixScreen> {
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        child: _SelectionBar(
-          selectedCount: selectedCount,
-          allVisibleSelected: visibleIds.isNotEmpty &&
-              visibleIds.every(selectedTemplateIds.contains),
-          onToggleAll: () => _toggleAll(visibleIds),
-          onClear: selectedCount == 0
-              ? null
-              : () => setState(selectedTemplateIds.clear),
-          onAssign: selectedCount == 0 ? null : _assignSelected,
-          onMoveToInbox:
-              selectedCount == 0 ? null : _moveSelectedToInbox,
-          onDelete: selectedCount == 0 ? null : _deleteSelected,
-          onCreate: () => showTaskEditor(
-            context,
-            state,
-            preselectCurrentCharacter: false,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: _SelectionBar(
+            selectedCount: selectedCount,
+            allVisibleSelected: visibleIds.isNotEmpty &&
+                visibleIds.every(selectedTemplateIds.contains),
+            onToggleAll: () => _toggleAll(visibleIds),
+            onClear: selectedCount == 0
+                ? null
+                : () => setState(selectedTemplateIds.clear),
+            onAssign: selectedCount == 0 ? null : _assignSelected,
+            onMoveToInbox:
+                selectedCount == 0 ? null : _moveSelectedToInbox,
+            onDelete: selectedCount == 0 ? null : _deleteSelected,
           ),
         ),
       ),
@@ -651,7 +658,6 @@ class _SelectionBar extends StatelessWidget {
     required this.onAssign,
     required this.onMoveToInbox,
     required this.onDelete,
-    required this.onCreate,
   });
 
   final int selectedCount;
@@ -661,7 +667,6 @@ class _SelectionBar extends StatelessWidget {
   final VoidCallback? onAssign;
   final VoidCallback? onMoveToInbox;
   final VoidCallback? onDelete;
-  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -698,11 +703,6 @@ class _SelectionBar extends StatelessWidget {
             onPressed: onDelete,
             icon: const Icon(Icons.delete_outline, size: 17),
             label: const Text('删除'),
-          ),
-          FilledButton.icon(
-            onPressed: onCreate,
-            icon: const Icon(Icons.add, size: 17),
-            label: const Text('新建任务'),
           ),
         ],
       );

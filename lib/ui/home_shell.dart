@@ -78,9 +78,14 @@ class HomeShell extends StatelessWidget {
                         label: '设置'),
                   ],
                   ),
-            floatingActionButton: state.currentTab == 0
+            floatingActionButton:
+                state.currentTab == 0 || state.currentTab == 1
                 ? FloatingActionButton.extended(
-                    onPressed: () => showTaskEditor(context, state),
+                    onPressed: () => showTaskEditor(
+                      context,
+                      state,
+                      preselectCurrentCharacter: state.currentTab != 1,
+                    ),
                     backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.white,
                     elevation: 1,
