@@ -98,6 +98,30 @@ void main() {
     state.dispose();
   });
 
+  test('configured sync periodically checks for backups from other devices',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+      remoteCheckInterval: const Duration(milliseconds: 10),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 45));
+    expect(webDav.listCount, greaterThanOrEqualTo(2));
+
+    state.dispose();
+    final checksAfterDispose = webDav.listCount;
+    await Future<void>.delayed(const Duration(milliseconds: 25));
+    expect(webDav.listCount, checksAfterDispose);
+  });
+
   testWidgets('system back returns a secondary tab to the todo home',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -999,6 +1023,7 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   final String downloadPayload;
   int downloadCount = 0;
   int uploadCount = 0;
+  int listCount = 0;
 
   @override
   Future<String> downloadBackup(
@@ -1016,5 +1041,8 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   }
 
   @override
-  Future<List<RemoteBackup>> listBackups(SyncConfig config) async => const [];
+  Future<List<RemoteBackup>> listBackups(SyncConfig config) async {
+    listCount++;
+    return const [];
+  }
 }

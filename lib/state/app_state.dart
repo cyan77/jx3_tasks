@@ -13,6 +13,7 @@ class AppState extends ChangeNotifier {
     SyncSettingsStore? syncSettingsStore,
     WebDavSyncService? webDavSyncService,
     ThemeSettingsStore? themeSettingsStore,
+    this.remoteCheckInterval = const Duration(minutes: 1),
   })  : syncSettingsStore = syncSettingsStore ?? SyncSettingsStore(),
         webDavSyncService = webDavSyncService ?? WebDavSyncService(),
         themeSettingsStore = themeSettingsStore ?? ThemeSettingsStore() {
@@ -26,7 +27,9 @@ class AppState extends ChangeNotifier {
   final SyncSettingsStore syncSettingsStore;
   final WebDavSyncService webDavSyncService;
   final ThemeSettingsStore themeSettingsStore;
+  final Duration remoteCheckInterval;
   Timer? _autoSyncTimer;
+  Timer? _remoteCheckTimer;
   Timer? _changeSyncTimer;
   Timer? _backupCheckRetryTimer;
   Timer? _taskDayTimer;
@@ -172,6 +175,7 @@ class AppState extends ChangeNotifier {
     _syncConfig = await syncSettingsStore.load();
     _lastSyncAt = await syncSettingsStore.loadLastSyncAt();
     _scheduleAutoSync();
+    _scheduleRemoteBackupChecks();
     _scheduleChangeSync();
     notifyListeners();
     await checkForNewerBackupWithRetry();
@@ -180,6 +184,7 @@ class AppState extends ChangeNotifier {
   Future<void> reloadSyncSettings() async {
     _syncConfig = await syncSettingsStore.load();
     _scheduleAutoSync();
+    _scheduleRemoteBackupChecks();
     _scheduleChangeSync();
     notifyListeners();
     await checkForNewerBackup();
@@ -221,6 +226,20 @@ class AppState extends ChangeNotifier {
       Duration(minutes: config.autoSyncMinutes),
       (_) => checkAutoSync(),
     );
+  }
+
+  void _scheduleRemoteBackupChecks() {
+    _remoteCheckTimer?.cancel();
+    final config = _syncConfig;
+    if (config == null || !config.isValid) return;
+    _remoteCheckTimer = Timer.periodic(remoteCheckInterval, (_) {
+      if (_newerRemoteBackup == null &&
+          !backupCheckBusy &&
+          !syncBusy &&
+          !restoreBusy) {
+        unawaited(checkForNewerBackup(silent: true));
+      }
+    });
   }
 
   void _scheduleTaskDayRefresh() {
@@ -327,7 +346,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> checkForNewerBackup() async {
+  Future<bool> checkForNewerBackup({bool silent = false}) async {
     if (backupCheckBusy || syncBusy || restoreBusy) return false;
     final config = _syncConfig ?? await syncSettingsStore.load();
     _syncConfig = config;
@@ -336,8 +355,9 @@ class AppState extends ChangeNotifier {
       return false;
     }
     backupCheckBusy = true;
+    final previousBackupPath = _newerRemoteBackup?.path;
     final syncGenerationAtStart = _successfulSyncGeneration;
-    notifyListeners();
+    if (!silent) notifyListeners();
     try {
       final backups = await webDavSyncService.listBackups(config);
       final latest = backups.firstOrNull;
@@ -359,7 +379,9 @@ class AppState extends ChangeNotifier {
       return false;
     } finally {
       backupCheckBusy = false;
-      notifyListeners();
+      if (!silent || previousBackupPath != _newerRemoteBackup?.path) {
+        notifyListeners();
+      }
     }
   }
 
@@ -1086,6 +1108,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _remoteCheckTimer?.cancel();
     _changeSyncTimer?.cancel();
     _backupCheckRetryTimer?.cancel();
     _taskDayTimer?.cancel();
