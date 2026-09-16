@@ -161,9 +161,20 @@ class _MatrixScreenState extends State<MatrixScreen> {
                     characters: _charactersFor(tasks),
                     gameName: _gameNameFor(tasks),
                     completion: _completionFor(tasks),
+                    completedTaskIds: tasks
+                        .where((task) => task.isCompletedOn(
+                              state.taskDateFor(task),
+                            ))
+                        .map((task) => task.id)
+                        .toSet(),
                     expiry: _expiryFor(tasks),
                     selected: selectedTemplateIds.contains(templateId),
                     onSelected: (value) => _setSelected(templateId, value),
+                    onToggleTask: (task) => state.setTaskCompleted(
+                      task,
+                      completed:
+                          !task.isCompletedOn(state.taskDateFor(task)),
+                    ),
                     onEdit: () => showTaskEditor(
                       context,
                       state,
@@ -502,6 +513,7 @@ class _FilterBar extends StatelessWidget {
     required this.gameId,
     required this.characterId,
     required this.completion,
+    required this.completedTaskIds,
     required this.onGameChanged,
     required this.onCharacterChanged,
     required this.onCompletionChanged,
@@ -703,9 +715,11 @@ class _TaskManagementTile extends StatelessWidget {
     required this.characters,
     required this.gameName,
     required this.completion,
+    required this.completedTaskIds,
     required this.expiry,
     required this.selected,
     required this.onSelected,
+    required this.onToggleTask,
     required this.onEdit,
     required this.onMoveToInbox,
     required this.onDelete,
@@ -715,9 +729,11 @@ class _TaskManagementTile extends StatelessWidget {
   final List<Character> characters;
   final String gameName;
   final _TemplateCompletion completion;
+  final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
   final bool selected;
   final ValueChanged<bool> onSelected;
+  final ValueChanged<TaskRecord> onToggleTask;
   final VoidCallback onEdit;
   final VoidCallback onMoveToInbox;
   final VoidCallback onDelete;
@@ -725,6 +741,10 @@ class _TaskManagementTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final task = tasks.first;
+    final assignedTasks = tasks.where((item) => !item.isInbox).toList();
+    final completedCount = assignedTasks
+        .where((item) => completedTaskIds.contains(item.id))
+        .length;
     final scheme = Theme.of(context).colorScheme;
     final warningColor = Theme.of(context).brightness == Brightness.dark
         ? AppTheme.warningDark
@@ -782,7 +802,11 @@ class _TaskManagementTile extends StatelessWidget {
                         icon: Icons.sports_esports_outlined,
                         label: gameName,
                       ),
-                      _CompletionChip(completion: completion),
+                      _CompletionChip(
+                        completion: completion,
+                        completedCount: completedCount,
+                        totalCount: assignedTasks.length,
+                      ),
                       if (expiry != TaskExpiryStatus.normal)
                         _ExpiryChip(expiry: expiry),
                       Text(details.join(' · '),
@@ -801,8 +825,19 @@ class _TaskManagementTile extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 6,
                       children: characters
-                          .map((character) =>
-                              _CharacterChip(character: character))
+                          .map((character) {
+                            final characterTask = assignedTasks.firstWhere(
+                              (item) => item.characterId == character.id,
+                            );
+                            final completed =
+                                completedTaskIds.contains(characterTask.id);
+                            return _CharacterChip(
+                              character: character,
+                              task: characterTask,
+                              completed: completed,
+                              onTap: () => onToggleTask(characterTask),
+                            );
+                          })
                           .toList(),
                     ),
                   if (task.note.isNotEmpty) ...[
@@ -834,14 +869,27 @@ class _TaskManagementTile extends StatelessWidget {
       ),
     );
   }
+
 }
 
 class _CharacterChip extends StatelessWidget {
-  const _CharacterChip({required this.character});
+  const _CharacterChip({
+    required this.character,
+    required this.task,
+    required this.completed,
+    required this.onTap,
+  });
   final Character character;
+  final TaskRecord task;
+  final bool completed;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => InkWell(
+    key: ValueKey('task-character-${task.id}'),
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(6),
+    child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -851,13 +899,23 @@ class _CharacterChip extends StatelessWidget {
           CharacterAvatar(character: character, size: 18),
           const SizedBox(width: 5),
           Text(character.name, style: const TextStyle(fontSize: 11)),
+          const SizedBox(width: 6),
+          Icon(
+            completed
+                ? Icons.check_circle_outline
+                : Icons.radio_button_unchecked,
+            size: 15,
+            color: completed
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           if (character.archived) ...[
             const SizedBox(width: 4),
             const Text('已归档',
                 style: TextStyle(fontSize: 9, color: AppTheme.muted)),
           ],
         ]),
-      );
+      ));
 }
 
 class _StatusChip extends StatelessWidget {
@@ -882,8 +940,14 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _CompletionChip extends StatelessWidget {
-  const _CompletionChip({required this.completion});
+  const _CompletionChip({
+    required this.completion,
+    required this.completedCount,
+    required this.totalCount,
+  });
   final _TemplateCompletion completion;
+  final int completedCount;
+  final int totalCount;
 
   @override
   Widget build(BuildContext context) {
@@ -894,7 +958,8 @@ class _CompletionChip extends StatelessWidget {
       _TemplateCompletion.incomplete =>
         ('未完成', Icons.radio_button_unchecked, scheme.onSurfaceVariant),
       _TemplateCompletion.partial =>
-        ('部分完成', Icons.timelapse_outlined, scheme.tertiary),
+        ('已完成 $completedCount/$totalCount',
+          Icons.timelapse_outlined, scheme.tertiary),
       _TemplateCompletion.complete =>
         ('已完成', Icons.check_circle_outline, scheme.primary),
     };
