@@ -375,6 +375,10 @@ class _SyncScreenState extends State<SyncScreen> {
                                         if (index > 0) const Divider(height: 1),
                                         _RemoteBackupTile(
                                           backup: backups[index],
+                                          isLatest: index == 0,
+                                          isCurrent: backups[index].path ==
+                                              widget.state
+                                                  .currentRemoteBackupPath,
                                           onRestore: busy
                                               ? null
                                               : () => _restoreBackup(
@@ -461,9 +465,16 @@ class _SyncScreenState extends State<SyncScreen> {
 }
 
 class _RemoteBackupTile extends StatelessWidget {
-  const _RemoteBackupTile({required this.backup, required this.onRestore});
+  const _RemoteBackupTile({
+    required this.backup,
+    required this.isLatest,
+    required this.isCurrent,
+    required this.onRestore,
+  });
 
   final RemoteBackup backup;
+  final bool isLatest;
+  final bool isCurrent;
   final VoidCallback? onRestore;
 
   @override
@@ -477,10 +488,25 @@ class _RemoteBackupTile extends StatelessWidget {
       dense: true,
       leading: const Icon(Icons.cloud_done_outlined,
           size: 20, color: AppTheme.accent),
-      title: Text(backup.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(backup.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+          if (isCurrent) ...[
+            const SizedBox(width: 6),
+            const _BackupVersionBadge(label: '当前版本', emphasized: true),
+          ],
+          if (isLatest) ...[
+            const SizedBox(width: 6),
+            const _BackupVersionBadge(label: '最新版本'),
+          ],
+        ],
+      ),
       subtitle: Text('$modified$size',
           style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
       trailing: OutlinedButton(
@@ -502,6 +528,39 @@ class _RemoteBackupTile extends StatelessWidget {
     if (value < 1024) return '$value B';
     if (value < 1024 * 1024) return '${(value / 1024).toStringAsFixed(1)} KB';
     return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+class _BackupVersionBadge extends StatelessWidget {
+  const _BackupVersionBadge({required this.label, this.emphasized = false});
+
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color:
+            emphasized ? scheme.primaryContainer : scheme.surfaceContainerLow,
+        border: Border.all(
+          color: emphasized ? scheme.primary : scheme.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: emphasized
+              ? scheme.onPrimaryContainer
+              : scheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 }
 

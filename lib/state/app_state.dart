@@ -37,7 +37,7 @@ class AppState extends ChangeNotifier {
   SyncConfig? _syncConfig;
   DateTime? _lastSyncAt;
   RemoteBackup? _newerRemoteBackup;
-  String? _lastUploadedBackupPath;
+  String? _currentRemoteBackupPath;
   int _successfulSyncGeneration = 0;
   int _dataRevision = 0;
   int _syncedRevision = 0;
@@ -64,6 +64,7 @@ class AppState extends ChangeNotifier {
   SyncConfig? get syncConfig => _syncConfig;
   DateTime? get lastSyncAt => _lastSyncAt;
   RemoteBackup? get newerRemoteBackup => _newerRemoteBackup;
+  String? get currentRemoteBackupPath => _currentRemoteBackupPath;
 
   Game? gameForTask(TaskRecord task) {
     final gameId = task.isInbox
@@ -174,6 +175,8 @@ class AppState extends ChangeNotifier {
   Future<void> _initializeSync() async {
     _syncConfig = await syncSettingsStore.load();
     _lastSyncAt = await syncSettingsStore.loadLastSyncAt();
+    _currentRemoteBackupPath =
+        await syncSettingsStore.loadCurrentBackupPath();
     _scheduleAutoSync();
     _scheduleRemoteBackupChecks();
     _scheduleChangeSync();
@@ -327,11 +330,12 @@ class AppState extends ChangeNotifier {
       final backup = await webDavSyncService.upload(config, exportBackup());
       _lastSyncAt = DateTime.now();
       _syncedRevision = revisionAtStart;
-      _lastUploadedBackupPath = backup.path;
+      _currentRemoteBackupPath = backup.path;
       _successfulSyncGeneration++;
       _newerRemoteBackup = null;
       syncSucceeded = true;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
+      await syncSettingsStore.saveCurrentBackupPath(backup.path);
       syncMessage = '已同步 · ${backup.name}';
       return true;
     } catch (error) {
@@ -365,7 +369,7 @@ class AppState extends ChangeNotifier {
           latest == null ? null : webDavSyncService.backupTime(latest);
       if (syncGenerationAtStart == _successfulSyncGeneration) {
         final isOwnLatest =
-            latest != null && latest.path == _lastUploadedBackupPath;
+            latest != null && latest.path == _currentRemoteBackupPath;
         _newerRemoteBackup = !isOwnLatest &&
                 latest != null &&
                 (_lastSyncAt == null ||
@@ -399,8 +403,10 @@ class AppState extends ChangeNotifier {
       _dataRevision = 0;
       _syncedRevision = 0;
       _lastSyncAt = DateTime.now();
+      _currentRemoteBackupPath = backup.path;
       _newerRemoteBackup = null;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
+      await syncSettingsStore.saveCurrentBackupPath(backup.path);
       syncMessage = '已恢复 · ${backup.name}';
     } finally {
       restoreBusy = false;
@@ -429,7 +435,9 @@ class AppState extends ChangeNotifier {
     _scheduleTaskDayRefresh();
     if (markAsLocalChange) {
       _dataRevision++;
+      _currentRemoteBackupPath = null;
       _newerRemoteBackup = null;
+      await syncSettingsStore.saveCurrentBackupPath(null);
       _scheduleChangeSync();
     }
     notifyListeners();
