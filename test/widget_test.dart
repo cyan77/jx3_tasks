@@ -245,6 +245,108 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('all tasks page supports selecting multiple task templates',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'task-1-char-1',
+          templateId: 'task-1',
+          title: '任务一',
+          characterId: 'char-1',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'task-2-char-1',
+          templateId: 'task-2',
+          title: '任务二',
+          characterId: 'char-1',
+          frequency: TaskFrequency.weekly,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+      ];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+    );
+    await tester.pump();
+
+    expect(find.text('全部任务'), findsOneWidget);
+    expect(find.text('任务一'), findsOneWidget);
+    expect(find.text('任务二'), findsOneWidget);
+    await tester.tap(find.byType(Checkbox).at(0));
+    await tester.pump();
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.pump();
+    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.text('批量分配'), findsOneWidget);
+    state.dispose();
+  });
+
+  test('multiple task templates can be assigned to characters together',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [
+        for (final id in ['task-1', 'task-2'])
+          TaskRecord(
+            id: '$id-char-1',
+            templateId: id,
+            title: id,
+            characterId: 'char-1',
+            frequency: TaskFrequency.daily,
+            createdAt: DateTime(2026, 9, 1),
+          ),
+      ];
+    final state = AppState(store);
+
+    final skipped = await state.assignTaskTemplatesToCharacters(
+      templateIds: {'task-1', 'task-2'},
+      characterIds: {'char-2'},
+    );
+
+    expect(skipped, isEmpty);
+    expect(store.tasks, hasLength(4));
+    expect(
+      store.tasks.where((task) => task.characterId == 'char-2').length,
+      2,
+    );
+    state.dispose();
+  });
+
   test('date helpers return stable calendar boundaries', () {
     final date = DateTime(2026, 9, 10, 14, 30);
     expect(dateKey(date), '2026-09-10');

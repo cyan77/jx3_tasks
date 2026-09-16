@@ -124,7 +124,7 @@ class _SideRail extends StatelessWidget {
                 state: state),
             _RailItem(
                 icon: Icons.checklist_outlined,
-                label: '任务',
+                label: '全部任务',
                 index: 1,
                 state: state),
             _RailItem(
