@@ -343,6 +343,15 @@ void main() {
           frequency: TaskFrequency.daily,
           createdAt: DateTime.now().subtract(const Duration(days: 1)),
         ),
+        TaskRecord(
+          id: 'expiring-char-2',
+          templateId: 'expiring',
+          title: '即将过期任务',
+          characterId: 'char-2',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          dueDate: startOfDay(DateTime.now()),
+        ),
       ];
     final state = AppState(store);
 
@@ -358,10 +367,23 @@ void main() {
     expect(firstFilter.style?.fontSize, 12);
     expect(find.text('已完成任务'), findsOneWidget);
     expect(find.text('未完成任务'), findsOneWidget);
+    expect(find.text('即将过期任务'), findsOneWidget);
+    expect(find.text('即将过期'), findsOneWidget);
 
     final dropdowns =
         find.byWidgetPredicate((widget) => widget is DropdownButton);
     expect(dropdowns, findsNWidgets(3));
+    await tester.tap(dropdowns.at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('即将过期').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('即将过期任务'), findsOneWidget);
+    expect(find.text('已完成任务'), findsNothing);
+    expect(find.text('未完成任务'), findsNothing);
+
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
     await tester.tap(dropdowns.at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('已完成').last);
