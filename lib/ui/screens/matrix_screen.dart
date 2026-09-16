@@ -613,6 +613,9 @@ class _FilterDropdown<T> extends StatelessWidget {
             child: DropdownButton<T>(
               value: value,
               isDense: true,
+              elevation: 0,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              focusColor: Colors.transparent,
               icon: const Icon(Icons.expand_more,
                   size: 16, color: AppTheme.muted),
               style: TextStyle(

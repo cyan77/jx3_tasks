@@ -385,6 +385,8 @@ void main() {
     );
     expect(firstFilter.style?.fontWeight, FontWeight.w400);
     expect(firstFilter.style?.fontSize, 12);
+    expect(firstFilter.elevation, 0);
+    expect(firstFilter.focusColor, Colors.transparent);
     expect(find.text('已完成任务'), findsOneWidget);
     expect(find.text('未完成任务'), findsOneWidget);
     expect(find.text('即将过期任务'), findsOneWidget);
