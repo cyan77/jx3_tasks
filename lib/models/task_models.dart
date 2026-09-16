@@ -266,6 +266,7 @@ class TaskRecord {
     this.note = '',
     this.inboxGameId,
     this.inboxFrequencySet = false,
+    this.archived = false,
   });
 
   final String id;
@@ -283,6 +284,7 @@ class TaskRecord {
   final String note;
   final String? inboxGameId;
   final bool inboxFrequencySet;
+  final bool archived;
 
   bool get isInbox => characterId.isEmpty;
   bool get hasConfiguredFrequency => !isInbox || inboxFrequencySet;
@@ -305,6 +307,7 @@ class TaskRecord {
     String? note,
     String? inboxGameId,
     bool? inboxFrequencySet,
+    bool? archived,
   }) =>
       TaskRecord(
         id: id,
@@ -322,6 +325,7 @@ class TaskRecord {
         note: note ?? this.note,
         inboxGameId: inboxGameId ?? this.inboxGameId,
         inboxFrequencySet: inboxFrequencySet ?? this.inboxFrequencySet,
+        archived: archived ?? this.archived,
       );
 
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
@@ -415,6 +419,7 @@ class TaskRecord {
         'note': note,
         'inboxGameId': inboxGameId,
         'inboxFrequencySet': inboxFrequencySet,
+        'archived': archived,
       };
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
@@ -442,6 +447,7 @@ class TaskRecord {
         note: json['note'] as String? ?? '',
         inboxGameId: json['inboxGameId'] as String?,
         inboxFrequencySet: json['inboxFrequencySet'] as bool? ?? false,
+        archived: json['archived'] as bool? ?? false,
       );
 }
 

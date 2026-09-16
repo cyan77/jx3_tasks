@@ -1112,6 +1112,58 @@ void main() {
     expect(state.inboxTasks, hasLength(1));
   });
 
+  test('task templates can be archived, restored, and serialized', () async {
+    SharedPreferences.setMockInitialValues({});
+    TaskRecord assigned(String id, String characterId) => TaskRecord(
+          id: id,
+          templateId: 'template-archive',
+          title: '可归档任务',
+          characterId: characterId,
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [assigned('task-1', 'char-1'), assigned('task-2', 'char-2')];
+    final state = AppState(store);
+
+    await state.setTaskTemplatesArchived(
+      {'template-archive'},
+      archived: true,
+    );
+
+    expect(state.tasks, isEmpty);
+    expect(state.calendarTasks(), isEmpty);
+    expect(store.tasks.every((task) => task.archived), isTrue);
+    expect(TaskRecord.fromJson(store.tasks.first.toJson()).archived, isTrue);
+
+    await state.setTaskTemplatesArchived(
+      {'template-archive'},
+      archived: false,
+    );
+
+    expect(state.tasks, hasLength(2));
+    expect(store.tasks.every((task) => !task.archived), isTrue);
+  });
+
   test('an inbox task without a start date begins when it is assigned',
       () async {
     SharedPreferences.setMockInitialValues({});

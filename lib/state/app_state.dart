@@ -96,11 +96,13 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> get tasks {
     final characterIds = characters.map((item) => item.id).toSet();
     return store.tasks
-        .where((task) => characterIds.contains(task.characterId))
+        .where((task) =>
+            !task.archived && characterIds.contains(task.characterId))
         .toList();
   }
   List<TaskRecord> get inboxTasks => store.tasks
       .where((task) =>
+          !task.archived &&
           task.isInbox &&
           task.inboxGameId == selectedGameId)
       .toList();
@@ -111,9 +113,9 @@ class AppState extends ChangeNotifier {
         .map((character) => character.id)
         .toSet();
     return store.tasks
-        .where((task) => task.isInbox
+        .where((task) => !task.archived && (task.isInbox
             ? task.inboxGameId == selectedGameId
-            : characterIds.contains(task.characterId))
+            : characterIds.contains(task.characterId)))
         .toList();
   }
 
@@ -182,7 +184,8 @@ class AppState extends ChangeNotifier {
         .map((character) => character.id)
         .toSet();
     return store.tasks
-        .where((task) => characterIds.contains(task.characterId))
+        .where((task) =>
+            !task.archived && characterIds.contains(task.characterId))
         .toList();
   }
 
@@ -953,6 +956,23 @@ class AppState extends ChangeNotifier {
       store.tasks.removeWhere((task) => task.id == source.id);
     }
     if (store.tasks.length != before) await _saveDataChange();
+  }
+
+  Future<void> setTaskTemplatesArchived(
+    Set<String> templateIds, {
+    required bool archived,
+  }) async {
+    var changed = false;
+    for (var index = 0; index < store.tasks.length; index++) {
+      final task = store.tasks[index];
+      if (!templateIds.contains(task.templateId) ||
+          task.archived == archived) {
+        continue;
+      }
+      store.tasks[index] = task.copyWith(archived: archived);
+      changed = true;
+    }
+    if (changed) await _saveDataChange();
   }
 
   Future<void> moveTaskToInbox(
