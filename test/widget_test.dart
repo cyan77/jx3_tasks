@@ -311,6 +311,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('全部任务'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
     expect(find.text('任务一'), findsOneWidget);
     expect(find.text('任务二'), findsOneWidget);
     await tester.tap(find.byType(Checkbox).at(0));
@@ -320,6 +321,10 @@ void main() {
     expect(find.text('已选 2 项'), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
     expect(find.text('移到收集箱'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.widgetWithText(OutlinedButton, '取消全选')).dx,
+      20,
+    );
     state.dispose();
   });
 
