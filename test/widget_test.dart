@@ -301,7 +301,12 @@ void main() {
     final state = AppState(store);
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(
+          home: Scaffold(body: MatrixScreen(state: state)),
+        ),
+      ),
     );
     await tester.pump();
 
@@ -477,7 +482,12 @@ void main() {
     final state = AppState(store);
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(
+          home: Scaffold(body: MatrixScreen(state: state)),
+        ),
+      ),
     );
     await tester.pump();
 
