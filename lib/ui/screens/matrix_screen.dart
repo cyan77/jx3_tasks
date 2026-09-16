@@ -891,10 +891,6 @@ class _CharacterChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          CharacterAvatar(character: character, size: 18),
-          const SizedBox(width: 5),
-          Text(character.name, style: const TextStyle(fontSize: 11)),
-          const SizedBox(width: 6),
           Icon(
             completed
                 ? Icons.check_circle_outline
@@ -904,6 +900,8 @@ class _CharacterChip extends StatelessWidget {
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
+          const SizedBox(width: 6),
+          Text(character.name, style: const TextStyle(fontSize: 11)),
           if (character.archived) ...[
             const SizedBox(width: 4),
             const Text('已归档',
