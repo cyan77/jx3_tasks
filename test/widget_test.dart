@@ -323,6 +323,26 @@ void main() {
     expect(state.isTaskScheduledOn(weeklyTask, DateTime(2026, 9, 14)), isFalse);
   });
 
+  test('task start date controls scheduling and survives backup round trips', () {
+    final task = TaskRecord(
+      id: 'daily-starting-later',
+      templateId: 'daily-starting-later',
+      title: '稍后开始',
+      characterId: 'char-1',
+      frequency: TaskFrequency.daily,
+      createdAt: DateTime(2026, 9, 1),
+      startDate: DateTime(2026, 9, 20),
+    );
+
+    expect(task.hasStartedBy(DateTime(2026, 9, 19)), isFalse);
+    expect(task.isScheduledOn(DateTime(2026, 9, 19)), isFalse);
+    expect(task.isScheduledOn(DateTime(2026, 9, 20)), isTrue);
+
+    final restored = TaskRecord.fromJson(task.toJson());
+    expect(restored.startDate, DateTime(2026, 9, 20));
+    expect(restored.isScheduledOn(DateTime(2026, 9, 20)), isTrue);
+  });
+
   test('count task tracks completions independently', () {
     final task = TaskRecord(
       id: '1',
@@ -665,6 +685,49 @@ void main() {
     await state.deleteTask(state.tasks.single, allLinked: true);
     expect(state.tasks, isEmpty);
     expect(state.inboxTasks, hasLength(1));
+  });
+
+  test('an inbox task without a start date begins when it is assigned',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final inbox = TaskRecord(
+      id: 'template-later-inbox',
+      templateId: 'template-later',
+      title: '稍后分配',
+      characterId: '',
+      frequency: TaskFrequency.daily,
+      createdAt: DateTime(2026, 1, 1),
+      inboxGameId: 'game-jx3',
+      inboxFrequencySet: true,
+    );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [inbox];
+    final state = AppState(store);
+    final beforeAssignment = DateTime.now();
+
+    await state.assignInboxTask(
+      source: inbox,
+      title: inbox.title,
+      characterIds: {'char-1'},
+      frequency: inbox.frequency,
+      targetCount: 1,
+    );
+
+    final assigned = store.tasks.single;
+    expect(assigned.startDate, isNull);
+    expect(assigned.createdAt.isBefore(beforeAssignment), isFalse);
+    expect(assigned.hasStartedBy(DateTime.now()), isTrue);
   });
 
   test('weekly and monthly tasks keep completion for their period', () {

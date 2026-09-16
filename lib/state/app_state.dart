@@ -86,6 +86,10 @@ class AppState extends ChangeNotifier {
         date,
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
       );
+  bool hasTaskStartedBy(TaskRecord task, DateTime date) => task.hasStartedBy(
+        date,
+        dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
+      );
   List<Character> get characters => store.characters
       .where((item) => item.gameId == selectedGameId && !item.archived)
       .toList();
@@ -589,6 +593,7 @@ class AppState extends ChangeNotifier {
     required String title,
     required List<String> characterIds,
     required TaskFrequency frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
@@ -604,6 +609,7 @@ class AppState extends ChangeNotifier {
           characterId: characterId,
           frequency: frequency,
           createdAt: now,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays,
@@ -619,6 +625,7 @@ class AppState extends ChangeNotifier {
   Future<void> addInboxTask({
     required String title,
     TaskFrequency? frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     int targetCount = 1,
     List<int> weeklyDays = const [],
@@ -634,6 +641,7 @@ class AppState extends ChangeNotifier {
       characterId: '',
       frequency: frequency ?? TaskFrequency.once,
       createdAt: now,
+      startDate: startDate,
       dueDate: dueDate,
       targetCount: frequency == null ? 1 : targetCount,
       weeklyDays: frequency == null ? const [] : [...weeklyDays],
@@ -651,6 +659,7 @@ class AppState extends ChangeNotifier {
     required TaskRecord source,
     required String title,
     TaskFrequency? frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     int targetCount = 1,
     List<int> weeklyDays = const [],
@@ -662,6 +671,8 @@ class AppState extends ChangeNotifier {
     store.tasks[index] = source.copyWith(
       title: title,
       frequency: frequency ?? TaskFrequency.once,
+      startDate: startDate,
+      clearStartDate: startDate == null,
       dueDate: dueDate,
       clearDueDate: dueDate == null,
       targetCount: frequency == null ? 1 : targetCount,
@@ -678,6 +689,7 @@ class AppState extends ChangeNotifier {
     required String title,
     required Set<String> characterIds,
     required TaskFrequency frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
@@ -690,6 +702,7 @@ class AppState extends ChangeNotifier {
         .where(characterIds.contains)
         .toList();
     if (validCharacterIds.isEmpty) return;
+    final assignedAt = DateTime.now();
     store.tasks.removeWhere((task) => task.id == source.id);
     store.tasks.addAll(validCharacterIds.map((characterId) => TaskRecord(
           id: '${source.templateId}-$characterId',
@@ -697,7 +710,8 @@ class AppState extends ChangeNotifier {
           title: title,
           characterId: characterId,
           frequency: frequency,
-          createdAt: source.createdAt,
+          createdAt: assignedAt,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: [...weeklyDays],
@@ -714,6 +728,7 @@ class AppState extends ChangeNotifier {
     required String title,
     required Set<String> characterIds,
     required TaskFrequency frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
@@ -727,6 +742,7 @@ class AppState extends ChangeNotifier {
     final existingByCharacter = {
       for (final task in linkedTasks) task.characterId: task,
     };
+    final assignedAt = DateTime.now();
 
     store.tasks.removeWhere((task) =>
         task.templateId == source.templateId &&
@@ -741,7 +757,8 @@ class AppState extends ChangeNotifier {
           title: title,
           characterId: characterId,
           frequency: frequency,
-          createdAt: source.createdAt,
+          createdAt: assignedAt,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: [...weeklyDays],
@@ -757,6 +774,8 @@ class AppState extends ChangeNotifier {
       store.tasks[index] = existing.copyWith(
         title: title,
         frequency: frequency,
+        startDate: startDate,
+        clearStartDate: startDate == null,
         dueDate: dueDate,
         clearDueDate: dueDate == null,
         targetCount: targetCount,
@@ -772,6 +791,7 @@ class AppState extends ChangeNotifier {
     required TaskRecord source,
     required String title,
     required TaskFrequency frequency,
+    DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
     List<int> weeklyDays = const [],
@@ -783,6 +803,8 @@ class AppState extends ChangeNotifier {
     store.tasks[index] = source.copyWith(
       title: title,
       frequency: frequency,
+      startDate: startDate,
+      clearStartDate: startDate == null,
       dueDate: dueDate,
       clearDueDate: dueDate == null,
       targetCount: targetCount,
@@ -808,13 +830,15 @@ class AppState extends ChangeNotifier {
             characterIds.contains(id) && !existingCharacterIds.contains(id))
         .toList();
     if (validCharacterIds.isEmpty) return;
+    final assignedAt = DateTime.now();
     store.tasks.addAll(validCharacterIds.map((characterId) => TaskRecord(
           id: '${source.templateId}-$characterId',
           templateId: source.templateId,
           title: source.title,
           characterId: characterId,
           frequency: source.frequency,
-          createdAt: source.createdAt,
+          createdAt: assignedAt,
+          startDate: source.startDate,
           dueDate: source.dueDate,
           targetCount: source.targetCount,
           weeklyDays: [...source.weeklyDays],
@@ -866,6 +890,7 @@ class AppState extends ChangeNotifier {
       characterId: '',
       frequency: source.frequency,
       createdAt: source.createdAt,
+      startDate: source.startDate,
       dueDate: source.dueDate,
       targetCount: source.targetCount,
       weeklyDays: [...source.weeklyDays],
