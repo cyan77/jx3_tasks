@@ -188,9 +188,10 @@ class _GameBar extends StatelessWidget {
                 focusColor: Colors.transparent,
                 icon: const Icon(Icons.unfold_more, size: 18),
                 style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant),
                 items: state.games
                     .map((game) => DropdownMenuItem(
                           value: game.id,
