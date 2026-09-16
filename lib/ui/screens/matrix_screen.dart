@@ -87,31 +87,34 @@ class _MatrixScreenState extends State<MatrixScreen> {
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-        child: _FilterBar(
-          games: state.games,
-          characters: _filterCharacters,
-          gameId: gameFilterId,
-          characterId: characterFilterId,
-          completion: completionFilter,
-          onGameChanged: (value) => setState(() {
-            gameFilterId = value;
-            selectedTemplateIds.clear();
-            if (characterFilterId != null &&
-                characterFilterId != _FilterBar.inboxValue &&
-                !_filterCharacters
-                    .any((character) => character.id == characterFilterId)) {
-              characterFilterId = null;
-            }
-          }),
-          onCharacterChanged: (value) => setState(() {
-            characterFilterId = value;
-            selectedTemplateIds.clear();
-          }),
-          onCompletionChanged: (value) => setState(() {
-            completionFilter = value;
-            selectedTemplateIds.clear();
-          }),
-          onReset: _hasActiveFilters ? _resetFilters : null,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: _FilterBar(
+            games: state.games,
+            characters: _filterCharacters,
+            gameId: gameFilterId,
+            characterId: characterFilterId,
+            completion: completionFilter,
+            onGameChanged: (value) => setState(() {
+              gameFilterId = value;
+              selectedTemplateIds.clear();
+              if (characterFilterId != null &&
+                  characterFilterId != _FilterBar.inboxValue &&
+                  !_filterCharacters.any(
+                      (character) => character.id == characterFilterId)) {
+                characterFilterId = null;
+              }
+            }),
+            onCharacterChanged: (value) => setState(() {
+              characterFilterId = value;
+              selectedTemplateIds.clear();
+            }),
+            onCompletionChanged: (value) => setState(() {
+              completionFilter = value;
+              selectedTemplateIds.clear();
+            }),
+            onReset: _hasActiveFilters ? _resetFilters : null,
+          ),
         ),
       ),
       Padding(
@@ -577,6 +580,13 @@ class _FilterDropdown<T> extends StatelessWidget {
             child: DropdownButton<T>(
               value: value,
               isDense: true,
+              icon: const Icon(Icons.expand_more,
+                  size: 16, color: AppTheme.muted),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               items: items,
               onChanged: onChanged,
             ),

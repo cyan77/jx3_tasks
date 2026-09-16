@@ -350,6 +350,12 @@ void main() {
       MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
     );
     await tester.pump();
+    expect(tester.getTopLeft(find.byTooltip('按游戏筛选')).dx, 20);
+    final firstFilter = tester.widget<DropdownButton<dynamic>>(
+      find.byWidgetPredicate((widget) => widget is DropdownButton).first,
+    );
+    expect(firstFilter.style?.fontWeight, FontWeight.w400);
+    expect(firstFilter.style?.fontSize, 12);
     expect(find.text('已完成任务'), findsOneWidget);
     expect(find.text('未完成任务'), findsOneWidget);
 
