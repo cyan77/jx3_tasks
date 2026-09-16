@@ -105,6 +105,18 @@ class AppState extends ChangeNotifier {
           task.inboxGameId == selectedGameId)
       .toList();
 
+  List<TaskRecord> get allTasksForSelectedGame {
+    final characterIds = store.characters
+        .where((character) => character.gameId == selectedGameId)
+        .map((character) => character.id)
+        .toSet();
+    return store.tasks
+        .where((task) => task.isInbox
+            ? task.inboxGameId == selectedGameId
+            : characterIds.contains(task.characterId))
+        .toList();
+  }
+
   Character? get selectedCharacter =>
       characters.where((item) => item.id == selectedCharacterId).firstOrNull;
 
@@ -848,6 +860,43 @@ class AppState extends ChangeNotifier {
           note: source.note,
         )));
     await _saveDataChange();
+  }
+
+  Future<List<String>> assignTaskTemplatesToCharacters({
+    required Set<String> templateIds,
+    required Set<String> characterIds,
+  }) async {
+    final skipped = <String>[];
+    for (final templateId in templateIds) {
+      final source = store.tasks
+          .where((task) => task.templateId == templateId)
+          .firstOrNull;
+      if (source == null) continue;
+      if (source.isInbox) {
+        if (!source.hasConfiguredFrequency) {
+          skipped.add(source.title);
+          continue;
+        }
+        await assignInboxTask(
+          source: source,
+          title: source.title,
+          characterIds: characterIds,
+          frequency: source.frequency,
+          startDate: source.startDate,
+          dueDate: source.dueDate,
+          targetCount: source.targetCount,
+          weeklyDays: source.weeklyDays,
+          subtasks: source.subtasks,
+          note: source.note,
+        );
+      } else {
+        await assignExistingTask(
+          source: source,
+          characterIds: characterIds,
+        );
+      }
+    }
+    return skipped;
   }
 
   Future<void> deleteTask(
