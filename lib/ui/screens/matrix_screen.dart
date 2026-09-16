@@ -864,7 +864,7 @@ class _TaskManagementTile extends StatelessWidget {
         ? scheme.error
         : warningColor;
     final cardColor = selected
-        ? scheme.primaryContainer.withValues(alpha: 0.45)
+        ? scheme.primaryContainer.withValues(alpha: 0.82)
         : expiry == TaskExpiryStatus.normal
             ? scheme.surface
             : alertColor.withValues(alpha: 0.06);
@@ -881,6 +881,7 @@ class _TaskManagementTile extends StatelessWidget {
     ];
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      onTap: selected ? onSelect : null,
       onLongPress: onSelect,
       onHorizontalDragEnd: (details) {
         if ((details.primaryVelocity ?? 0) > 250) onSelect();
@@ -888,7 +889,7 @@ class _TaskManagementTile extends StatelessWidget {
       child: Material(
         color: cardColor,
         shape: RoundedRectangleBorder(
-          side: BorderSide(color: borderColor),
+          side: BorderSide(color: borderColor, width: selected ? 2 : 1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
@@ -898,9 +899,22 @@ class _TaskManagementTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(task.title,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  Row(children: [
+                    if (selected) ...[
+                      Icon(
+                        Icons.check_circle,
+                        key: ValueKey('selected-task-${task.templateId}'),
+                        size: 19,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 7),
+                    ],
+                    Expanded(
+                      child: Text(task.title,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
+                    ),
+                  ]),
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 6,

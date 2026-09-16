@@ -388,12 +388,20 @@ void main() {
     await tester.longPress(find.text('任务二'));
     await tester.pump();
     expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.byKey(const ValueKey('selected-task-task-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
     expect(find.text('移到收集箱'), findsOneWidget);
     expect(
       tester.getTopLeft(find.widgetWithText(OutlinedButton, '取消全选')).dx,
       20,
     );
+    await tester.tap(find.text('任务一'));
+    await tester.pump();
+    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.byKey(const ValueKey('selected-task-task-1')), findsNothing);
+    expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
+    expect(find.text('管理分配'), findsOneWidget);
     state.dispose();
   });
 
