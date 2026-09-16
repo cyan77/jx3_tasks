@@ -5,9 +5,9 @@ enum TaskExpiryStatus { normal, expiringSoon, overdue }
 /// Returns the urgency of an unfinished one-time task.
 ///
 /// "Expiring soon" means fewer than seven calendar days remain, or there is
-/// no China rest day from [currentDate] (inclusive) to the day before the
-/// deadline. Published holiday schedules override ordinary weekends; years
-/// without published data fall back to Saturday and Sunday.
+/// at most one China rest day remains from [currentDate] (inclusive) to the
+/// day before the deadline. Published holiday schedules override ordinary
+/// weekends; years without published data fall back to Saturday and Sunday.
 TaskExpiryStatus taskExpiryStatus(TaskRecord task, DateTime currentDate) {
   if (task.frequency != TaskFrequency.once ||
       task.dueDate == null ||
@@ -21,10 +21,13 @@ TaskExpiryStatus taskExpiryStatus(TaskRecord task, DateTime currentDate) {
     return TaskExpiryStatus.expiringSoon;
   }
 
+  var remainingRestDays = 0;
   for (var day = current;
       day.isBefore(deadline);
       day = day.add(const Duration(days: 1))) {
-    if (isChinaRestDay(day)) return TaskExpiryStatus.normal;
+    if (isChinaRestDay(day) && ++remainingRestDays > 1) {
+      return TaskExpiryStatus.normal;
+    }
   }
   return TaskExpiryStatus.expiringSoon;
 }
