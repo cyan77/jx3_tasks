@@ -294,6 +294,91 @@ void main() {
     await tester.pump();
     expect(find.text('已选 2 项'), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
+    expect(find.text('移到收集箱'), findsOneWidget);
+    state.dispose();
+  });
+
+  testWidgets('all tasks page filters by game, character, and completion',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final today = dateKey(DateTime.now());
+    final store = LocalStore()
+      ..games = const [
+        Game(id: 'game-jx3', name: '剑网3'),
+        Game(id: 'game-hsr', name: '崩坏：星穹铁道'),
+      ]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-hsr',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'done-char-1',
+          templateId: 'done',
+          title: '已完成任务',
+          characterId: 'char-1',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          completedDates: [today],
+        ),
+        TaskRecord(
+          id: 'open-char-2',
+          templateId: 'open',
+          title: '未完成任务',
+          characterId: 'char-2',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+    );
+    await tester.pump();
+    expect(find.text('已完成任务'), findsOneWidget);
+    expect(find.text('未完成任务'), findsOneWidget);
+
+    final dropdowns =
+        find.byWidgetPredicate((widget) => widget is DropdownButton);
+    expect(dropdowns, findsNWidgets(3));
+    await tester.tap(dropdowns.at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('已完成').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('已完成任务'), findsOneWidget);
+    expect(find.text('未完成任务'), findsNothing);
+    expect(find.text('清除筛选'), findsOneWidget);
+
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
+    await tester.tap(dropdowns.at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('崩坏：星穹铁道').last);
+    await tester.pumpAndSettle();
+    expect(find.text('已完成任务'), findsNothing);
+    expect(find.text('未完成任务'), findsOneWidget);
+
+    await tester.tap(dropdowns.at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('角色二').last);
+    await tester.pumpAndSettle();
+    expect(find.text('未完成任务'), findsOneWidget);
     state.dispose();
   });
 
