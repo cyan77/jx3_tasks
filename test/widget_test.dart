@@ -236,6 +236,36 @@ void main() {
     );
   });
 
+  testWidgets('窄屏标题和右上操作按钮顶部对齐', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PageHeader(
+            title: '全部任务',
+            subtitle: '显示任务数量',
+            action: OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.add),
+              label: const Text('新建任务'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getTopLeft(find.text('全部任务')).dy,
+      closeTo(
+        tester
+            .getTopLeft(find.widgetWithText(OutlinedButton, '新建任务'))
+            .dy,
+        4,
+      ),
+    );
+  });
+
   testWidgets('task search starts as an icon and expands in the title row',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
