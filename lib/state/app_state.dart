@@ -505,6 +505,13 @@ class AppState extends ChangeNotifier {
       } else {
         completedDates.clear();
       }
+    } else if (task.frequency == TaskFrequency.daily) {
+      final key = dateKey(targetDate);
+      if (completed) {
+        completedDates.add(key);
+      } else {
+        completedDates.remove(key);
+      }
     } else {
       final periodStart = taskPeriodStart(task, targetDate);
       final periodEnd = taskPeriodEnd(task, targetDate);
