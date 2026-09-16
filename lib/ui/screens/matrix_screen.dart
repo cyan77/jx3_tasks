@@ -597,12 +597,11 @@ class _FilterBar extends StatelessWidget {
   final VoidCallback? onReset;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-        spacing: 10,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _FilterDropdown<String>(
+          Row(children: [
+          Expanded(child: _FilterDropdown<String>(
             tooltip: '按游戏筛选',
             value: gameId ?? allGamesValue,
             items: [
@@ -613,8 +612,9 @@ class _FilterBar extends StatelessWidget {
             ],
             onChanged: (value) => onGameChanged(
                 value == allGamesValue ? null : value),
-          ),
-          _FilterDropdown<String>(
+          )),
+          const SizedBox(width: 6),
+          Expanded(child: _FilterDropdown<String>(
             tooltip: '按角色筛选',
             value: characterId ?? allCharactersValue,
             items: [
@@ -627,8 +627,9 @@ class _FilterBar extends StatelessWidget {
             ],
             onChanged: (value) => onCharacterChanged(
                 value == allCharactersValue ? null : value),
-          ),
-          _FilterDropdown<_CompletionFilter>(
+          )),
+          const SizedBox(width: 6),
+          Expanded(child: _FilterDropdown<_CompletionFilter>(
             tooltip: '按完成状态筛选',
             value: completion,
             items: const [
@@ -649,8 +650,9 @@ class _FilterBar extends StatelessWidget {
             onChanged: (value) {
               if (value != null) onCompletionChanged(value);
             },
-          ),
-          _FilterDropdown<_ArchiveFilter>(
+          )),
+          const SizedBox(width: 6),
+          Expanded(child: _FilterDropdown<_ArchiveFilter>(
             tooltip: '按归档状态筛选',
             value: archive,
             items: const [
@@ -664,12 +666,16 @@ class _FilterBar extends StatelessWidget {
             onChanged: (value) {
               if (value != null) onArchiveChanged(value);
             },
-          ),
+          )),
+          ]),
           if (onReset != null)
-            TextButton.icon(
-              onPressed: onReset,
-              icon: const Icon(Icons.filter_alt_off_outlined, size: 16),
-              label: const Text('清除筛选'),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TextButton.icon(
+                onPressed: onReset,
+                icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+                label: const Text('清除筛选'),
+              ),
             ),
         ],
       );
@@ -692,8 +698,8 @@ class _FilterDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
         message: tooltip,
         child: Container(
-          constraints: const BoxConstraints(minWidth: 132),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 38,
+          padding: const EdgeInsets.only(left: 8, right: 4),
           decoration: BoxDecoration(
             border: Border.all(
                 color: Theme.of(context).colorScheme.outlineVariant),
@@ -702,18 +708,30 @@ class _FilterDropdown<T> extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
               value: value,
+              isExpanded: true,
               isDense: true,
               elevation: 0,
               dropdownColor: Theme.of(context).colorScheme.surface,
               focusColor: Colors.transparent,
               icon: const Icon(Icons.expand_more,
-                  size: 16, color: AppTheme.muted),
+                  size: 15, color: AppTheme.muted),
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w400,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              items: items,
+              items: items
+                  .map((item) => DropdownMenuItem<T>(
+                        value: item.value,
+                        enabled: item.enabled,
+                        alignment: item.alignment,
+                        child: DefaultTextStyle.merge(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          child: item.child,
+                        ),
+                      ))
+                  .toList(),
               onChanged: onChanged,
             ),
           ),

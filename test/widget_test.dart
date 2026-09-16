@@ -473,6 +473,10 @@ void main() {
     final dropdowns =
         find.byWidgetPredicate((widget) => widget is DropdownButton);
     expect(dropdowns, findsNWidgets(4));
+    final filterTop = tester.getTopLeft(dropdowns.first).dy;
+    for (var index = 1; index < 4; index++) {
+      expect(tester.getTopLeft(dropdowns.at(index)).dy, filterTop);
+    }
     await tester.tap(dropdowns.at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('即将过期').last);
