@@ -18,6 +18,8 @@ enum _CompletionFilter {
 
 enum _TemplateCompletion { unassigned, incomplete, partial, complete }
 
+enum _ArchiveFilter { active, archived, all }
+
 class MatrixScreen extends StatefulWidget {
   const MatrixScreen({required this.state, super.key});
   final AppState state;
@@ -35,6 +37,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
   String? gameFilterId;
   String? characterFilterId;
   _CompletionFilter completionFilter = _CompletionFilter.all;
+  _ArchiveFilter archiveFilter = _ArchiveFilter.active;
 
   AppState get state => widget.state;
 
@@ -48,7 +51,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
     final visibleTemplates = templates.values.where((tasks) {
       if (!_matchesGame(tasks) ||
           !_matchesCharacter(tasks) ||
-          !_matchesCompletion(tasks)) {
+          !_matchesCompletion(tasks) ||
+          !_matchesArchive(tasks)) {
         return false;
       }
       if (query.isEmpty) return true;
@@ -112,6 +116,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
             gameId: gameFilterId,
             characterId: characterFilterId,
             completion: completionFilter,
+            archive: archiveFilter,
             onGameChanged: (value) => setState(() {
               gameFilterId = value;
               selectedTemplateIds.clear();
@@ -130,6 +135,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
               completionFilter = value;
               selectedTemplateIds.clear();
             }),
+            onArchiveChanged: (value) => setState(() {
+              archiveFilter = value;
+              selectedTemplateIds.clear();
+            }),
             onReset: _hasActiveFilters ? _resetFilters : null,
           ),
         ),
@@ -146,9 +155,24 @@ class _MatrixScreenState extends State<MatrixScreen> {
             onClear: selectedCount == 0
                 ? null
                 : () => setState(selectedTemplateIds.clear),
-            onAssign: selectedCount == 0 ? null : _assignSelected,
-            onMoveToInbox:
-                selectedCount == 0 ? null : _moveSelectedToInbox,
+            onAssign: selectedCount == 0 ||
+                    archiveFilter == _ArchiveFilter.archived
+                ? null
+                : _assignSelected,
+            onMoveToInbox: selectedCount == 0 ||
+                    archiveFilter == _ArchiveFilter.archived
+                ? null
+                : _moveSelectedToInbox,
+            onArchive: selectedCount == 0
+                ? null
+                : () => _setTemplatesArchived(
+                    Set.of(selectedTemplateIds), true),
+            onRestore: selectedCount == 0
+                ? null
+                : () => _setTemplatesArchived(
+                    Set.of(selectedTemplateIds), false),
+            showArchive: archiveFilter != _ArchiveFilter.archived,
+            showRestore: archiveFilter != _ArchiveFilter.active,
             onDelete: selectedCount == 0 ? null : _deleteSelected,
           ),
         ),
@@ -190,6 +214,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
                     ),
                     onMoveToInbox: () =>
                         _moveTemplatesToInbox({templateId}),
+                    onArchiveChanged: (archived) =>
+                        _setTemplatesArchived({templateId}, archived),
                     onDelete: () => _deleteTemplates({templateId}),
                   );
                 },
@@ -212,7 +238,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   bool get _hasActiveFilters => gameFilterId != null ||
       characterFilterId != null ||
-      completionFilter != _CompletionFilter.all;
+      completionFilter != _CompletionFilter.all ||
+      archiveFilter != _ArchiveFilter.active;
 
   String? _gameIdFor(List<TaskRecord> tasks) {
     final task = tasks.first;
@@ -284,10 +311,17 @@ class _MatrixScreenState extends State<MatrixScreen> {
     };
   }
 
+  bool _matchesArchive(List<TaskRecord> tasks) => switch (archiveFilter) {
+        _ArchiveFilter.active => tasks.any((task) => !task.archived),
+        _ArchiveFilter.archived => tasks.every((task) => task.archived),
+        _ArchiveFilter.all => true,
+      };
+
   void _resetFilters() => setState(() {
         gameFilterId = null;
         characterFilterId = null;
         completionFilter = _CompletionFilter.all;
+        archiveFilter = _ArchiveFilter.active;
         selectedTemplateIds.clear();
       });
 
@@ -412,6 +446,17 @@ class _MatrixScreenState extends State<MatrixScreen> {
   Future<void> _moveSelectedToInbox() =>
       _moveTemplatesToInbox(Set.of(selectedTemplateIds));
 
+  Future<void> _setTemplatesArchived(
+      Set<String> templateIds, bool archived) async {
+    if (templateIds.isEmpty) return;
+    await state.setTaskTemplatesArchived(templateIds, archived: archived);
+    if (!mounted) return;
+    setState(() => selectedTemplateIds.removeAll(templateIds));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(archived ? '任务已归档' : '任务已恢复'),
+    ));
+  }
+
   Future<void> _moveTemplatesToInbox(Set<String> templateIds) async {
     final assignedTemplateIds = templateIds.where((templateId) => state
         .store.tasks
@@ -520,9 +565,11 @@ class _FilterBar extends StatelessWidget {
     required this.gameId,
     required this.characterId,
     required this.completion,
+    required this.archive,
     required this.onGameChanged,
     required this.onCharacterChanged,
     required this.onCompletionChanged,
+    required this.onArchiveChanged,
     required this.onReset,
   });
 
@@ -534,9 +581,11 @@ class _FilterBar extends StatelessWidget {
   final String? gameId;
   final String? characterId;
   final _CompletionFilter completion;
+  final _ArchiveFilter archive;
   final ValueChanged<String?> onGameChanged;
   final ValueChanged<String?> onCharacterChanged;
   final ValueChanged<_CompletionFilter> onCompletionChanged;
+  final ValueChanged<_ArchiveFilter> onArchiveChanged;
   final VoidCallback? onReset;
 
   @override
@@ -591,6 +640,21 @@ class _FilterBar extends StatelessWidget {
             ],
             onChanged: (value) {
               if (value != null) onCompletionChanged(value);
+            },
+          ),
+          _FilterDropdown<_ArchiveFilter>(
+            tooltip: '按归档状态筛选',
+            value: archive,
+            items: const [
+              DropdownMenuItem(
+                  value: _ArchiveFilter.active, child: Text('未归档')),
+              DropdownMenuItem(
+                  value: _ArchiveFilter.archived, child: Text('已归档')),
+              DropdownMenuItem(
+                  value: _ArchiveFilter.all, child: Text('全部归档状态')),
+            ],
+            onChanged: (value) {
+              if (value != null) onArchiveChanged(value);
             },
           ),
           if (onReset != null)
@@ -657,6 +721,10 @@ class _SelectionBar extends StatelessWidget {
     required this.onClear,
     required this.onAssign,
     required this.onMoveToInbox,
+    required this.onArchive,
+    required this.onRestore,
+    required this.showArchive,
+    required this.showRestore,
     required this.onDelete,
   });
 
@@ -666,6 +734,10 @@ class _SelectionBar extends StatelessWidget {
   final VoidCallback? onClear;
   final VoidCallback? onAssign;
   final VoidCallback? onMoveToInbox;
+  final VoidCallback? onArchive;
+  final VoidCallback? onRestore;
+  final bool showArchive;
+  final bool showRestore;
   final VoidCallback? onDelete;
 
   @override
@@ -699,6 +771,18 @@ class _SelectionBar extends StatelessWidget {
             icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
             label: const Text('移到收集箱'),
           ),
+          if (showArchive)
+            OutlinedButton.icon(
+              onPressed: onArchive,
+              icon: const Icon(Icons.archive_outlined, size: 17),
+              label: const Text('归档'),
+            ),
+          if (showRestore)
+            OutlinedButton.icon(
+              onPressed: onRestore,
+              icon: const Icon(Icons.unarchive_outlined, size: 17),
+              label: const Text('恢复'),
+            ),
           OutlinedButton.icon(
             onPressed: onDelete,
             icon: const Icon(Icons.delete_outline, size: 17),
@@ -721,6 +805,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.onToggleTask,
     required this.onEdit,
     required this.onMoveToInbox,
+    required this.onArchiveChanged,
     required this.onDelete,
   });
 
@@ -735,6 +820,7 @@ class _TaskManagementTile extends StatelessWidget {
   final ValueChanged<TaskRecord> onToggleTask;
   final VoidCallback onEdit;
   final VoidCallback onMoveToInbox;
+  final ValueChanged<bool> onArchiveChanged;
   final VoidCallback onDelete;
 
   @override
@@ -805,6 +891,11 @@ class _TaskManagementTile extends StatelessWidget {
                       ),
                       if (expiry != TaskExpiryStatus.normal)
                         _ExpiryChip(expiry: expiry),
+                      if (task.archived)
+                        const _StatusChip(
+                          icon: Icons.archive_outlined,
+                          label: '已归档',
+                        ),
                       Text(details.join(' · '),
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.muted)),
@@ -852,12 +943,23 @@ class _TaskManagementTile extends StatelessWidget {
               onSelected: (value) {
                 if (value == 'edit') onEdit();
                 if (value == 'inbox') onMoveToInbox();
+                if (value == 'archive') onArchiveChanged(true);
+                if (value == 'restore') onArchiveChanged(false);
                 if (value == 'delete') onDelete();
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('编辑与管理分配')),
-                PopupMenuItem(value: 'inbox', child: Text('移到收集箱')),
-                PopupMenuItem(value: 'delete', child: Text('删除任务')),
+              itemBuilder: (_) => [
+                if (!task.archived)
+                  const PopupMenuItem(
+                      value: 'edit', child: Text('编辑与管理分配')),
+                if (!task.archived)
+                  const PopupMenuItem(
+                      value: 'inbox', child: Text('移到收集箱')),
+                PopupMenuItem(
+                  value: task.archived ? 'restore' : 'archive',
+                  child: Text(task.archived ? '恢复任务' : '归档任务'),
+                ),
+                const PopupMenuItem(
+                    value: 'delete', child: Text('删除任务')),
               ],
             ),
           ]),
