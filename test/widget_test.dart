@@ -432,6 +432,68 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('全部任务可按角色切换完成状态', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final today = dateKey(DateTime.now());
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const [
+        Character(
+          id: 'character-1',
+          gameId: 'game',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'character-2',
+          gameId: 'game',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'task-1',
+          templateId: 'shared-task',
+          title: '共享任务',
+          characterId: 'character-1',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now(),
+          completedDates: [today],
+        ),
+        TaskRecord(
+          id: 'task-2',
+          templateId: 'shared-task',
+          title: '共享任务',
+          characterId: 'character-2',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+    );
+    await tester.pump();
+
+    expect(find.text('已完成 1/2'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('task-character-task-2')));
+    await tester.pumpAndSettle();
+    expect(store.tasks.last.isCompletedOn(DateTime.now()), isTrue);
+    expect(find.text('已完成 1/2'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('task-character-task-1')));
+    await tester.pumpAndSettle();
+    expect(store.tasks.first.isCompletedOn(DateTime.now()), isFalse);
+    expect(find.text('已完成 1/2'), findsOneWidget);
+    state.dispose();
+  });
+
   test('multiple task templates can be assigned to characters together',
       () async {
     SharedPreferences.setMockInitialValues({});
@@ -487,6 +549,32 @@ void main() {
     expect(dateKey(date), '2026-09-10');
     expect(startOfWeek(date), DateTime(2026, 9, 7));
     expect(startOfMonth(date), DateTime(2026, 9));
+  });
+
+  test('从全部任务标记次数任务会直接切换整体状态', () async {
+    SharedPreferences.setMockInitialValues({});
+    final date = DateTime(2026, 9, 16);
+    final task = TaskRecord(
+      id: 'count-task',
+      templateId: 'count-task',
+      title: '次数任务',
+      characterId: 'character',
+      frequency: TaskFrequency.weeklyCount,
+      targetCount: 3,
+      createdAt: date,
+    );
+    final store = LocalStore()..tasks = [task];
+    final state = AppState(store);
+
+    await state.setTaskCompleted(task, completed: true, date: date);
+    expect(store.tasks.single.isCompletedOn(date), isTrue);
+    await state.setTaskCompleted(
+      store.tasks.single,
+      completed: false,
+      date: date,
+    );
+    expect(store.tasks.single.isCompletedOn(date), isFalse);
+    state.dispose();
   });
 
   test('game reset time defines its task day and survives backup data', () {
