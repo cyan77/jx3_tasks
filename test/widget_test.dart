@@ -81,9 +81,10 @@ void main() {
         "tasks": []
       }''',
     );
+    final settings = _FakeSyncSettingsStore();
     final state = AppState(
       store,
-      syncSettingsStore: _FakeSyncSettingsStore(),
+      syncSettingsStore: settings,
       webDavSyncService: webDav,
     );
 
@@ -95,6 +96,12 @@ void main() {
     expect(webDav.uploadCount, 0);
     expect(store.games.single.name, '云端游戏');
     expect(state.syncMessage, '已恢复 · backup.json');
+    expect(state.currentRemoteBackupPath, '/backup.json');
+    expect(settings.currentBackupPath, '/backup.json');
+
+    await state.importBackup(webDav.downloadPayload);
+    expect(state.currentRemoteBackupPath, isNull);
+    expect(settings.currentBackupPath, isNull);
     state.dispose();
   });
 
@@ -1006,6 +1013,7 @@ class _FakeSyncSettingsStore extends SyncSettingsStore {
     password: 'password',
     remotePath: '/RoleSchedule/backup.json',
   );
+  String? currentBackupPath;
 
   @override
   Future<SyncConfig> load() async => config;
@@ -1015,6 +1023,14 @@ class _FakeSyncSettingsStore extends SyncSettingsStore {
 
   @override
   Future<void> saveLastSyncAt(DateTime value) async {}
+
+  @override
+  Future<String?> loadCurrentBackupPath() async => currentBackupPath;
+
+  @override
+  Future<void> saveCurrentBackupPath(String? path) async {
+    currentBackupPath = path;
+  }
 }
 
 class _FakeWebDavSyncService extends WebDavSyncService {
