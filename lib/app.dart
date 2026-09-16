@@ -3,6 +3,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'data/local_store.dart';
 import 'state/app_state.dart';
@@ -40,6 +41,9 @@ class _Jx3TasksAppState extends State<Jx3TasksApp> {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: state.themeMode,
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         scrollBehavior: const _DesktopScrollBehavior(),
         home: HomeShell(state: state),
       ),
