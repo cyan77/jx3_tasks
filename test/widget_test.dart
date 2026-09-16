@@ -16,12 +16,12 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
-  test('theme preference defaults to system and persists the selected mode',
+  test('theme preference defaults to light and persists the selected mode',
       () async {
     SharedPreferences.setMockInitialValues({});
     final settings = ThemeSettingsStore();
 
-    expect(await settings.load(), ThemeMode.system);
+    expect(await settings.load(), ThemeMode.light);
     await settings.save(ThemeMode.dark);
     expect(await settings.load(), ThemeMode.dark);
   });
