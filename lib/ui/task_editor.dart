@@ -66,6 +66,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   int subtaskSequence = 0;
   bool assignExisting = false;
   String? existingTemplateId;
+  String? selectedEditorGameId;
   String? validationMessage;
 
   bool get isEditing => widget.task != null;
@@ -91,6 +92,14 @@ class _TaskEditorState extends State<_TaskEditor> {
   void initState() {
     super.initState();
     final task = widget.task;
+    selectedEditorGameId = task == null
+        ? widget.state.selectedGameId ?? widget.state.games.firstOrNull?.id
+        : task.isInbox
+            ? task.inboxGameId
+            : widget.state.store.characters
+                .where((character) => character.id == task.characterId)
+                .firstOrNull
+                ?.gameId;
     titleController = TextEditingController(text: task?.title ?? '');
     noteController = TextEditingController(text: task?.note ?? '');
     frequency = task?.frequency ?? TaskFrequency.daily;
@@ -127,7 +136,10 @@ class _TaskEditorState extends State<_TaskEditor> {
 
   List<TaskRecord> get existingTasks {
     final byTemplate = <String, TaskRecord>{};
-    for (final task in widget.state.tasks) {
+    for (final task in widget.state.store.tasks.where((task) =>
+        !task.archived &&
+        !task.isInbox &&
+        widget.state.gameForTask(task)?.id == editorGameId)) {
       byTemplate.putIfAbsent(task.templateId, () => task);
     }
     return byTemplate.values.where((task) {
@@ -135,7 +147,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           .tasksForTemplate(task.templateId)
           .map((item) => item.characterId)
           .toSet();
-      return widget.state.characters
+      return editorCharacters
           .any((character) => !assignedIds.contains(character.id));
     }).toList();
   }
@@ -145,13 +157,7 @@ class _TaskEditorState extends State<_TaskEditor> {
       .firstOrNull;
 
   String? get editorGameId {
-    final task = widget.task;
-    if (task == null) return widget.state.selectedGameId;
-    if (task.isInbox) return task.inboxGameId;
-    return widget.state.store.characters
-        .where((character) => character.id == task.characterId)
-        .firstOrNull
-        ?.gameId;
+    return selectedEditorGameId;
   }
 
   List<Character> get editorCharacters => widget.state.store.characters
@@ -194,6 +200,26 @@ class _TaskEditorState extends State<_TaskEditor> {
                       icon: const Icon(Icons.close, size: 20))
                 ]),
                 const SizedBox(height: 14),
+                if (!isEditing &&
+                    (widget.createInInbox ||
+                        !widget.preselectCurrentCharacter)) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedEditorGameId,
+                    decoration: const InputDecoration(labelText: '所属游戏'),
+                    items: widget.state.games
+                        .map((game) => DropdownMenuItem(
+                              value: game.id,
+                              child: Text(game.name),
+                            ))
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      selectedEditorGameId = value;
+                      selected.clear();
+                      existingTemplateId = null;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 if (!isEditing && !widget.createInInbox)
                   SegmentedButton<bool>(
                     segments: const [
@@ -607,6 +633,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     if (widget.createInInbox) {
       await widget.state.addInboxTask(
         title: title,
+        gameId: editorGameId,
         frequency: frequencyConfigured ? frequency : null,
         startDate: startDate,
         dueDate: dueDate,
@@ -681,6 +708,7 @@ class _TaskEditorState extends State<_TaskEditor> {
       if (selected.isEmpty) {
         await widget.state.addInboxTask(
           title: title,
+          gameId: editorGameId,
           frequency: frequency,
           startDate: startDate,
           dueDate: dueDate,
@@ -775,7 +803,10 @@ class _TaskEditorState extends State<_TaskEditor> {
       existingTemplateId = null;
       selected.clear();
       final selectedCharacterId = widget.state.selectedCharacterId;
-      if (!value && selectedCharacterId != null) {
+      if (!value &&
+          selectedCharacterId != null &&
+          editorCharacters
+              .any((character) => character.id == selectedCharacterId)) {
         selected.add(selectedCharacterId);
       }
     });

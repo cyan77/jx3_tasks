@@ -41,7 +41,7 @@ class HomeShell extends StatelessWidget {
                   Expanded(
                       child: Column(
                     children: [
-                      _GameBar(state: state),
+                      if (state.currentTab == 0) _GameBar(state: state),
                       Expanded(child: screens[state.currentTab]),
                     ],
                   )),
@@ -166,6 +166,7 @@ class _GameBar extends StatelessWidget {
     final lastSyncAt = state.lastSyncAt?.toLocal();
     final compact = MediaQuery.sizeOf(context).width < 520;
     return Container(
+      key: const ValueKey('home-game-filter'),
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
