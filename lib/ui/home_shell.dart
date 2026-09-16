@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../data/update_service.dart';
 import '../models/task_models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
@@ -11,10 +15,27 @@ import 'screens/settings_screen.dart';
 import 'screens/sync_screen.dart';
 import 'task_editor.dart';
 
-class HomeShell extends StatelessWidget {
+class HomeShell extends StatefulWidget {
   const HomeShell({required this.state, super.key});
 
   final AppState state;
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  AppState get state => widget.state;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kReleaseMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkForUpdatesOnStart();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +116,77 @@ class HomeShell extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _checkForUpdatesOnStart() async {
+    try {
+      final results = await Future.wait([
+        PackageInfo.fromPlatform(),
+        UpdateService().fetchLatestRelease(),
+      ]);
+      final packageInfo = results[0] as PackageInfo;
+      final release = results[1] as AppRelease;
+      if (!mounted ||
+          !isVersionNewer(release.version, packageInfo.version)) {
+        return;
+      }
+      final download = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('发现新版本 v${release.version}'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '当前版本 v${packageInfo.version} · 最新版本 v${release.version}',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.muted),
+                  ),
+                  if (release.notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    const Text('更新内容',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 7),
+                    SelectableText(
+                      release.notes.trim(),
+                      style: const TextStyle(fontSize: 12, height: 1.5),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('稍后'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.download_outlined, size: 18),
+              label: const Text('下载更新'),
+            ),
+          ],
+        ),
+      );
+      if (download != true || !mounted) return;
+      final opened = await launchUrl(
+        release.platformDownloadUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('无法打开下载地址，请前往 GitHub Release 下载')),
+        );
+      }
+    } catch (_) {
+      // Startup checks are intentionally silent when offline or GitHub is unavailable.
+    }
   }
 }
 
