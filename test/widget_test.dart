@@ -1394,6 +1394,22 @@ void main() {
     await tester.pump();
 
     expect(find.text('今日待办'), findsOneWidget);
+    final glassNavigation = find.byKey(
+      const ValueKey('glass-bottom-navigation'),
+    );
+    expect(glassNavigation, findsOneWidget);
+    expect(
+      find.descendant(
+        of: glassNavigation,
+        matching: find.byType(BackdropFilter),
+      ),
+      findsOneWidget,
+    );
+    final navigationContainer = tester.widget<Container>(glassNavigation);
+    expect(
+      (navigationContainer.decoration! as BoxDecoration).borderRadius,
+      BorderRadius.circular(24),
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

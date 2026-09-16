@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -55,6 +57,7 @@ class _HomeShellState extends State<HomeShell> {
             if (!didPop && state.currentTab != 0) state.setTab(0);
           },
           child: Scaffold(
+            extendBody: true,
             body: SafeArea(
               child: Row(
                 children: [
@@ -71,34 +74,7 @@ class _HomeShellState extends State<HomeShell> {
             ),
             bottomNavigationBar: wide
                 ? null
-                : NavigationBar(
-                  selectedIndex: state.currentTab,
-                  labelBehavior:
-                      NavigationDestinationLabelBehavior.onlyShowSelected,
-                  onDestinationSelected: state.setTab,
-                  destinations: const [
-                    NavigationDestination(
-                        icon: Icon(Icons.task_alt_outlined),
-                        selectedIcon: Icon(Icons.task_alt),
-                        label: '待办'),
-                    NavigationDestination(
-                        icon: Icon(Icons.checklist_outlined),
-                        selectedIcon: Icon(Icons.checklist),
-                        label: '任务'),
-                    NavigationDestination(
-                        icon: Icon(Icons.event_available_outlined),
-                        selectedIcon: Icon(Icons.event_available),
-                        label: '日历'),
-                    NavigationDestination(
-                        icon: Icon(Icons.inbox_outlined),
-                        selectedIcon: Icon(Icons.inbox),
-                        label: '收集箱'),
-                    NavigationDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: '设置'),
-                  ],
-                  ),
+                : _GlassBottomNavigation(state: state),
             floatingActionButton: state.currentTab == 0
                 ? FloatingActionButton.extended(
                     onPressed: () => showTaskEditor(
@@ -187,6 +163,82 @@ class _HomeShellState extends State<HomeShell> {
     } catch (_) {
       // Startup checks are intentionally silent when offline or GitHub is unavailable.
     }
+  }
+}
+
+class _GlassBottomNavigation extends StatelessWidget {
+  const _GlassBottomNavigation({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Container(
+        key: const ValueKey('glass-bottom-navigation'),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? 0.20 : 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: scheme.surface.withValues(alpha: dark ? 0.78 : 0.86),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: 0.72),
+                ),
+              ),
+              child: NavigationBar(
+              height: 66,
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              indicatorColor: scheme.primaryContainer.withValues(alpha: 0.72),
+              selectedIndex: state.currentTab,
+              labelBehavior:
+                  NavigationDestinationLabelBehavior.onlyShowSelected,
+              onDestinationSelected: state.setTab,
+              destinations: const [
+                NavigationDestination(
+                    icon: Icon(Icons.task_alt_outlined),
+                    selectedIcon: Icon(Icons.task_alt),
+                    label: '待办'),
+                NavigationDestination(
+                    icon: Icon(Icons.checklist_outlined),
+                    selectedIcon: Icon(Icons.checklist),
+                    label: '任务'),
+                NavigationDestination(
+                    icon: Icon(Icons.event_available_outlined),
+                    selectedIcon: Icon(Icons.event_available),
+                    label: '日历'),
+                NavigationDestination(
+                    icon: Icon(Icons.inbox_outlined),
+                    selectedIcon: Icon(Icons.inbox),
+                    label: '收集箱'),
+                NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings),
+                    label: '设置'),
+              ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
