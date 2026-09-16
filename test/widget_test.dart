@@ -278,6 +278,29 @@ void main() {
     );
   });
 
+  testWidgets('手机端全部任务只保留右上新建入口', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(400, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store)..setTab(1);
+
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(home: HomeShell(state: state)),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    state.dispose();
+  });
+
   testWidgets('task search starts as an icon and expands in the title row',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
