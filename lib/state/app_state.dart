@@ -212,10 +212,10 @@ class AppState extends ChangeNotifier {
   bool get _hasUnsyncedChanges => _dataRevision > _syncedRevision;
 
   Future<void> _saveDataChange() async {
-    await store.save();
     _dataRevision++;
     notifyListeners();
     _scheduleChangeSync();
+    await store.save();
   }
 
   void _scheduleChangeSync() {
