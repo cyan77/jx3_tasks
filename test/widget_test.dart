@@ -59,7 +59,7 @@ void main() {
     expect(isVersionNewer('0.2.9', '0.3.0'), isFalse);
   });
 
-  test('once task warns when no China rest day remains before deadline', () {
+  test('once task warns within seven days or without a remaining rest day', () {
     TaskRecord taskDue(DateTime dueDate) => TaskRecord(
           id: 'once',
           templateId: 'once',
@@ -76,6 +76,14 @@ void main() {
     );
     expect(
       taskExpiryStatus(taskDue(DateTime(2026, 9, 21)), DateTime(2026, 9, 15)),
+      TaskExpiryStatus.expiringSoon,
+    );
+    expect(
+      taskExpiryStatus(taskDue(DateTime(2026, 9, 20)), DateTime(2026, 9, 16)),
+      TaskExpiryStatus.expiringSoon,
+    );
+    expect(
+      taskExpiryStatus(taskDue(DateTime(2026, 9, 25)), DateTime(2026, 9, 15)),
       TaskExpiryStatus.normal,
     );
     expect(
