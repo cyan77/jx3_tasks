@@ -462,7 +462,7 @@ void main() {
       find.byWidgetPredicate((widget) => widget is DropdownButton).first,
     );
     expect(firstFilter.style?.fontWeight, FontWeight.w400);
-    expect(firstFilter.style?.fontSize, 12);
+    expect(firstFilter.style?.fontSize, 11);
     expect(firstFilter.elevation, 0);
     expect(firstFilter.focusColor, Colors.transparent);
     expect(find.text('已完成任务'), findsOneWidget);
@@ -1303,7 +1303,7 @@ void main() {
     expect(store.tasks.single.isCompletedOn(date), isTrue);
   });
 
-  test('inbox and archived characters respect game and can be restored',
+  test('inbox includes every game and archived characters can be restored',
       () async {
     SharedPreferences.setMockInitialValues({});
     const archived = Character(
@@ -1343,11 +1343,39 @@ void main() {
       ];
     final state = AppState(store);
 
-    expect(state.inboxTasks.single.title, '剑网3 收集箱');
+    expect(state.inboxTasks.map((task) => task.title).toSet(),
+        {'剑网3 收集箱', '崩铁收集箱'});
     state.selectGame('game-hsr');
-    expect(state.inboxTasks.single.title, '崩铁收集箱');
+    expect(state.inboxTasks.map((task) => task.title).toSet(),
+        {'剑网3 收集箱', '崩铁收集箱'});
     await state.restoreCharacter(archived);
     expect(store.characters.single.archived, isFalse);
+  });
+
+  testWidgets('global game filter is only visible on the todo home',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(home: HomeShell(state: state)),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('home-game-filter')), findsOneWidget);
+
+    for (final tab in [1, 2, 3, 4]) {
+      state.setTab(tab);
+      await tester.pump();
+      expect(find.byKey(const ValueKey('home-game-filter')), findsNothing);
+    }
+    state.dispose();
   });
 
   testWidgets('home shell fits a narrow phone width', (tester) async {

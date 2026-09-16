@@ -103,8 +103,7 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> get inboxTasks => store.tasks
       .where((task) =>
           !task.archived &&
-          task.isInbox &&
-          task.inboxGameId == selectedGameId)
+          task.isInbox)
       .toList();
 
   List<TaskRecord> get allTasksForSelectedGame {
@@ -676,6 +675,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> addInboxTask({
     required String title,
+    String? gameId,
     TaskFrequency? frequency,
     DateTime? startDate,
     DateTime? dueDate,
@@ -701,7 +701,9 @@ class AppState extends ChangeNotifier {
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
       note: note,
-      inboxGameId: selectedGameId,
+      inboxGameId: games.any((game) => game.id == gameId)
+          ? gameId
+          : selectedGameId ?? games.firstOrNull?.id,
       inboxFrequencySet: frequency != null,
     ));
     await _saveDataChange();

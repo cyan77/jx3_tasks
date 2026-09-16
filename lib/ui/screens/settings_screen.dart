@@ -94,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _SettingCard(
                       icon: Icons.shield_outlined,
                       title: '角色管理',
-                      subtitle: '管理当前游戏下的角色和角色任务',
+                      subtitle: '按游戏管理全部角色和角色任务',
                       onTap: () =>
                           _open(context, CharactersScreen(state: state)),
                     ),
