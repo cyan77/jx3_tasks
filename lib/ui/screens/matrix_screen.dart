@@ -773,10 +773,7 @@ class _TaskManagementTile extends StatelessWidget {
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onSelected(!selected),
-        child: Padding(
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Checkbox(
@@ -864,7 +861,6 @@ class _TaskManagementTile extends StatelessWidget {
               ],
             ),
           ]),
-        ),
       ),
     );
   }
