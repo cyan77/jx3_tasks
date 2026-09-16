@@ -467,13 +467,18 @@ void main() {
     );
     await tester.pump();
     expect(tester.getTopLeft(find.byTooltip('按游戏筛选')).dx, 20);
-    final firstFilter = tester.widget<DropdownButton<dynamic>>(
-      find.byWidgetPredicate((widget) => widget is DropdownButton).first,
+    final filterControls = [
+      find.byKey(const ValueKey('task-filter-control-按游戏筛选')),
+      find.byKey(const ValueKey('task-filter-control-按角色筛选')),
+      find.byKey(const ValueKey('task-filter-control-按完成状态筛选')),
+      find.byKey(const ValueKey('task-filter-control-按归档状态筛选')),
+    ];
+    final firstFilter = tester.widget<PopupMenuButton<dynamic>>(
+      filterControls.first,
     );
-    expect(firstFilter.style?.fontWeight, FontWeight.w400);
-    expect(firstFilter.style?.fontSize, 11.5);
+    expect(firstFilter.position, PopupMenuPosition.under);
+    expect(firstFilter.offset.dy, greaterThan(0));
     expect(firstFilter.elevation, 0);
-    expect(firstFilter.focusColor, Colors.transparent);
     final gameFilterContainer = tester.widget<Container>(
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
     );
@@ -486,15 +491,19 @@ void main() {
     expect(find.text('即将过期任务'), findsOneWidget);
     expect(find.text('即将过期'), findsOneWidget);
 
-    final dropdowns =
-        find.byWidgetPredicate((widget) => widget is DropdownButton);
-    expect(dropdowns, findsNWidgets(4));
-    final filterTop = tester.getTopLeft(dropdowns.first).dy;
-    for (var index = 1; index < 4; index++) {
-      expect(tester.getTopLeft(dropdowns.at(index)).dy, filterTop);
+    for (final control in filterControls) {
+      expect(control, findsOneWidget);
     }
-    await tester.tap(dropdowns.at(2));
+    final filterTop = tester.getTopLeft(filterControls.first).dy;
+    for (var index = 1; index < 4; index++) {
+      expect(tester.getTopLeft(filterControls[index]).dy, filterTop);
+    }
+    await tester.tap(filterControls[2]);
     await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(find.text('全部状态').last).dy,
+      greaterThanOrEqualTo(tester.getBottomLeft(filterControls[2]).dy),
+    );
     await tester.tap(find.text('即将过期').last);
     await tester.pumpAndSettle();
 
@@ -504,7 +513,7 @@ void main() {
 
     await tester.tap(find.text('清除筛选'));
     await tester.pumpAndSettle();
-    await tester.tap(dropdowns.at(2));
+    await tester.tap(filterControls[2]);
     await tester.pumpAndSettle();
     await tester.tap(find.text('已完成').last);
     await tester.pumpAndSettle();

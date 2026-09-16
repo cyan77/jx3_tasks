@@ -77,38 +77,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                        value: validGameFilter,
-                        isExpanded: true,
-                        alignment: Alignment.centerRight,
+                      child: PopupMenuButton<String>(
+                        position: PopupMenuPosition.under,
+                        offset: const Offset(0, 6),
                         elevation: 0,
-                        borderRadius: BorderRadius.circular(12),
-                        dropdownColor: Color.lerp(
+                        color: Color.lerp(
                           Theme.of(context).colorScheme.surface,
                           Theme.of(context).colorScheme.primaryContainer,
                           0.42,
                         ),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.20),
+                          ),
                         ),
-                        icon: const Padding(
-                          padding: EdgeInsets.only(left: 8),
-                          child: Icon(Icons.filter_list,
-                              size: 17, color: AppTheme.accent),
-                        ),
-                        items: [
-                          const DropdownMenuItem(
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
                             value: _allGames,
-                            alignment: Alignment.centerRight,
                             child: Text('全部游戏', textAlign: TextAlign.right),
                           ),
-                          ...state.games.map((game) => DropdownMenuItem(
+                          ...state.games.map((game) => PopupMenuItem(
                                 value: game.id,
-                                alignment: Alignment.centerRight,
                                 child: Text(
                                   game.name,
                                   textAlign: TextAlign.right,
@@ -116,12 +109,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ),
                               )),
                         ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _gameFilterId = value);
-                          }
+                        onSelected: (value) {
+                          setState(() => _gameFilterId = value);
                         },
-                      ),
+                        child: Row(children: [
+                          Expanded(
+                            child: Text(
+                              filteredGame?.name ?? '全部游戏',
+                              textAlign: TextAlign.right,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.filter_list,
+                              size: 17, color: AppTheme.accent),
+                        ]),
                       ),
                     ),
                   ),

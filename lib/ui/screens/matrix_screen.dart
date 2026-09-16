@@ -698,6 +698,13 @@ class _FilterDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    Widget selectedChild = const SizedBox.shrink();
+    for (final item in items) {
+      if (item.value == value) {
+        selectedChild = item.child;
+        break;
+      }
+    }
     return Tooltip(
         message: tooltip,
         child: Container(
@@ -709,37 +716,53 @@ class _FilterDropdown<T> extends StatelessWidget {
             border: Border.all(color: scheme.primary.withValues(alpha: 0.20)),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              isExpanded: true,
-              isDense: true,
+          child: PopupMenuButton<T>(
+              key: ValueKey('task-filter-control-$tooltip'),
+              position: PopupMenuPosition.under,
+              offset: const Offset(0, 6),
               elevation: 0,
-              borderRadius: BorderRadius.circular(12),
-              dropdownColor: fill,
-              focusColor: Colors.transparent,
-              icon: const Icon(Icons.expand_more,
-                  size: 16, color: AppTheme.accent),
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w400,
-                color: scheme.onSurfaceVariant,
+              color: fill,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: scheme.primary.withValues(alpha: 0.20),
+                ),
               ),
-              items: items
-                  .map((item) => DropdownMenuItem<T>(
+              onSelected: (selected) => onChanged(selected),
+              itemBuilder: (_) => items
+                  .map((item) => PopupMenuItem<T>(
                         value: item.value,
                         enabled: item.enabled,
-                        alignment: item.alignment,
                         child: DefaultTextStyle.merge(
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: scheme.onSurfaceVariant,
+                          ),
                           child: item.child,
                         ),
                       ))
                   .toList(),
-              onChanged: onChanged,
+              child: Row(children: [
+                Expanded(
+                  child: DefaultTextStyle.merge(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    child: selectedChild,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                const Icon(Icons.expand_more,
+                    size: 16, color: AppTheme.accent),
+              ]),
             ),
-          ),
         ),
       );
   }
