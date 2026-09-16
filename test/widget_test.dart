@@ -12,6 +12,7 @@ import 'package:jx3_tasks/state/app_state.dart';
 import 'package:jx3_tasks/theme/app_theme.dart';
 import 'package:jx3_tasks/app.dart';
 import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
+import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
 import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
@@ -1395,6 +1396,72 @@ void main() {
     expect(find.text('今日待办'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('首页只显示仍有未完成待办的角色', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final today = dateKey(DateTime.now());
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const [
+        Character(
+          id: 'done-character',
+          gameId: 'game',
+          account: '',
+          name: '已清空角色',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'pending-character',
+          gameId: 'game',
+          account: '',
+          name: '仍有待办角色',
+          occupation: '',
+          color: 0xff5a78aa,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'done-task',
+          templateId: 'done-task',
+          title: '已完成任务',
+          characterId: 'done-character',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          completedDates: [today],
+        ),
+        TaskRecord(
+          id: 'pending-task',
+          templateId: 'pending-task',
+          title: '尚未完成任务',
+          characterId: 'pending-character',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(
+          home: Scaffold(body: DashboardScreen(state: state)),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('已清空角色'), findsNothing);
+    expect(find.text('仍有待办角色'), findsWidgets);
+    expect(find.text('1 个待办'), findsOneWidget);
+
+    await tester.tap(find.byType(TaskCheck).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('仍有待办角色'), findsNothing);
+    expect(find.text('今天的任务都完成了'), findsOneWidget);
+    state.dispose();
   });
 
   testWidgets('unfinished once task stays visible before its due date',
