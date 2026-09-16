@@ -16,6 +16,26 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('日期控件统一使用简体中文', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const []
+      ..characters = const []
+      ..tasks = const [];
+
+    await tester.pumpWidget(Jx3TasksApp(store: store));
+    await tester.pump();
+
+    final context = tester.element(find.byType(HomeShell));
+    expect(Localizations.localeOf(context), const Locale('zh', 'CN'));
+    expect(
+      MaterialLocalizations.of(context).formatMonthYear(DateTime(2026, 9)),
+      contains('月'),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('theme preference defaults to light and persists the selected mode',
       () async {
     SharedPreferences.setMockInitialValues({});
