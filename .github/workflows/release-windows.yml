@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.4.2 build 10 — cloud restore fix
+# Release v0.5.0 build 11 — task management and synchronization update
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.4.2]')
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.0]')
     needs:
       - build-windows
       - build-android
@@ -178,30 +178,37 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove superseded v0.4.2 assets
+      - name: Remove existing v0.5.0 assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/${{ github.repository }}/releases/tags/v0.4.2 \
-            --jq '.assets[].id' |
-            while read -r asset_id; do
-              gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
-            done
+          asset_ids="$(
+            gh api repos/${{ github.repository }}/releases/tags/v0.5.0 \
+              --jq '.assets[].id' 2>/dev/null || true
+          )"
+          for asset_id in $asset_ids; do
+            gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
+          done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.2
+          tag_name: v0.5.0
           target_commitish: ${{ github.sha }}
-          name: v0.4.2 修复云端恢复重复备份
+          name: v0.5.0 全部任务管理与同步增强
           files: release-assets/*
           body: |
-            v0.4.2 修复云端恢复重复生成备份
+            v0.5.0 全部任务管理与同步增强
 
-            - 修复从云端恢复到本地时立刻额外创建一份云端备份的问题
-            - 恢复操作现在只下载并替换本地数据，不再自动上传旧本地数据
-            - 恢复后的数据会保持为已同步状态，不会被自动同步再次上传
-            - 恢复确认提示已明确说明不会创建新云端备份
-            - 新增回归测试，验证恢复期间 WebDAV 上传次数为 0
-            - Android 延续固定发布签名，可直接覆盖安装 v0.4.1
+            - 新增“全部任务”页，支持单选、多选、批量分配、删除和移入收集箱
+            - 支持按游戏、角色、完成状态、即将过期和已逾期筛选任务
+            - 角色任务可在全部任务页直接切换完成状态，部分完成显示已完成数量
+            - 一次性任务会结合周末及中国节假日标记即将过期或已逾期
+            - 新建任务支持开始日期，未设置时从分配角色当天开始
+            - 游戏可定义文本、长文本、数字、单选、多选、开关、日期、时间和链接元数据
+            - 同步页显示当前与最新云端版本，并定时检测其他设备上传的新备份
+            - 修复从云端恢复后立即重复生成备份的问题
+            - 默认使用浅色外观，日期与日历控件统一使用简体中文
+            - 改进桌面端宽屏布局、筛选对齐、移动端标题操作与角色状态样式
+            - Android 延续固定发布签名，可直接覆盖安装 v0.4.2
             - Windows 正式包保持单层 ZIP，macOS 使用 DMG
