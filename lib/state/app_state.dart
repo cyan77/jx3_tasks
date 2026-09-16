@@ -709,7 +709,10 @@ class AppState extends ChangeNotifier {
     String note = '',
   }) async {
     if (!source.isInbox || characterIds.isEmpty) return;
-    final validCharacterIds = characters
+    final gameId = source.inboxGameId;
+    final validCharacterIds = store.characters
+        .where((character) =>
+            !character.archived && character.gameId == gameId)
         .map((character) => character.id)
         .where(characterIds.contains)
         .toList();
@@ -836,7 +839,10 @@ class AppState extends ChangeNotifier {
         .where((task) => task.templateId == source.templateId)
         .map((task) => task.characterId)
         .toSet();
-    final validCharacterIds = characters
+    final gameId = gameForTask(source)?.id;
+    final validCharacterIds = store.characters
+        .where((character) =>
+            !character.archived && character.gameId == gameId)
         .map((character) => character.id)
         .where((id) =>
             characterIds.contains(id) && !existingCharacterIds.contains(id))
