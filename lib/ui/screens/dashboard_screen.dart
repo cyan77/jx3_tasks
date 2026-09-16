@@ -24,16 +24,19 @@ class DashboardScreen extends StatelessWidget {
     final today = state.currentTaskDate;
     final allTasks = state.selectedTasks;
     final todayTasks = allTasks.where((task) {
-      if (task.frequency == TaskFrequency.daily) return true;
+      if (task.frequency == TaskFrequency.daily) {
+        return state.hasTaskStartedBy(task, today);
+      }
       if (task.frequency != TaskFrequency.once) return false;
-      return task.isVisibleOn(today);
+      return state.hasTaskStartedBy(task, today) && task.isVisibleOn(today);
     }).toList()
       ..sort((a, b) => _compareTasks(a, b, today));
     final periodTasks = allTasks
         .where((task) =>
-            task.frequency == TaskFrequency.weekly ||
-            task.frequency == TaskFrequency.monthly ||
-            task.isCountTask)
+            state.hasTaskStartedBy(task, today) &&
+            (task.frequency == TaskFrequency.weekly ||
+                task.frequency == TaskFrequency.monthly ||
+                task.isCountTask))
         .toList()
       ..sort((a, b) => _compareTasks(a, b, today));
     final doneToday =

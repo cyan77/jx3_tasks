@@ -257,6 +257,7 @@ class TaskRecord {
     required this.characterId,
     required this.frequency,
     required this.createdAt,
+    this.startDate,
     this.dueDate,
     this.targetCount = 1,
     this.weeklyDays = const [],
@@ -273,6 +274,7 @@ class TaskRecord {
   final String characterId;
   final TaskFrequency frequency;
   final DateTime createdAt;
+  final DateTime? startDate;
   final DateTime? dueDate;
   final int targetCount;
   final List<int> weeklyDays;
@@ -292,6 +294,8 @@ class TaskRecord {
   TaskRecord copyWith({
     String? title,
     TaskFrequency? frequency,
+    DateTime? startDate,
+    bool clearStartDate = false,
     DateTime? dueDate,
     bool clearDueDate = false,
     int? targetCount,
@@ -309,6 +313,7 @@ class TaskRecord {
         characterId: characterId,
         frequency: frequency ?? this.frequency,
         createdAt: createdAt,
+        startDate: clearStartDate ? null : startDate ?? this.startDate,
         dueDate: clearDueDate ? null : dueDate ?? this.dueDate,
         targetCount: targetCount ?? this.targetCount,
         weeklyDays: weeklyDays ?? this.weeklyDays,
@@ -358,26 +363,32 @@ class TaskRecord {
 
   bool isScheduledOn(DateTime date, {int dailyResetMinutes = 0}) {
     final day = startOfDay(date);
-    final createdDay = startOfDay(
-      createdAt.subtract(Duration(minutes: dailyResetMinutes)),
-    );
-    if (day.isBefore(createdDay)) return false;
+    final startDay = startOfDay(startDate ??
+        createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    if (day.isBefore(startDay)) return false;
     return switch (frequency) {
       TaskFrequency.once => dueDate != null && dateKey(dueDate!) == dateKey(day),
       TaskFrequency.daily => true,
       TaskFrequency.weekly => weeklyDays.isEmpty
-          ? day.weekday == (dueDate?.weekday ?? createdDay.weekday)
+          ? day.weekday == (dueDate?.weekday ?? startDay.weekday)
           : weeklyDays.contains(day.weekday),
       TaskFrequency.monthly =>
-        day.day == _clampedMonthlyDay(day, createdDay: createdDay),
+        day.day == _clampedMonthlyDay(day, startDay: startDay),
       TaskFrequency.weeklyCount =>
         weeklyDays.isEmpty || weeklyDays.contains(day.weekday),
       TaskFrequency.monthlyCount => true,
     };
   }
 
-  int _clampedMonthlyDay(DateTime month, {required DateTime createdDay}) {
-    final anchorDay = dueDate?.day ?? createdDay.day;
+  bool hasStartedBy(DateTime date, {int dailyResetMinutes = 0}) {
+    final day = startOfDay(date);
+    final startDay = startOfDay(startDate ??
+        createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    return !day.isBefore(startDay);
+  }
+
+  int _clampedMonthlyDay(DateTime month, {required DateTime startDay}) {
+    final anchorDay = dueDate?.day ?? startDay.day;
     final lastDay = DateTime(month.year, month.month + 1, 0).day;
     return anchorDay > lastDay ? lastDay : anchorDay;
   }
@@ -395,6 +406,7 @@ class TaskRecord {
         'characterId': characterId,
         'frequency': frequency.name,
         'createdAt': createdAt.toIso8601String(),
+        'startDate': startDate?.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),
         'targetCount': targetCount,
         'weeklyDays': weeklyDays,
@@ -413,6 +425,9 @@ class TaskRecord {
         frequency:
             TaskFrequency.values.byName(json['frequency'] as String? ?? 'once'),
         createdAt: DateTime.parse(json['createdAt'] as String),
+        startDate: json['startDate'] == null
+            ? null
+            : DateTime.parse(json['startDate'] as String),
         dueDate: json['dueDate'] == null
             ? null
             : DateTime.parse(json['dueDate'] as String),
