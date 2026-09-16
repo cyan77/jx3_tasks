@@ -482,14 +482,20 @@ void main() {
     await tester.pump();
 
     expect(find.text('已完成 1/2'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('task-character-task-2')));
+    await tester.tap(find.text('角色二'));
     await tester.pumpAndSettle();
-    expect(store.tasks.last.isCompletedOn(DateTime.now()), isTrue);
+    expect(
+      store.tasks.last.isCompletedOn(state.taskDateFor(store.tasks.last)),
+      isTrue,
+    );
     expect(find.text('已完成 1/2'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('task-character-task-1')));
+    await tester.tap(find.text('角色一'));
     await tester.pumpAndSettle();
-    expect(store.tasks.first.isCompletedOn(DateTime.now()), isFalse);
+    expect(
+      store.tasks.first.isCompletedOn(state.taskDateFor(store.tasks.first)),
+      isFalse,
+    );
     expect(find.text('已完成 1/2'), findsOneWidget);
     state.dispose();
   });
