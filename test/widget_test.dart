@@ -489,8 +489,10 @@ void main() {
     expect(characterTwoControl, findsOneWidget);
     tester.widget<InkWell>(characterTwoControl).onTap!();
     await tester.pumpAndSettle();
+    final characterTwoTask =
+        store.tasks.singleWhere((task) => task.id == 'task-2');
     expect(
-      store.tasks.last.isCompletedOn(state.taskDateFor(store.tasks.last)),
+      characterTwoTask.isCompletedOn(state.taskDateFor(characterTwoTask)),
       isTrue,
     );
     expect(find.text('已完成 1/2'), findsNothing);
@@ -502,8 +504,10 @@ void main() {
     expect(characterOneControl, findsOneWidget);
     tester.widget<InkWell>(characterOneControl).onTap!();
     await tester.pumpAndSettle();
+    final characterOneTask =
+        store.tasks.singleWhere((task) => task.id == 'task-1');
     expect(
-      store.tasks.first.isCompletedOn(state.taskDateFor(store.tasks.first)),
+      characterOneTask.isCompletedOn(state.taskDateFor(characterOneTask)),
       isFalse,
     );
     expect(find.text('已完成 1/2'), findsOneWidget);
