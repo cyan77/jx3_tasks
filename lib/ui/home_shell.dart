@@ -76,16 +76,11 @@ class _HomeShellState extends State<HomeShell> {
                 ? null
                 : _GlassBottomNavigation(state: state),
             floatingActionButton: state.currentTab == 0
-                ? FloatingActionButton.extended(
+                ? _GlassCreateButton(
                     onPressed: () => showTaskEditor(
                       context,
                       state,
                     ),
-                    backgroundColor: AppTheme.accent,
-                    foregroundColor: Colors.white,
-                    elevation: 1,
-                    icon: const Icon(Icons.add, size: 19),
-                    label: const Text('新建任务'),
                   )
                 : null,
           ),
@@ -163,6 +158,53 @@ class _HomeShellState extends State<HomeShell> {
     } catch (_) {
       // Startup checks are intentionally silent when offline or GitHub is unavailable.
     }
+  }
+}
+
+class _GlassCreateButton extends StatelessWidget {
+  const _GlassCreateButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      key: const ValueKey('glass-create-task-button'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.20 : 0.09),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: FloatingActionButton.extended(
+            onPressed: onPressed,
+            elevation: 0,
+            highlightElevation: 0,
+            backgroundColor:
+                scheme.surface.withValues(alpha: dark ? 0.80 : 0.88),
+            foregroundColor: scheme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.76),
+              ),
+            ),
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('新建任务'),
+          ),
+        ),
+      ),
+    );
   }
 }
 
