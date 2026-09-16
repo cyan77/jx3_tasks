@@ -50,6 +50,7 @@ class SyncSettingsStore {
   static const _remotePathKey = 'webdav.remotePath';
   static const _autoSyncMinutesKey = 'webdav.autoSyncMinutes';
   static const _lastSyncAtKey = 'webdav.lastSyncAt';
+  static const _currentBackupPathKey = 'webdav.currentBackupPath';
 
   Future<SyncConfig> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -85,6 +86,20 @@ class SyncSettingsStore {
   Future<void> saveLastSyncAt(DateTime value) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_lastSyncAtKey, value.toIso8601String());
+  }
+
+  Future<String?> loadCurrentBackupPath() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_currentBackupPathKey);
+  }
+
+  Future<void> saveCurrentBackupPath(String? path) async {
+    final preferences = await SharedPreferences.getInstance();
+    if (path == null || path.isEmpty) {
+      await preferences.remove(_currentBackupPathKey);
+    } else {
+      await preferences.setString(_currentBackupPathKey, path);
+    }
   }
 }
 
