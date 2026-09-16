@@ -482,7 +482,12 @@ void main() {
     await tester.pump();
 
     expect(find.text('已完成 1/2'), findsOneWidget);
-    await tester.tap(find.text('角色二'));
+    final characterTwoControl = find.ancestor(
+      of: find.text('角色二'),
+      matching: find.byType(InkWell),
+    );
+    expect(characterTwoControl, findsOneWidget);
+    tester.widget<InkWell>(characterTwoControl).onTap!();
     await tester.pumpAndSettle();
     expect(
       store.tasks.last.isCompletedOn(state.taskDateFor(store.tasks.last)),
@@ -490,7 +495,12 @@ void main() {
     );
     expect(find.text('已完成 1/2'), findsNothing);
 
-    await tester.tap(find.text('角色一'));
+    final characterOneControl = find.ancestor(
+      of: find.text('角色一'),
+      matching: find.byType(InkWell),
+    );
+    expect(characterOneControl, findsOneWidget);
+    tester.widget<InkWell>(characterOneControl).onTap!();
     await tester.pumpAndSettle();
     expect(
       store.tasks.first.isCompletedOn(state.taskDateFor(store.tasks.first)),
