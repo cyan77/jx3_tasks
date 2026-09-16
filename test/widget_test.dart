@@ -471,9 +471,16 @@ void main() {
       find.byWidgetPredicate((widget) => widget is DropdownButton).first,
     );
     expect(firstFilter.style?.fontWeight, FontWeight.w400);
-    expect(firstFilter.style?.fontSize, 11);
+    expect(firstFilter.style?.fontSize, 11.5);
     expect(firstFilter.elevation, 0);
     expect(firstFilter.focusColor, Colors.transparent);
+    final gameFilterContainer = tester.widget<Container>(
+      find.byKey(const ValueKey('task-filter-按游戏筛选')),
+    );
+    final gameFilterDecoration =
+        gameFilterContainer.decoration! as BoxDecoration;
+    expect(gameFilterDecoration.borderRadius, BorderRadius.circular(12));
+    expect(gameFilterDecoration.color, isNotNull);
     expect(find.text('已完成任务'), findsOneWidget);
     expect(find.text('未完成任务'), findsOneWidget);
     expect(find.text('即将过期任务'), findsOneWidget);
