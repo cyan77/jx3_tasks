@@ -27,7 +27,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"角色日程", origin, size)) {
+  if (!window.Create(L"\u89d2\u8272\u65e5\u7a0b", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
