@@ -58,6 +58,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late final Set<String> selected;
   late TaskFrequency frequency;
   late bool frequencyConfigured;
+  DateTime? startDate;
   DateTime? dueDate;
   late int targetCount;
   late final Set<int> weeklyDays;
@@ -96,6 +97,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     frequencyConfigured = task == null
         ? !widget.createInInbox
         : task.hasConfiguredFrequency;
+    startDate = task?.startDate;
     dueDate = task?.dueDate;
     targetCount = task?.targetCount ?? 5;
     weeklyDays = {...?task?.weeklyDays};
@@ -350,7 +352,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                       const SizedBox(height: 10),
                       Text(
                           frequency == TaskFrequency.weekly
-                              ? '每周在哪几天显示（不选则按创建当天）'
+                              ? '每周在哪几天显示（不选则按开始当天）'
                               : '计划完成日期（不选则本周任意几天完成）',
                           style: const TextStyle(
                               fontSize: 12, color: AppTheme.muted)),
@@ -375,6 +377,32 @@ class _TaskEditorState extends State<_TaskEditor> {
                     ],
                   ],
                   const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: const Icon(Icons.play_circle_outline,
+                        size: 19, color: AppTheme.muted),
+                    title: const Text('开始日期',
+                        style: TextStyle(fontSize: 13)),
+                    subtitle: Text(
+                        startDate == null
+                            ? '不设置；分配角色当天开始'
+                            : dueLabel(startDate),
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.muted)),
+                    trailing: TextButton(
+                        onPressed: _pickStartDate,
+                        child: Text(startDate == null ? '选择' : '修改')),
+                  ),
+                  if (startDate != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() => startDate = null),
+                        child: const Text('按分配日期开始'),
+                      ),
+                    ),
+                  const SizedBox(height: 4),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
@@ -535,6 +563,19 @@ class _TaskEditorState extends State<_TaskEditor> {
     if (date != null) setState(() => dueDate = date);
   }
 
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    final editorGame = widget.state.games
+        .where((game) => game.id == editorGameId)
+        .firstOrNull;
+    final date = await showDatePicker(
+        context: context,
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100),
+        initialDate: startDate ?? editorGame?.taskDayAt(now) ?? now);
+    if (date != null) setState(() => startDate = date);
+  }
+
   Future<void> _save() async {
     if (assignExisting) {
       final task = existingTask;
@@ -557,10 +598,17 @@ class _TaskEditorState extends State<_TaskEditor> {
       _showValidation('请填写任务名称');
       return;
     }
+    if (startDate != null &&
+        dueDate != null &&
+        startOfDay(dueDate!).isBefore(startOfDay(startDate!))) {
+      _showValidation('截止日期不能早于开始日期');
+      return;
+    }
     if (widget.createInInbox) {
       await widget.state.addInboxTask(
         title: title,
         frequency: frequencyConfigured ? frequency : null,
+        startDate: startDate,
         dueDate: dueDate,
         targetCount: targetCount,
         weeklyDays: weeklyDays.toList()..sort(),
@@ -573,6 +621,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           source: widget.task!,
           title: title,
           frequency: frequencyConfigured ? frequency : null,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
@@ -589,6 +638,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           title: title,
           characterIds: Set.of(selected),
           frequency: frequency,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
@@ -607,6 +657,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           title: title,
           characterIds: Set.of(selected),
           frequency: frequency,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
@@ -618,6 +669,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           source: widget.task!,
           title: title,
           frequency: frequency,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
@@ -630,6 +682,7 @@ class _TaskEditorState extends State<_TaskEditor> {
         await widget.state.addInboxTask(
           title: title,
           frequency: frequency,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
@@ -641,6 +694,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           title: title,
           characterIds: selected.toList(),
           frequency: frequency,
+          startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
