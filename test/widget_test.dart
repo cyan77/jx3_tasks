@@ -441,7 +441,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('select-task-task-1')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('select-task-task-2')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('已选 2 项'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('selected-task-task-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
