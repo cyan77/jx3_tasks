@@ -724,9 +724,11 @@ class _FilterDropdown<T> extends StatelessWidget {
           ),
           child: PopupMenuButton<T>(
               key: ValueKey('task-filter-control-$tooltip'),
+              padding: EdgeInsets.zero,
               position: PopupMenuPosition.under,
               offset: const Offset(0, 6),
               elevation: 0,
+              menuPadding: const EdgeInsets.symmetric(vertical: 4),
               color: fill,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -739,6 +741,7 @@ class _FilterDropdown<T> extends StatelessWidget {
                   .map((item) => PopupMenuItem<T>(
                         value: item.value,
                         enabled: item.enabled,
+                        height: 40,
                         child: DefaultTextStyle.merge(
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

@@ -541,6 +541,9 @@ void main() {
     expect(firstFilter.position, PopupMenuPosition.under);
     expect(firstFilter.offset.dy, greaterThan(0));
     expect(firstFilter.elevation, 0);
+    for (final control in filterControls) {
+      expect(tester.getSize(control).height, 40);
+    }
     final gameFilterContainer = tester.widget<Container>(
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
     );
@@ -548,6 +551,15 @@ void main() {
         gameFilterContainer.decoration! as BoxDecoration;
     expect(gameFilterDecoration.borderRadius, BorderRadius.circular(12));
     expect(gameFilterDecoration.color, isNotNull);
+    await tester.tap(filterControls.first);
+    await tester.pumpAndSettle();
+    final openMenuItems = find.byWidgetPredicate((widget) => widget is PopupMenuItem);
+    expect(openMenuItems, findsWidgets);
+    for (final item in openMenuItems.evaluate()) {
+      expect(tester.getSize(find.byWidget(item.widget)).height, 40);
+    }
+    await tester.tapAt(const Offset(1, 1));
+    await tester.pumpAndSettle();
     expect(find.text('已完成任务'), findsOneWidget);
     expect(find.text('未完成任务'), findsOneWidget);
     expect(find.text('即将过期任务'), findsOneWidget);
