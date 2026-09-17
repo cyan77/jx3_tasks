@@ -181,6 +181,8 @@ class _HomeGameSelector extends StatelessWidget {
     final selected = state.selectedGame;
     final lastSyncAt = state.lastSyncAt?.toLocal();
     final scheme = Theme.of(context).colorScheme;
+    final menuColor =
+        Color.lerp(scheme.surface, scheme.primaryContainer, 0.32)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -204,12 +206,23 @@ class _HomeGameSelector extends StatelessWidget {
             Expanded(
               child: PopupMenuButton<String>(
                 tooltip: '切换首页游戏',
+                padding: EdgeInsets.zero,
                 position: PopupMenuPosition.under,
                 offset: const Offset(0, 6),
+                elevation: 0,
+                color: menuColor,
+                menuPadding: const EdgeInsets.symmetric(vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: scheme.outlineVariant.withValues(alpha: 0.78),
+                  ),
+                ),
                 onSelected: state.selectGame,
                 itemBuilder: (context) => state.games
                     .map((game) => PopupMenuItem<String>(
                           value: game.id,
+                          padding: EdgeInsets.zero,
                           child: Row(
                             children: [
                               Container(
@@ -220,7 +233,7 @@ class _HomeGameSelector extends StatelessWidget {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 9),
+                              const SizedBox(width: 7),
                               Expanded(child: Text(game.name)),
                               if (game.id == selected?.id)
                                 const Icon(Icons.check,
