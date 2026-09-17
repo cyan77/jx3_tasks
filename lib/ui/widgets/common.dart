@@ -159,6 +159,108 @@ class TaskCheck extends StatelessWidget {
       );
 }
 
+class AppDropdownField<T> extends StatelessWidget {
+  const AppDropdownField({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.label,
+    this.helperText,
+    this.menuMaxHeight = 240,
+    super.key,
+  });
+
+  final T? value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+  final String label;
+  final String? helperText;
+  final double menuMaxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.30)!;
+    final selectedIndex = items.indexWhere((item) => item.value == value);
+    final selectedChild = selectedIndex < 0
+        ? const SizedBox.shrink()
+        : items[selectedIndex].child;
+    return LayoutBuilder(
+      builder: (context, constraints) => PopupMenuButton<int>(
+          enabled: onChanged != null,
+          tooltip: label,
+          padding: EdgeInsets.zero,
+          position: PopupMenuPosition.under,
+          offset: const Offset(0, 6),
+          elevation: 0,
+          menuPadding: const EdgeInsets.symmetric(vertical: 4),
+          constraints: BoxConstraints(
+            minWidth: constraints.maxWidth,
+            maxWidth: constraints.maxWidth,
+            maxHeight: menuMaxHeight,
+          ),
+          color: fill,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.20),
+            ),
+          ),
+          onSelected: (index) => onChanged?.call(items[index].value),
+          itemBuilder: (_) => List.generate(items.length, (index) {
+            final item = items[index];
+            return PopupMenuItem<int>(
+              value: index,
+              enabled: item.enabled,
+              height: 40,
+              child: DefaultTextStyle.merge(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: scheme.onSurface,
+                ),
+                child: item.child,
+              ),
+            );
+          }),
+          child: InputDecorator(
+            decoration:
+                InputDecoration(labelText: label, helperText: helperText),
+            isEmpty: selectedIndex < 0,
+            child: Row(
+              children: [
+                Expanded(
+                  child: DefaultTextStyle.merge(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: onChanged == null
+                          ? scheme.onSurface.withValues(alpha: 0.38)
+                          : scheme.onSurface,
+                    ),
+                    child: selectedChild,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.expand_more,
+                  size: 18,
+                  color: onChanged == null
+                      ? scheme.onSurface.withValues(alpha: 0.38)
+                      : scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+    );
+  }
+}
+
 String dueLabel(DateTime? date) {
   if (date == null) return '';
   return '${date.month}/${date.day} 截止';

@@ -293,12 +293,11 @@ class _SyncScreenState extends State<SyncScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            DropdownButtonFormField<int>(
-                              initialValue: autoSyncMinutes,
-                              decoration: const InputDecoration(
-                                labelText: '自动同步周期',
-                                helperText: '仅在应用运行或回到前台时检查，不会在系统完全退出后后台常驻运行。',
-                              ),
+                            AppDropdownField<int>(
+                              value: autoSyncMinutes,
+                              label: '自动同步周期',
+                              helperText:
+                                  '仅在应用运行或回到前台时检查，不会在系统完全退出后后台常驻运行。',
                               items: const [
                                 DropdownMenuItem(
                                     value: 0, child: Text('关闭自动同步')),

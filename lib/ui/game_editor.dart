@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/task_models.dart';
 import '../state/app_state.dart';
+import 'widgets/common.dart';
 
 Future<void> showGameEditor(
   BuildContext context,
@@ -138,9 +139,9 @@ class _GameEditorState extends State<_GameEditor> {
               children: [
                 TextField(controller: name, decoration: const InputDecoration(labelText: '字段名称')),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<MetadataFieldType>(
-                  initialValue: type,
-                  decoration: const InputDecoration(labelText: '值的格式'),
+                AppDropdownField<MetadataFieldType>(
+                  value: type,
+                  label: '值的格式',
                   items: MetadataFieldType.values
                       .map((item) => DropdownMenuItem(value: item, child: Text(item.label)))
                       .toList(),
