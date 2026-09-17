@@ -70,14 +70,6 @@ class GameManagementScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          IconButton(
-                            tooltip: '切换到此游戏',
-                            onPressed: () {
-                              state.selectGame(game.id);
-                              Navigator.pop(context);
-                            },
-                            icon: const Icon(Icons.login, size: 18),
-                          ),
                           PopupMenuButton<String>(
                             onSelected: (value) async {
                               if (value == 'edit') {
