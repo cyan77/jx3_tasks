@@ -94,42 +94,35 @@ class DashboardScreen extends StatelessWidget {
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: LayoutBuilder(builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 520;
                   final cards = [
                     _SummaryCard(
                         label: '今日完成',
                         value: '$doneToday / ${todayTasks.length}',
                         progress: todayTasks.isEmpty
                             ? 0
-                            : doneToday / todayTasks.length),
+                            : doneToday / todayTasks.length,
+                        compact: compact),
                     _SummaryCard(
                         label: '周期进度',
                         value: '$periodDone / ${periodTasks.length}',
                         progress: periodTasks.isEmpty
                             ? 0
-                            : periodDone / periodTasks.length),
+                            : periodDone / periodTasks.length,
+                        compact: compact),
                     _SummaryCard(
                         label: '角色总任务',
                         value: '${allTasks.length}',
                         progress: 1,
-                        showProgress: false),
+                        showProgress: false,
+                        compact: compact),
                   ];
-                  if (constraints.maxWidth < 520) {
-                    return Column(
-                      children: [
-                        for (var index = 0; index < cards.length; index++) ...[
-                          SizedBox(width: double.infinity, child: cards[index]),
-                          if (index < cards.length - 1)
-                            const SizedBox(height: 8),
-                        ],
-                      ],
-                    );
-                  }
                   return Row(
                     children: [
                       for (var index = 0; index < cards.length; index++) ...[
                         Expanded(child: cards[index]),
                         if (index < cards.length - 1)
-                          const SizedBox(width: 10),
+                          SizedBox(width: compact ? 6 : 10),
                       ],
                     ],
                   );
@@ -567,32 +560,44 @@ class _SummaryCard extends StatelessWidget {
       {required this.label,
       required this.value,
       required this.progress,
-      this.showProgress = true});
+      this.showProgress = true,
+      this.compact = false});
   final String label;
   final String value;
   final double progress;
   final bool showProgress;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(13),
+      padding: EdgeInsets.all(compact ? 9 : 13),
       decoration: BoxDecoration(
           border: Border.all(
               color: Theme.of(context).colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(7)),
+          borderRadius: BorderRadius.circular(compact ? 10 : 7)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
-        const SizedBox(height: 7),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 10.5 : 12,
+            color: AppTheme.muted,
+          ),
+        ),
+        SizedBox(height: compact ? 4 : 7),
         Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+                fontSize: compact ? 17 : 20,
+                fontWeight: compact ? FontWeight.w600 : FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface)),
         if (showProgress) ...[
-          const SizedBox(height: 9),
+          SizedBox(height: compact ? 6 : 9),
           ProgressLine(value: progress)
-        ]
+        ] else if (compact)
+          const SizedBox(height: 11),
       ]));
 }
 
