@@ -148,44 +148,14 @@ class _MatrixScreenState extends State<MatrixScreen> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, selectedCount > 0 ? 12 : 6),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: desktopSelection && selectedCount > 0
-              ? _SelectionBar(
-            selectedCount: selectedCount,
-            allVisibleSelected: visibleIds.isNotEmpty &&
-                visibleIds.every(selectedTemplateIds.contains),
-            onToggleAll: () => _toggleAll(visibleIds),
-            onClear: selectedCount == 0
-                ? null
-                : () => setState(selectedTemplateIds.clear),
-            onAssign: selectedCount == 0 ||
-                    archiveFilter == _ArchiveFilter.archived
-                ? null
-                : _assignSelected,
-            onMoveToInbox: selectedCount == 0 ||
-                    archiveFilter == _ArchiveFilter.archived
-                ? null
-                : _moveSelectedToInbox,
-            onArchive: selectedCount == 0
-                ? null
-                : () => _setTemplatesArchived(
-                    Set.of(selectedTemplateIds), true),
-            onRestore: selectedCount == 0
-                ? null
-                : () => _setTemplatesArchived(
-                    Set.of(selectedTemplateIds), false),
-            showArchive: archiveFilter != _ArchiveFilter.archived,
-            showRestore: archiveFilter != _ArchiveFilter.active,
-            onDelete: selectedCount == 0 ? null : _deleteSelected,
-                )
-              : Text(
-                  desktopSelection
-                      ? '点击任务右上角的选择按钮进行多选管理'
-                      : selectedCount > 0
-                          ? '已选 $selectedCount 项'
-                          : '长按任务进行管理',
-                  style: const TextStyle(
-                      fontSize: 11, color: AppTheme.muted),
-                ),
+          child: Text(
+            selectedCount > 0
+                ? '已选 $selectedCount 项'
+                : desktopSelection
+                    ? '点击任务右上角的选择按钮进行多选管理'
+                    : '长按任务进行管理',
+            style: const TextStyle(fontSize: 11, color: AppTheme.muted),
+          ),
         ),
       ),
       Expanded(
@@ -199,7 +169,9 @@ class _MatrixScreenState extends State<MatrixScreen> {
                   20,
                   0,
                   20,
-                  !desktopSelection && selectedCount > 0 ? 172 : 28,
+                  selectedCount > 0
+                      ? (desktopSelection ? 92 : 172)
+                      : 28,
                 ),
                 itemCount: visibleTemplates.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -245,11 +217,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
                 },
               ),
             ),
-            if (!desktopSelection)
-              Positioned(
+            Positioned(
                 left: 12,
                 right: 12,
-                bottom: 82,
+                bottom: desktopSelection ? 12 : 82,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   reverseDuration: const Duration(milliseconds: 160),
