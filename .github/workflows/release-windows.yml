@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.5.1 build 12 — expiring-soon rule update
+# Release v0.5.2 build 13 — interaction and sync improvements
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.1]')
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.2]')
     needs:
       - build-windows
       - build-android
@@ -178,13 +178,13 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove existing v0.5.1 assets
+      - name: Remove existing v0.5.2 assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset_ids="$(
             gh api repos/${{ github.repository }}/releases --paginate \
-              --jq '.[] | select(.tag_name == "v0.5.1") | .assets[].id'
+              --jq '.[] | select(.tag_name == "v0.5.2") | .assets[].id'
           )"
           for asset_id in $asset_ids; do
             gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
@@ -193,13 +193,18 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.1
+          tag_name: v0.5.2
           target_commitish: ${{ github.sha }}
-          name: v0.5.1 任务过期提醒优化
+          name: v0.5.2 交互与同步体验优化
           files: release-assets/*
           body: |
-            v0.5.1 任务过期提醒优化
+            v0.5.2 交互与同步体验优化
 
-            - 一次性任务距截止日期不足 7 个自然日时标记“即将过期”
-            - 截止日前剩余休息日为 0～1 天时也会标记“即将过期”
-            - 两个条件任一满足即生效，并统一应用于待办、日历、收集箱和全部任务页
+            - 新增启动页动画，数据加载期间不再显示空白页面
+            - 首页当前游戏区域和手机端统计卡更紧凑，并按未完成任务统计角色与任务
+            - 全部任务与收集箱支持长按多选及底部批量操作栏
+            - 统一任务编辑、分配、下拉菜单和日期选择器的磨砂玻璃视觉
+            - 修复编辑弹层被键盘顶出安全区域、批量分配无变化等问题
+            - 宽屏日历支持直接勾选子任务，手机端保持紧凑展示
+            - 优化角色管理和游戏切换在窄屏下的布局与对齐
+            - 坚果云配置按状态收起，已配置与未配置操作更清晰
