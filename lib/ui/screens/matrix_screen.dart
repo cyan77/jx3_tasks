@@ -209,6 +209,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                         .toSet(),
                     expiry: _expiryFor(tasks),
                     selected: selectedTemplateIds.contains(templateId),
+                    selectionMode: selectedCount > 0,
                     showSelectionButton: desktopSelection,
                     onSelect: () => _setSelected(
                       templateId,
@@ -861,6 +862,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.completedTaskIds,
     required this.expiry,
     required this.selected,
+    required this.selectionMode,
     required this.showSelectionButton,
     required this.onSelect,
     required this.onToggleTask,
@@ -877,6 +879,7 @@ class _TaskManagementTile extends StatelessWidget {
   final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
   final bool selected;
+  final bool selectionMode;
   final bool showSelectionButton;
   final VoidCallback onSelect;
   final ValueChanged<TaskRecord> onToggleTask;
@@ -917,7 +920,7 @@ class _TaskManagementTile extends StatelessWidget {
     ];
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: selected ? onSelect : null,
+      onTap: selectionMode ? onSelect : null,
       onLongPress: onSelect,
       onHorizontalDragEnd: (details) {
         if ((details.primaryVelocity ?? 0) > 250) onSelect();
@@ -999,7 +1002,9 @@ class _TaskManagementTile extends StatelessWidget {
                               character: character,
                               task: characterTask,
                               completed: completed,
-                              onTap: () => onToggleTask(characterTask),
+                              onTap: selectionMode
+                                  ? onSelect
+                                  : () => onToggleTask(characterTask),
                             );
                           })
                           .toList(),
