@@ -13,6 +13,7 @@ import 'package:jx3_tasks/theme/app_theme.dart';
 import 'package:jx3_tasks/app.dart';
 import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
+import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
 import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
@@ -299,6 +300,56 @@ void main() {
 
     expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
+    state.dispose();
+  });
+
+  testWidgets('calendar keeps subtasks hidden on narrow screens',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final date = DateTime(2026, 9, 10);
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'calendar-task-narrow',
+          templateId: 'calendar-task-narrow',
+          title: '手机日历任务',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: date,
+          subtasks: const [
+            TaskSubtask(id: 'subtask-1', title: '手机端隐藏的子任务'),
+          ],
+        ),
+      ];
+    final state = AppState(store)..selectCalendarDate(date);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: state,
+            builder: (context, child) => CalendarScreen(state: state),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('手机日历任务'), findsOneWidget);
+    expect(find.text('手机端隐藏的子任务'), findsNothing);
     state.dispose();
   });
 
@@ -1400,6 +1451,64 @@ void main() {
         store.tasks.single, store.tasks.single.subtasks.last,
         date: date);
     expect(store.tasks.single.isCompletedOn(date), isTrue);
+  });
+
+  testWidgets('calendar task shows independently completable subtasks',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final date = DateTime(2026, 9, 10);
+    final task = TaskRecord(
+      id: 'calendar-task',
+      templateId: 'calendar-task',
+      title: '日历任务',
+      characterId: 'char-1',
+      frequency: TaskFrequency.once,
+      createdAt: DateTime(2026, 9, 1),
+      dueDate: date,
+      subtasks: const [
+        TaskSubtask(id: 'subtask-1', title: '日历子任务一'),
+        TaskSubtask(id: 'subtask-2', title: '日历子任务二'),
+      ],
+    );
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [task];
+    final state = AppState(store)..selectCalendarDate(date);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: state,
+            builder: (context, child) => CalendarScreen(state: state),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('日历子任务一'), findsOneWidget);
+    expect(find.text('日历子任务二'), findsOneWidget);
+    await tester.tap(find.byKey(
+        const ValueKey('calendar-subtask-calendar-task-subtask-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      store.tasks.single
+          .isSubtaskCompletedOn(store.tasks.single.subtasks.first, date),
+      isTrue,
+    );
+    expect(store.tasks.single.isCompletedOn(date), isFalse);
+    state.dispose();
   });
 
   test('inbox includes every game and archived characters can be restored',
