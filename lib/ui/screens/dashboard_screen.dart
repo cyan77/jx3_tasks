@@ -197,8 +197,10 @@ class _HomeGameSelector extends StatelessWidget {
             color: scheme.outlineVariant.withValues(alpha: 0.78),
           ),
         ),
-        child: Row(
+        child: Column(
           children: [
+            Row(
+              children: [
             const Icon(Icons.sports_esports_outlined,
                 size: 19, color: AppTheme.accent),
             const SizedBox(width: 9),
@@ -337,6 +339,26 @@ class _HomeGameSelector extends StatelessWidget {
                       size: 20,
                     ),
             ),
+              ],
+            ),
+            if (lastSyncAt != null &&
+                MediaQuery.sizeOf(context).width < 520) ...[
+              const SizedBox(height: 2),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    '上次同步成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
+                    '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
