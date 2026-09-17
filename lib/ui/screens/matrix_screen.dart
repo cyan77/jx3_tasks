@@ -180,7 +180,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
               : Text(
                   desktopSelection
                       ? '点击任务右上角的选择按钮进行多选管理'
-                      : '长按或向右滑动任务进行管理',
+                      : '长按任务进行管理',
                   style: const TextStyle(
                       fontSize: 11, color: AppTheme.muted),
                 ),
@@ -610,6 +610,10 @@ class _FilterBar extends StatelessWidget {
           Expanded(child: _FilterDropdown<String>(
             tooltip: '按游戏筛选',
             value: gameId ?? allGamesValue,
+            selectedLabel:
+                MediaQuery.sizeOf(context).width < 600 && gameId == null
+                    ? '游戏'
+                    : null,
             items: [
               const DropdownMenuItem(
                   value: allGamesValue, child: Text('全部游戏')),
@@ -623,6 +627,10 @@ class _FilterBar extends StatelessWidget {
           Expanded(child: _FilterDropdown<String>(
             tooltip: '按角色筛选',
             value: characterId ?? allCharactersValue,
+            selectedLabel:
+                MediaQuery.sizeOf(context).width < 600 && characterId == null
+                    ? '角色'
+                    : null,
             items: [
               const DropdownMenuItem(
                   value: allCharactersValue, child: Text('全部角色')),
@@ -638,6 +646,10 @@ class _FilterBar extends StatelessWidget {
           Expanded(child: _FilterDropdown<_CompletionFilter>(
             tooltip: '按完成状态筛选',
             value: completion,
+            selectedLabel: MediaQuery.sizeOf(context).width < 600 &&
+                    completion == _CompletionFilter.all
+                ? '状态'
+                : null,
             items: const [
               DropdownMenuItem(
                   value: _CompletionFilter.all, child: Text('全部状态')),
@@ -693,10 +705,12 @@ class _FilterDropdown<T> extends StatelessWidget {
     required this.value,
     required this.items,
     required this.onChanged,
+    this.selectedLabel,
   });
 
   final String tooltip;
   final T value;
+  final String? selectedLabel;
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?> onChanged;
 
@@ -704,11 +718,15 @@ class _FilterDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
-    Widget selectedChild = const SizedBox.shrink();
-    for (final item in items) {
-      if (item.value == value) {
-        selectedChild = item.child;
-        break;
+    Widget selectedChild = selectedLabel == null
+        ? const SizedBox.shrink()
+        : Text(selectedLabel!);
+    if (selectedLabel == null) {
+      for (final item in items) {
+        if (item.value == value) {
+          selectedChild = item.child;
+          break;
+        }
       }
     }
     return Tooltip(
@@ -925,9 +943,6 @@ class _TaskManagementTile extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: selectionMode ? onSelect : null,
       onLongPress: onSelect,
-      onHorizontalDragEnd: (details) {
-        if ((details.primaryVelocity ?? 0) > 250) onSelect();
-      },
       child: Material(
         color: cardColor,
         shape: RoundedRectangleBorder(
