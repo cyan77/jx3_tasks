@@ -7,6 +7,7 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../task_editor.dart';
 import '../widgets/common.dart';
+import 'sync_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({required this.state, super.key});
@@ -17,6 +18,7 @@ class DashboardScreen extends StatelessWidget {
     if (state.characters.isEmpty) {
       return Column(children: [
         const PageHeader(title: '今日待办'),
+        _HomeGameSelector(state: state),
         _EmptyState(onAdd: () => showCharacterEditor(context, state))
       ]);
     }
@@ -40,6 +42,7 @@ class DashboardScreen extends StatelessWidget {
             label: const Text('新建任务'),
           ),
         ),
+        _HomeGameSelector(state: state),
         const _AllDoneState(),
       ]);
     }
@@ -81,6 +84,8 @@ class DashboardScreen extends StatelessWidget {
                         ),
                     icon: const Icon(Icons.add, size: 17),
                     label: const Text('新建任务'))),
+            _HomeGameSelector(state: state),
+            const SizedBox(height: 14),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: _CharacterStrip(
@@ -165,6 +170,204 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+
+class _HomeGameSelector extends StatelessWidget {
+  const _HomeGameSelector({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = state.selectedGame;
+    final lastSyncAt = state.lastSyncAt?.toLocal();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        key: const ValueKey('home-game-filter'),
+        padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer.withValues(alpha: 0.32),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.78),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sports_esports_outlined,
+                size: 19, color: AppTheme.accent),
+            const SizedBox(width: 9),
+            const Text('当前游戏',
+                style: TextStyle(fontSize: 12, color: AppTheme.muted)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PopupMenuButton<String>(
+                tooltip: '切换首页游戏',
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                onSelected: state.selectGame,
+                itemBuilder: (context) => state.games
+                    .map((game) => PopupMenuItem<String>(
+                          value: game.id,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: Color(game.color),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(child: Text(game.name)),
+                              if (game.id == selected?.id)
+                                const Icon(Icons.check,
+                                    size: 18, color: AppTheme.accent),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected != null) ...[
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: Color(selected.color),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                    ],
+                    Flexible(
+                      child: Text(
+                        selected?.name ?? '请选择',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    const Icon(Icons.keyboard_arrow_down, size: 18),
+                  ],
+                ),
+              ),
+            ),
+            if (state.newerRemoteBackup != null)
+              IconButton(
+                tooltip: '发现更新的云端备份，点击恢复',
+                visualDensity: VisualDensity.compact,
+                onPressed: state.restoreBusy || state.syncBusy
+                    ? null
+                    : () => _restoreNewerBackup(context),
+                icon: state.restoreBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.restore, size: 20),
+              ),
+            if (lastSyncAt != null && MediaQuery.sizeOf(context).width >= 520)
+              Tooltip(
+                message: '上次成功同步：${_fullSyncTime(lastSyncAt)}',
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6, right: 2),
+                  child: Text(
+                    '上次成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
+                    '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.muted,
+                    ),
+                  ),
+                ),
+              ),
+            IconButton(
+              tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
+              visualDensity: VisualDensity.compact,
+              onPressed: state.restoreBusy ? null : () => _sync(context),
+              icon: state.syncBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      state.isSyncConfigured
+                          ? Icons.cloud_sync_outlined
+                          : Icons.cloud_off_outlined,
+                      size: 20,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sync(BuildContext context) async {
+    if (!state.isSyncConfigured) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => SyncScreen(state: state)),
+      );
+      return;
+    }
+    final success = await state.syncNow();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(state.syncMessage ?? (success ? '已同步' : '同步失败'))),
+    );
+  }
+
+  Future<void> _restoreNewerBackup(BuildContext context) async {
+    final backup = state.newerRemoteBackup;
+    if (backup == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('恢复更新的云端备份？'),
+        content: Text(
+          '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。这次恢复不会在云端创建新备份；如需保留当前本地数据，请先手动上传备份。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('恢复'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await state.restoreBackup(backup);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已从云端备份恢复')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('恢复失败：$error')),
+      );
+    }
+  }
+}
+
+String _fullSyncTime(DateTime date) =>
+    '${date.year}/${twoDigits(date.month)}/${twoDigits(date.day)} '
+    '${twoDigits(date.hour)}:${twoDigits(date.minute)}:${twoDigits(date.second)}';
 
 List<TaskRecord> _todayTasks(
   AppState state,
