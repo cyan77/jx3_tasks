@@ -25,6 +25,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/jx3_tasks_icon.png
 
 flutter_launcher_icons:
   android: true
