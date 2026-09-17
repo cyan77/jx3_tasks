@@ -16,6 +16,7 @@ Future<void> showTaskEditor(
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => _TaskEditor(
           state: state,
@@ -68,6 +69,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   String? existingTemplateId;
   String? selectedEditorGameId;
   String? validationMessage;
+  bool saving = false;
 
   bool get isEditing => widget.task != null;
   bool get isInboxEditing => widget.task?.isInbox ?? false;
@@ -180,7 +182,13 @@ class _TaskEditorState extends State<_TaskEditor> {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-      child: Padding(
+      child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height -
+                MediaQuery.paddingOf(context).top -
+                12,
+          ),
+          child: Padding(
           padding: EdgeInsets.only(
               left: 22,
               right: 22,
@@ -203,9 +211,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                 if (!isEditing &&
                     (widget.createInInbox ||
                         !widget.preselectCurrentCharacter)) ...[
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedEditorGameId,
-                    decoration: const InputDecoration(labelText: '所属游戏'),
+                  _editorDropdown<String>(
+                    value: selectedEditorGameId,
+                    label: '所属游戏',
                     items: widget.state.games
                         .map((game) => DropdownMenuItem(
                               value: game.id,
@@ -251,9 +259,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                               TextStyle(fontSize: 12, color: AppTheme.muted)),
                     )
                   else
-                    DropdownButtonFormField<String>(
-                      initialValue: existingTemplateId,
-                      decoration: const InputDecoration(labelText: '选择已有任务'),
+                    _editorDropdown<String>(
+                      value: existingTemplateId,
+                      label: '选择已有任务',
                       items: existingTasks
                           .map((task) => DropdownMenuItem(
                                 value: task.templateId,
@@ -341,9 +349,9 @@ class _TaskEditorState extends State<_TaskEditor> {
                       frequencyConfigured) ...[
                     if (!widget.createInInbox && !isInboxEditing)
                       const SizedBox(height: 18),
-                    DropdownButtonFormField<TaskFrequency>(
-                      initialValue: frequency,
-                      decoration: const InputDecoration(labelText: '周期'),
+                    _editorDropdown<TaskFrequency>(
+                      value: frequency,
+                      label: '周期',
                       items: TaskFrequency.values
                           .map((item) => DropdownMenuItem(
                               value: item, child: Text(item.label)))
@@ -537,11 +545,50 @@ class _TaskEditorState extends State<_TaskEditor> {
                 SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                        onPressed: assignExisting && existingTask == null
-                            ? null
-                            : _save,
-                        child: Text(saveLabel)))
-              ]))));
+                        onPressed: saving ? null : _submit,
+                        child: saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(saveLabel)))
+              ])))));
+
+  Widget _editorDropdown<T>({
+    required T? value,
+    required String label,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final menuColor =
+        Color.lerp(scheme.surface, scheme.primaryContainer, 0.30)!;
+    return LayoutBuilder(
+      builder: (context, constraints) => InputDecorator(
+        decoration: InputDecoration(labelText: label),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<T>(
+            value: value,
+            isExpanded: true,
+            menuWidth: constraints.maxWidth,
+            elevation: 0,
+            dropdownColor: menuColor,
+            borderRadius: BorderRadius.circular(12),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: scheme.onSurface,
+            ),
+            icon: const Icon(Icons.expand_more, size: 18),
+            items: items,
+            onChanged: onChanged,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _characterAction({
     required String label,
@@ -600,6 +647,25 @@ class _TaskEditorState extends State<_TaskEditor> {
         lastDate: DateTime(2100),
         initialDate: startDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => startDate = date);
+  }
+
+  Future<void> _submit() async {
+    if (saving) return;
+    setState(() {
+      saving = true;
+      validationMessage = null;
+    });
+    try {
+      await _save();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          validationMessage = '保存失败，请重试：$error';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 
   Future<void> _save() async {
