@@ -148,7 +148,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, selectedCount > 0 ? 12 : 6),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: selectedCount > 0
+          child: desktopSelection && selectedCount > 0
               ? _SelectionBar(
             selectedCount: selectedCount,
             allVisibleSelected: visibleIds.isNotEmpty &&
@@ -180,17 +180,27 @@ class _MatrixScreenState extends State<MatrixScreen> {
               : Text(
                   desktopSelection
                       ? '点击任务右上角的选择按钮进行多选管理'
-                      : '长按任务进行管理',
+                      : selectedCount > 0
+                          ? '已选 $selectedCount 项'
+                          : '长按任务进行管理',
                   style: const TextStyle(
                       fontSize: 11, color: AppTheme.muted),
                 ),
         ),
       ),
       Expanded(
-        child: visibleTemplates.isEmpty
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: visibleTemplates.isEmpty
             ? const _EmptyTasks()
             : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  0,
+                  20,
+                  !desktopSelection && selectedCount > 0 ? 172 : 28,
+                ),
                 itemCount: visibleTemplates.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
@@ -234,6 +244,70 @@ class _MatrixScreenState extends State<MatrixScreen> {
                   );
                 },
               ),
+            ),
+            if (!desktopSelection)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 82,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  reverseDuration: const Duration(milliseconds: 160),
+                  transitionBuilder: (child, animation) {
+                    final curved = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+                    return FadeTransition(
+                      opacity: curved,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.16, 0),
+                          end: Offset.zero,
+                        ).animate(curved),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: selectedCount == 0
+                      ? const SizedBox.shrink(
+                          key: ValueKey('mobile-selection-empty'),
+                        )
+                      : _SelectionBar(
+                          key: const ValueKey('mobile-selection-actions'),
+                          compact: true,
+                          selectedCount: selectedCount,
+                          allVisibleSelected: visibleIds.isNotEmpty &&
+                              visibleIds.every(selectedTemplateIds.contains),
+                          onToggleAll: () => _toggleAll(visibleIds),
+                          onClear: () => setState(selectedTemplateIds.clear),
+                          onAssign:
+                              archiveFilter == _ArchiveFilter.archived
+                                  ? null
+                                  : _assignSelected,
+                          onMoveToInbox:
+                              archiveFilter == _ArchiveFilter.archived
+                                  ? null
+                                  : _moveSelectedToInbox,
+                          onArchive: () => _setTemplatesArchived(
+                            Set.of(selectedTemplateIds),
+                            true,
+                          ),
+                          onRestore: () => _setTemplatesArchived(
+                            Set.of(selectedTemplateIds),
+                            false,
+                          ),
+                          showArchive:
+                              archiveFilter != _ArchiveFilter.archived,
+                          showRestore:
+                              archiveFilter != _ArchiveFilter.active,
+                          onDelete: _deleteSelected,
+                        ),
+                ),
+              ),
+          ],
+        ),
       ),
     ]);
   }
@@ -798,6 +872,7 @@ class _FilterDropdown<T> extends StatelessWidget {
 class _SelectionBar extends StatelessWidget {
   const _SelectionBar({
     required this.selectedCount,
+    this.compact = false,
     required this.allVisibleSelected,
     required this.onToggleAll,
     required this.onClear,
@@ -811,6 +886,7 @@ class _SelectionBar extends StatelessWidget {
   });
 
   final int selectedCount;
+  final bool compact;
   final bool allVisibleSelected;
   final VoidCallback onToggleAll;
   final VoidCallback? onClear;
@@ -823,55 +899,86 @@ class _SelectionBar extends StatelessWidget {
   final VoidCallback? onDelete;
 
   @override
-  Widget build(BuildContext context) => Wrap(
+  Widget build(BuildContext context) {
+    final actions = <Widget>[
+      OutlinedButton.icon(
+        onPressed: onToggleAll,
+        icon: Icon(
+          allVisibleSelected
+              ? Icons.deselect_outlined
+              : Icons.select_all_outlined,
+          size: 17,
+        ),
+        label: Text(allVisibleSelected ? '取消全选' : '全选'),
+      ),
+      Text('已选 $selectedCount 项',
+          style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
+      TextButton(onPressed: onClear, child: const Text('退出')),
+      OutlinedButton.icon(
+        onPressed: onAssign,
+        icon: const Icon(Icons.person_add_alt_outlined, size: 17),
+        label: Text(selectedCount == 1 ? '管理分配' : '批量分配'),
+      ),
+      OutlinedButton.icon(
+        onPressed: onMoveToInbox,
+        icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
+        label: const Text('移到收集箱'),
+      ),
+      if (showArchive)
+        OutlinedButton.icon(
+          onPressed: onArchive,
+          icon: const Icon(Icons.archive_outlined, size: 17),
+          label: const Text('归档'),
+        ),
+      if (showRestore)
+        OutlinedButton.icon(
+          onPressed: onRestore,
+          icon: const Icon(Icons.unarchive_outlined, size: 17),
+          label: const Text('恢复'),
+        ),
+      OutlinedButton.icon(
+        onPressed: onDelete,
+        icon: const Icon(Icons.delete_outline, size: 17),
+        label: const Text('删除'),
+      ),
+    ];
+
+    if (!compact) {
+      return Wrap(
         spacing: 8,
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          OutlinedButton.icon(
-            onPressed: onToggleAll,
-            icon: Icon(
-              allVisibleSelected
-                  ? Icons.deselect_outlined
-                  : Icons.select_all_outlined,
-              size: 17,
-            ),
-            label: Text(allVisibleSelected ? '取消全选' : '全选'),
-          ),
-          if (selectedCount > 0)
-            Text('已选 $selectedCount 项',
-                style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
-          if (selectedCount > 0)
-            TextButton(onPressed: onClear, child: const Text('清除选择')),
-          OutlinedButton.icon(
-            onPressed: onAssign,
-            icon: const Icon(Icons.person_add_alt_outlined, size: 17),
-            label: Text(selectedCount == 1 ? '管理分配' : '批量分配'),
-          ),
-          OutlinedButton.icon(
-            onPressed: onMoveToInbox,
-            icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
-            label: const Text('移到收集箱'),
-          ),
-          if (showArchive)
-            OutlinedButton.icon(
-              onPressed: onArchive,
-              icon: const Icon(Icons.archive_outlined, size: 17),
-              label: const Text('归档'),
-            ),
-          if (showRestore)
-            OutlinedButton.icon(
-              onPressed: onRestore,
-              icon: const Icon(Icons.unarchive_outlined, size: 17),
-              label: const Text('恢复'),
-            ),
-          OutlinedButton.icon(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, size: 17),
-            label: const Text('删除'),
-          ),
-        ],
+        children: actions,
       );
+    }
+
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 0,
+      color: scheme.surface.withValues(alpha: 0.96),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 58,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              for (var index = 0; index < actions.length; index++) ...[
+                actions[index],
+                if (index < actions.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TaskManagementTile extends StatelessWidget {
