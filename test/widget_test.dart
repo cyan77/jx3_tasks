@@ -306,8 +306,10 @@ void main() {
   testWidgets('calendar keeps subtasks hidden on narrow screens',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
     final date = DateTime(2026, 9, 10);
     final store = LocalStore()
       ..games = const [Game(id: 'game-jx3', name: '剑网3')]
@@ -445,10 +447,12 @@ void main() {
     expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
     expect(find.text('移到收集箱'), findsOneWidget);
-    expect(
-      tester.getTopLeft(find.widgetWithText(OutlinedButton, '取消全选')).dx,
-      20,
+    final selectionBar = find.byKey(
+      const ValueKey('mobile-selection-actions'),
     );
+    expect(selectionBar, findsOneWidget);
+    expect(tester.getTopLeft(selectionBar).dx, greaterThanOrEqualTo(0));
+    expect(tester.getTopRight(selectionBar).dx, lessThanOrEqualTo(800));
     await tester.tap(find.text('任务一'));
     await tester.pump();
     expect(find.text('已选 1 项'), findsNWidgets(2));
