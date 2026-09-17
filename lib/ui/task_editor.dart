@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../models/task_models.dart';
@@ -13,17 +15,37 @@ Future<void> showTaskEditor(
   bool createInInbox = false,
   bool preselectCurrentCharacter = true,
 }) async {
+  final scheme = Theme.of(context).colorScheme;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final glassColor = Color.lerp(
+    scheme.surface,
+    scheme.primaryContainer,
+    dark ? 0.26 : 0.38,
+  )!;
   await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (_) => _TaskEditor(
-          state: state,
-          task: task,
-          syncAll: syncAll,
-          createInInbox: createInInbox,
-          preselectCurrentCharacter: preselectCurrentCharacter));
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: dark ? 0.34 : 0.16),
+      elevation: 0,
+      builder: (_) => ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(22)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: ColoredBox(
+                color: glassColor.withValues(alpha: dark ? 0.90 : 0.88),
+                child: _TaskEditor(
+                  state: state,
+                  task: task,
+                  syncAll: syncAll,
+                  createInInbox: createInInbox,
+                  preselectCurrentCharacter: preselectCurrentCharacter,
+                ),
+              ),
+            ),
+          ));
 }
 
 Future<void> showCharacterEditor(
@@ -202,7 +224,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                   Expanded(
                       child: Text(editorTitle,
                           style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w700))),
+                              fontSize: 18, fontWeight: FontWeight.w600))),
                   IconButton(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close, size: 20))
@@ -1000,7 +1022,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(widget.character == null ? '添加角色' : '编辑角色',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         content: SizedBox(
           width: 460,
           child: SingleChildScrollView(
