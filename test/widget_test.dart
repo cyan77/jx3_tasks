@@ -382,10 +382,12 @@ void main() {
     expect(find.text('任务二'), findsOneWidget);
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('批量分配'), findsNothing);
-    expect(find.text('长按或向右滑动任务进行管理'), findsOneWidget);
-    await tester.longPress(find.text('任务一'));
+    expect(find.text('点击任务右上角的选择按钮进行多选管理'), findsOneWidget);
+    expect(find.byKey(const ValueKey('select-task-task-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('select-task-task-2')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('select-task-task-1')));
     await tester.pump();
-    await tester.longPress(find.text('任务二'));
+    await tester.tap(find.byKey(const ValueKey('select-task-task-2')));
     await tester.pump();
     expect(find.text('已选 2 项'), findsOneWidget);
     expect(find.byKey(const ValueKey('selected-task-task-1')), findsOneWidget);
@@ -524,14 +526,14 @@ void main() {
 
     await tester.tap(find.text('清除筛选'));
     await tester.pumpAndSettle();
-    await tester.tap(dropdowns.at(0));
+    await tester.tap(filterControls[0]);
     await tester.pumpAndSettle();
     await tester.tap(find.text('崩坏：星穹铁道').last);
     await tester.pumpAndSettle();
     expect(find.text('已完成任务'), findsNothing);
     expect(find.text('未完成任务'), findsOneWidget);
 
-    await tester.tap(dropdowns.at(1));
+    await tester.tap(filterControls[1]);
     await tester.pumpAndSettle();
     await tester.tap(find.text('角色二').last);
     await tester.pumpAndSettle();

@@ -43,6 +43,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final desktopSelection = MediaQuery.sizeOf(context).width >= 800;
     final templates = <String, List<TaskRecord>>{};
     for (final task in state.store.tasks) {
       templates.putIfAbsent(task.templateId, () => []).add(task);
@@ -176,9 +177,12 @@ class _MatrixScreenState extends State<MatrixScreen> {
             showRestore: archiveFilter != _ArchiveFilter.active,
             onDelete: selectedCount == 0 ? null : _deleteSelected,
                 )
-              : const Text(
-                  '长按或向右滑动任务进行管理',
-                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+              : Text(
+                  desktopSelection
+                      ? '点击任务右上角的选择按钮进行多选管理'
+                      : '长按或向右滑动任务进行管理',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppTheme.muted),
                 ),
         ),
       ),
@@ -205,6 +209,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                         .toSet(),
                     expiry: _expiryFor(tasks),
                     selected: selectedTemplateIds.contains(templateId),
+                    showSelectionButton: desktopSelection,
                     onSelect: () => _setSelected(
                       templateId,
                       !selectedTemplateIds.contains(templateId),
@@ -856,6 +861,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.completedTaskIds,
     required this.expiry,
     required this.selected,
+    required this.showSelectionButton,
     required this.onSelect,
     required this.onToggleTask,
     required this.onEdit,
@@ -871,6 +877,7 @@ class _TaskManagementTile extends StatelessWidget {
   final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
   final bool selected;
+  final bool showSelectionButton;
   final VoidCallback onSelect;
   final ValueChanged<TaskRecord> onToggleTask;
   final VoidCallback onEdit;
@@ -1008,6 +1015,22 @@ class _TaskManagementTile extends StatelessWidget {
                 ],
               ),
             ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+            if (showSelectionButton)
+              IconButton(
+                key: ValueKey('select-task-${task.templateId}'),
+                tooltip: selected ? '取消选择' : '选择任务',
+                onPressed: onSelect,
+                icon: Icon(
+                  selected
+                      ? Icons.check_circle
+                      : Icons.library_add_check_outlined,
+                  size: 20,
+                  color: selected ? scheme.primary : AppTheme.muted,
+                ),
+              ),
             PopupMenuButton<String>(
               tooltip: '任务操作',
               onSelected: (value) {
@@ -1030,6 +1053,8 @@ class _TaskManagementTile extends StatelessWidget {
                 ),
                 const PopupMenuItem(
                     value: 'delete', child: Text('删除任务')),
+              ],
+            ),
               ],
             ),
           ]),
