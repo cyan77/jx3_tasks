@@ -29,6 +29,8 @@ class _SyncScreenState extends State<SyncScreen> {
   bool loading = true;
   bool busy = false;
   bool backupsLoading = false;
+  bool editingConfig = false;
+  SyncConfig? savedConfig;
   List<RemoteBackup> backups = const [];
   String? message;
   bool messageIsError = false;
@@ -47,7 +49,10 @@ class _SyncScreenState extends State<SyncScreen> {
     passwordController.text = config.password;
     pathController.text = config.remotePath;
     autoSyncMinutes = config.autoSyncMinutes;
-    setState(() => loading = false);
+    setState(() {
+      savedConfig = config;
+      loading = false;
+    });
     if (config.isValid) _loadBackupsSilently();
   }
 
@@ -58,6 +63,8 @@ class _SyncScreenState extends State<SyncScreen> {
         remotePath: pathController.text,
         autoSyncMinutes: autoSyncMinutes,
       );
+
+  bool get _isConfigured => savedConfig?.isValid ?? false;
 
   Future<void> _run(Future<void> Function() action) async {
     if (busy) return;
@@ -76,23 +83,58 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   Future<void> _saveConfig() async {
+    if (!_config.isValid) {
+      _showFeedback('请填写完整的坚果云 WebDAV 配置', error: true);
+      return;
+    }
     await _run(() async {
-      await settingsStore.save(_config);
+      final config = _config;
+      await settingsStore.save(config);
       await widget.state.reloadSyncSettings();
       await _loadBackupsSilently();
+      if (mounted) {
+        setState(() {
+          savedConfig = config;
+          editingConfig = false;
+        });
+      }
       _showFeedback('配置已保存在本机');
     });
   }
 
   Future<void> _testConnection() async {
+    if (!_config.isValid) {
+      _showFeedback('请填写完整的坚果云 WebDAV 配置', error: true);
+      return;
+    }
     await _run(() async {
       final config = _config;
+      await webDav.testConnection(config);
       await settingsStore.save(config);
       await widget.state.reloadSyncSettings();
-      await webDav.testConnection(config);
       await _loadBackupsSilently();
+      if (mounted) {
+        setState(() {
+          savedConfig = config;
+          editingConfig = false;
+        });
+      }
       _showFeedback('连接成功');
     });
+  }
+
+  void _editConfig() => setState(() => editingConfig = true);
+
+  void _cancelConfigEdit() {
+    final config = savedConfig;
+    if (config != null) {
+      urlController.text = config.url;
+      usernameController.text = config.username;
+      passwordController.text = config.password;
+      pathController.text = config.remotePath;
+      autoSyncMinutes = config.autoSyncMinutes;
+    }
+    setState(() => editingConfig = false);
   }
 
   Future<void> _upload() async {
@@ -229,6 +271,155 @@ class _SyncScreenState extends State<SyncScreen> {
         false;
   }
 
+  Widget _buildWebDavPanel() {
+    final config = savedConfig;
+    return _Panel(
+      title: '坚果云 WebDAV',
+      status: _isConfigured ? '已配置' : '未配置',
+      subtitle: editingConfig
+          ? '使用坚果云的应用密码，不要填写网页登录密码；密码只保存在本机。'
+          : _isConfigured
+              ? '${config!.username} · ${config.remotePath}'
+              : '配置后可自动备份，并在多个设备之间同步。',
+      child: editingConfig
+          ? _buildConfigForm()
+          : _isConfigured
+              ? _buildConfiguredActions(config!)
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    key: const ValueKey('configure-webdav'),
+                    onPressed: busy ? null : _editConfig,
+                    icon: const Icon(Icons.settings_outlined, size: 17),
+                    label: const Text('配置坚果云'),
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildConfiguredActions(SyncConfig config) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            config.autoSyncMinutes == 0
+                ? '自动同步已关闭'
+                : '自动同步：${_autoSyncLabel(config.autoSyncMinutes)}',
+            style: const TextStyle(fontSize: 12, color: AppTheme.muted),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: busy ? null : _upload,
+                icon: const Icon(Icons.cloud_upload_outlined, size: 17),
+                label: const Text('上传备份'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : _refreshBackups,
+                icon: const Icon(Icons.refresh, size: 17),
+                label: const Text('刷新备份'),
+              ),
+              TextButton.icon(
+                key: const ValueKey('edit-webdav'),
+                onPressed: busy ? null : _editConfig,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('修改配置'),
+              ),
+            ],
+          ),
+        ],
+      );
+
+  Widget _buildConfigForm() => Column(
+        key: const ValueKey('webdav-config-form'),
+        children: [
+          TextField(
+            controller: urlController,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'WebDAV 地址',
+              hintText: 'https://dav.jianguoyun.com/dav/',
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: usernameController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: '账号 / 邮箱'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: '应用密码'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: pathController,
+            decoration: const InputDecoration(
+              labelText: '远程备份路径',
+              hintText: '/JX3Tasks/backup.json',
+              helperText: '例如 /JX3Tasks/backup.json',
+            ),
+          ),
+          const SizedBox(height: 10),
+          AppDropdownField<int>(
+            value: autoSyncMinutes,
+            label: '自动同步周期',
+            helperText: '仅在应用运行或回到前台时检查。',
+            items: const [
+              DropdownMenuItem(value: 0, child: Text('关闭自动同步')),
+              DropdownMenuItem(value: 15, child: Text('每 15 分钟')),
+              DropdownMenuItem(value: 30, child: Text('每 30 分钟')),
+              DropdownMenuItem(value: 60, child: Text('每 1 小时')),
+              DropdownMenuItem(value: 360, child: Text('每 6 小时')),
+              DropdownMenuItem(value: 1440, child: Text('每天')),
+            ],
+            onChanged: busy
+                ? null
+                : (value) {
+                    if (value != null) {
+                      setState(() => autoSyncMinutes = value);
+                    }
+                  },
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: busy ? null : _saveConfig,
+                  child: const Text('保存配置'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _testConnection,
+                  icon: const Icon(Icons.wifi_tethering, size: 17),
+                  label: const Text('测试并保存'),
+                ),
+                TextButton(
+                  onPressed: busy ? null : _cancelConfigEdit,
+                  child: const Text('取消'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+
+  String _autoSyncLabel(int minutes) => switch (minutes) {
+        15 => '每 15 分钟',
+        30 => '每 30 分钟',
+        60 => '每 1 小时',
+        360 => '每 6 小时',
+        1440 => '每天',
+        _ => '已关闭',
+      };
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -255,138 +446,46 @@ class _SyncScreenState extends State<SyncScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Panel(
-                        title: '坚果云 WebDAV',
-                        subtitle: '使用坚果云的应用密码，不要填写网页登录密码。请填写远程备份路径，密码只保存在本机。',
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: urlController,
-                              keyboardType: TextInputType.url,
-                              decoration: const InputDecoration(
-                                labelText: 'WebDAV 地址',
-                                hintText: 'https://dav.jianguoyun.com/dav/',
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: usernameController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration:
-                                  const InputDecoration(labelText: '账号 / 邮箱'),
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: passwordController,
-                              obscureText: true,
-                              decoration:
-                                  const InputDecoration(labelText: '应用密码'),
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: pathController,
-                              decoration: const InputDecoration(
-                                labelText: '远程备份路径',
-                                hintText: '/JX3Tasks/backup.json',
-                                helperText:
-                                    '可以填写坚果云中的文件路径，例如 /JX3Tasks/backup.json',
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            AppDropdownField<int>(
-                              value: autoSyncMinutes,
-                              label: '自动同步周期',
-                              helperText:
-                                  '仅在应用运行或回到前台时检查，不会在系统完全退出后后台常驻运行。',
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 0, child: Text('关闭自动同步')),
-                                DropdownMenuItem(
-                                    value: 15, child: Text('每 15 分钟')),
-                                DropdownMenuItem(
-                                    value: 30, child: Text('每 30 分钟')),
-                                DropdownMenuItem(
-                                    value: 60, child: Text('每 1 小时')),
-                                DropdownMenuItem(
-                                    value: 360, child: Text('每 6 小时')),
-                                DropdownMenuItem(
-                                    value: 1440, child: Text('每天')),
-                              ],
-                              onChanged: busy
-                                  ? null
-                                  : (value) {
-                                      if (value != null) {
-                                        setState(() => autoSyncMinutes = value);
-                                      }
-                                    },
-                            ),
-                            const SizedBox(height: 14),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                OutlinedButton(
-                                  onPressed: busy ? null : _saveConfig,
-                                  child: const Text('保存配置'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _testConnection,
-                                  icon: const Icon(Icons.wifi_tethering,
-                                      size: 17),
-                                  label: const Text('测试连接'),
-                                ),
-                                FilledButton.icon(
-                                  onPressed: busy ? null : _upload,
-                                  icon: const Icon(Icons.cloud_upload_outlined,
-                                      size: 17),
-                                  label: const Text('上传备份'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _refreshBackups,
-                                  icon: const Icon(Icons.refresh, size: 17),
-                                  label: const Text('刷新列表'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _Panel(
-                        title: '云端备份（最近 10 份）',
-                        subtitle: '每次上传都会生成新文件，并自动清理更旧的版本。选择任意一份即可恢复。',
-                        child: backupsLoading
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: LinearProgressIndicator(minHeight: 3),
-                              )
-                            : backups.isEmpty
-                                ? const Text(
-                                    '暂无版本化备份，请先点击“上传备份”。',
-                                    style: TextStyle(
-                                        fontSize: 12, color: AppTheme.muted),
-                                  )
-                                : Column(
-                                    children: [
-                                      for (var index = 0;
-                                          index < backups.length;
-                                          index++) ...[
-                                        if (index > 0) const Divider(height: 1),
-                                        _RemoteBackupTile(
-                                          backup: backups[index],
-                                          isLatest: index == 0,
-                                          isCurrent: backups[index].path ==
-                                              widget.state
-                                                  .currentRemoteBackupPath,
-                                          onRestore: busy
-                                              ? null
-                                              : () => _restoreBackup(
-                                                  backups[index]),
-                                        ),
+                      _buildWebDavPanel(),
+                      if (_isConfigured) ...[
+                        const SizedBox(height: 14),
+                        _Panel(
+                          title: '云端备份（最近 10 份）',
+                          subtitle: '每次上传都会生成新文件，并自动清理更旧的版本。选择任意一份即可恢复。',
+                          child: backupsLoading
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: LinearProgressIndicator(minHeight: 3),
+                                )
+                              : backups.isEmpty
+                                  ? const Text(
+                                      '暂无版本化备份，请先点击“上传备份”。',
+                                      style: TextStyle(
+                                          fontSize: 12, color: AppTheme.muted),
+                                    )
+                                  : Column(
+                                      children: [
+                                        for (var index = 0;
+                                            index < backups.length;
+                                            index++) ...[
+                                          if (index > 0)
+                                            const Divider(height: 1),
+                                          _RemoteBackupTile(
+                                            backup: backups[index],
+                                            isLatest: index == 0,
+                                            isCurrent: backups[index].path ==
+                                                widget.state
+                                                    .currentRemoteBackupPath,
+                                            onRestore: busy
+                                                ? null
+                                                : () => _restoreBackup(
+                                                    backups[index]),
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                      ),
+                                    ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       _Panel(
                         title: '本地备份',
@@ -565,11 +664,15 @@ class _BackupVersionBadge extends StatelessWidget {
 
 class _Panel extends StatelessWidget {
   const _Panel(
-      {required this.title, required this.subtitle, required this.child});
+      {required this.title,
+      required this.subtitle,
+      required this.child,
+      this.status});
 
   final String title;
   final String subtitle;
   final Widget child;
+  final String? status;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -583,7 +686,35 @@ class _Panel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title,
+                      style: Theme.of(context).textTheme.titleMedium),
+                ),
+                if (status != null)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: status == '已配置'
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      status!,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: status == '已配置'
+                            ? Theme.of(context).colorScheme.onPrimaryContainer
+                            : AppTheme.muted,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(subtitle,
                 style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
