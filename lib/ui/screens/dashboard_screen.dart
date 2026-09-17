@@ -181,6 +181,11 @@ class _HomeGameSelector extends StatelessWidget {
     final selected = state.selectedGame;
     final lastSyncAt = state.lastSyncAt?.toLocal();
     final scheme = Theme.of(context).colorScheme;
+    final characterCount = state.characters.length;
+    final taskCount = state.allTasksForSelectedGame
+        .map((task) => task.templateId)
+        .toSet()
+        .length;
     final menuColor =
         Color.lerp(scheme.surface, scheme.primaryContainer, 0.32)!;
     return Padding(
@@ -257,14 +262,29 @@ class _HomeGameSelector extends StatelessWidget {
                       const SizedBox(width: 7),
                     ],
                     Flexible(
-                      child: Text(
-                        selected?.name ?? '请选择',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: scheme.onSurface,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            selected?.name ?? '请选择',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '$characterCount 个角色 · $taskCount 个任务',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 3),
