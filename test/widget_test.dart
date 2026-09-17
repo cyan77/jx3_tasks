@@ -1379,7 +1379,7 @@ void main() {
     expect(store.characters.single.archived, isFalse);
   });
 
-  testWidgets('global game filter is only visible on the todo home',
+  testWidgets('home game selector lives below the page title and nowhere else',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore()
@@ -1396,6 +1396,10 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(const ValueKey('home-game-filter')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('home-game-filter'))).dy,
+      greaterThan(tester.getTopLeft(find.text('今日待办')).dy),
+    );
 
     for (final tab in [1, 2, 3, 4]) {
       state.setTab(tab);

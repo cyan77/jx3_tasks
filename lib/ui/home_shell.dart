@@ -6,7 +6,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/update_service.dart';
-import '../models/task_models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'screens/calendar_screen.dart';
@@ -14,7 +13,6 @@ import 'screens/dashboard_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/matrix_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/sync_screen.dart';
 import 'task_editor.dart';
 
 class HomeShell extends StatefulWidget {
@@ -63,12 +61,8 @@ class _HomeShellState extends State<HomeShell> {
                 children: [
                   if (wide) _SideRail(state: state),
                   Expanded(
-                      child: Column(
-                    children: [
-                      if (state.currentTab == 0) _GameBar(state: state),
-                      Expanded(child: screens[state.currentTab]),
-                    ],
-                  )),
+                    child: screens[state.currentTab],
+                  ),
                 ],
               ),
             ),
@@ -356,180 +350,6 @@ class _SideRail extends StatelessWidget {
         ),
       );
 }
-
-class _GameBar extends StatelessWidget {
-  const _GameBar({required this.state});
-
-  final AppState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = state.selectedGame;
-    final lastSyncAt = state.lastSyncAt?.toLocal();
-    final compact = MediaQuery.sizeOf(context).width < 520;
-    return Container(
-      key: const ValueKey('home-game-filter'),
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        border: Border(
-            bottom: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.sports_esports_outlined,
-              size: 19, color: AppTheme.accent),
-          const SizedBox(width: 7),
-          const Text('游戏',
-              style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selected?.id,
-                isExpanded: true,
-                elevation: 0,
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                focusColor: Colors.transparent,
-                icon: const Icon(Icons.unfold_more, size: 18),
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color:
-                        Theme.of(context).colorScheme.onSurfaceVariant),
-                items: state.games
-                    .map((game) => DropdownMenuItem(
-                          value: game.id,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: Color(game.color),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Text(game.name),
-                            ],
-                          ),
-                        ))
-                    .toList(),
-                onChanged: (id) {
-                  if (id != null) state.selectGame(id);
-                },
-              ),
-            ),
-          ),
-          if (state.newerRemoteBackup != null)
-            IconButton(
-              tooltip: '发现更新的云端备份，点击恢复',
-              onPressed: state.restoreBusy || state.syncBusy
-                  ? null
-                  : () => _restoreNewerBackup(context),
-              icon: state.restoreBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.restore, size: 20),
-            ),
-          if (lastSyncAt != null)
-            Tooltip(
-              message: '上次成功同步：${_fullSyncTime(lastSyncAt)}',
-              child: Padding(
-                padding: const EdgeInsets.only(left: 6, right: 2),
-                child: Text(
-                  compact
-                      ? '上次 ${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}'
-                      : '上次成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
-                          '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.muted,
-                  ),
-                ),
-              ),
-            ),
-          IconButton(
-            tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
-            onPressed: state.restoreBusy ? null : () => _sync(context),
-            icon: state.syncBusy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    state.isSyncConfigured
-                        ? Icons.cloud_sync_outlined
-                        : Icons.cloud_off_outlined,
-                    size: 20,
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _sync(BuildContext context) async {
-    if (!state.isSyncConfigured) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => SyncScreen(state: state)),
-      );
-      return;
-    }
-    final success = await state.syncNow();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(state.syncMessage ?? (success ? '已同步' : '同步失败'))),
-    );
-  }
-
-  Future<void> _restoreNewerBackup(BuildContext context) async {
-    final backup = state.newerRemoteBackup;
-    if (backup == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('恢复更新的云端备份？'),
-        content: Text(
-          '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。这次恢复不会在云端创建新备份；如需保留当前本地数据，请先手动上传备份。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('恢复'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await state.restoreBackup(backup);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已从云端备份恢复')),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('恢复失败：$error')),
-      );
-    }
-  }
-}
-
-String _fullSyncTime(DateTime date) =>
-    '${date.year}/${twoDigits(date.month)}/${twoDigits(date.day)} '
-    '${twoDigits(date.hour)}:${twoDigits(date.minute)}:${twoDigits(date.second)}';
 
 class _RailItem extends StatelessWidget {
   const _RailItem(
