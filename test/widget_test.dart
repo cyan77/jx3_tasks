@@ -1593,6 +1593,26 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('home-game-filter'))).dy,
       greaterThan(tester.getTopLeft(find.text('今日待办')).dy),
     );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('home-game-counts'))).dy,
+      greaterThan(
+        tester.getBottomLeft(find.byKey(const ValueKey('home-game-filter'))).dy,
+      ),
+    );
+    final menuButton = find.byKey(const ValueKey('home-game-menu'));
+    final menuLeft = tester.getTopLeft(menuButton).dx;
+    await tester.tap(menuButton);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('home-game-option-game-jx3')),
+          )
+          .dx,
+      closeTo(menuLeft, 1),
+    );
+    await tester.tap(find.text('剑网3').last);
+    await tester.pumpAndSettle();
 
     for (final tab in [1, 2, 3, 4]) {
       state.setTab(tab);
@@ -1970,4 +1990,3 @@ class _FakeWebDavSyncService extends WebDavSyncService {
     return const [];
   }
 }
-
