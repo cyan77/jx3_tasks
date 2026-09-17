@@ -584,31 +584,11 @@ class _TaskEditorState extends State<_TaskEditor> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    final scheme = Theme.of(context).colorScheme;
-    final menuColor =
-        Color.lerp(scheme.surface, scheme.primaryContainer, 0.30)!;
-    return LayoutBuilder(
-      builder: (context, constraints) => InputDecorator(
-        decoration: InputDecoration(labelText: label),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<T>(
-            value: value,
-            isExpanded: true,
-            menuWidth: constraints.maxWidth,
-            elevation: 0,
-            dropdownColor: menuColor,
-            borderRadius: BorderRadius.circular(12),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: scheme.onSurface,
-            ),
-            icon: const Icon(Icons.expand_more, size: 18),
-            items: items,
-            onChanged: onChanged,
-          ),
-        ),
-      ),
+    return AppDropdownField<T>(
+      value: value,
+      label: label,
+      items: items,
+      onChanged: onChanged,
     );
   }
 
@@ -1040,9 +1020,9 @@ class _CharacterEditorState extends State<_CharacterEditor> {
                     decoration: const InputDecoration(
                         labelText: '账号', hintText: '例如：主账号 / 小号账号')),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedGameId,
-                  decoration: const InputDecoration(labelText: '所属游戏'),
+                AppDropdownField<String>(
+                  value: selectedGameId,
+                  label: '所属游戏',
                   items: widget.state.games
                       .map((game) => DropdownMenuItem(
                             value: game.id,
@@ -1086,9 +1066,9 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   Widget _fieldEditor(GameMetadataField field) {
     switch (field.type) {
       case MetadataFieldType.choice:
-        return DropdownButtonFormField<String?>(
-          initialValue: choiceValues[field.id],
-          decoration: InputDecoration(labelText: field.name),
+        return AppDropdownField<String?>(
+          value: choiceValues[field.id],
+          label: field.name,
           items: [
             const DropdownMenuItem<String?>(value: null, child: Text('未设置')),
             ...field.options.map((option) => DropdownMenuItem<String?>(

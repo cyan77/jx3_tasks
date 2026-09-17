@@ -18,6 +18,52 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('shared dropdown menus open below their full-width field',
+      (tester) async {
+    String selected = 'game-jx3';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: 300,
+              child: StatefulBuilder(
+                builder: (context, setState) => AppDropdownField<String>(
+                  key: const ValueKey('shared-dropdown'),
+                  value: selected,
+                  label: '所属游戏',
+                  items: const [
+                    DropdownMenuItem(value: 'game-jx3', child: Text('剑网3')),
+                    DropdownMenuItem(value: 'game-hsr', child: Text('崩铁')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => selected = value);
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('shared-dropdown'));
+    final button = tester.widget<PopupMenuButton<int>>(
+      find.descendant(of: field, matching: find.byType(PopupMenuButton<int>)),
+    );
+    expect(button.position, PopupMenuPosition.under);
+    expect(button.offset.dy, greaterThan(0));
+    expect(button.elevation, 0);
+    expect(button.constraints?.maxWidth, 300);
+    expect(button.constraints?.maxHeight, 240);
+    final fieldBottom = tester.getBottomLeft(field).dy;
+
+    await tester.tap(find.byTooltip('所属游戏'));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('崩铁')).dy, greaterThan(fieldBottom));
+  });
+
   testWidgets('日期控件统一使用简体中文', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore()
