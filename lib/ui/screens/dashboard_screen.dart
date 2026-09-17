@@ -180,180 +180,178 @@ class _HomeGameSelector extends StatelessWidget {
         Color.lerp(scheme.surface, scheme.primaryContainer, 0.32)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        key: const ValueKey('home-game-filter'),
-        padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
-        decoration: BoxDecoration(
-          color: scheme.primaryContainer.withValues(alpha: 0.32),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.78),
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            key: const ValueKey('home-game-filter'),
+            padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withValues(alpha: 0.32),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.78),
+              ),
+            ),
+            child: Column(
               children: [
-            const Icon(Icons.sports_esports_outlined,
-                size: 19, color: AppTheme.accent),
-            const SizedBox(width: 9),
-            const Text('当前游戏',
-                style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: PopupMenuButton<String>(
-                tooltip: '切换首页游戏',
-                padding: EdgeInsets.zero,
-                position: PopupMenuPosition.under,
-                offset: const Offset(0, 6),
-                elevation: 0,
-                color: menuColor,
-                menuPadding: const EdgeInsets.symmetric(vertical: 4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: scheme.outlineVariant.withValues(alpha: 0.78),
-                  ),
-                ),
-                onSelected: state.selectGame,
-                itemBuilder: (context) => state.games
-                    .map((game) => PopupMenuItem<String>(
-                          value: game.id,
-                          padding: EdgeInsets.zero,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: Color(game.color),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(child: Text(game.name)),
-                              if (game.id == selected?.id)
-                                const Icon(Icons.check,
-                                    size: 18, color: AppTheme.accent),
-                            ],
-                          ),
-                        ))
-                    .toList(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                Row(
                   children: [
-                    if (selected != null) ...[
-                      Container(
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: Color(selected.color),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                    ],
-                    Flexible(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            selected?.name ?? '请选择',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: scheme.onSurface,
+                    const Icon(Icons.sports_esports_outlined,
+                        size: 19, color: AppTheme.accent),
+                    const SizedBox(width: 9),
+                    const Text('当前游戏',
+                        style:
+                            TextStyle(fontSize: 12, color: AppTheme.muted)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: PopupMenuButton<String>(
+                          key: const ValueKey('home-game-menu'),
+                          tooltip: '切换首页游戏',
+                          padding: EdgeInsets.zero,
+                          position: PopupMenuPosition.under,
+                          offset: const Offset(0, 6),
+                          elevation: 0,
+                          color: menuColor,
+                          menuPadding:
+                              const EdgeInsets.symmetric(vertical: 4),
+                          constraints: const BoxConstraints(
+                            minWidth: 120,
+                            maxWidth: 220,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: scheme.outlineVariant
+                                  .withValues(alpha: 0.78),
                             ),
                           ),
-                          const SizedBox(height: 1),
-                          Text(
-                            '$characterCount 个角色 · $taskCount 个任务',
-                            overflow: TextOverflow.ellipsis,
+                          onSelected: state.selectGame,
+                          itemBuilder: (context) => state.games
+                              .map((game) => PopupMenuItem<String>(
+                                    key: ValueKey(
+                                        'home-game-option-${game.id}'),
+                                    value: game.id,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10),
+                                    child: Row(
+                                      children: [
+                                        Expanded(child: Text(game.name)),
+                                        if (game.id == selected?.id)
+                                          const Icon(Icons.check,
+                                              size: 18,
+                                              color: AppTheme.accent),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  selected?.name ?? '请选择',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Icon(Icons.keyboard_arrow_down, size: 18),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (state.newerRemoteBackup != null)
+                      IconButton(
+                        tooltip: '发现更新的云端备份，点击恢复',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: state.restoreBusy || state.syncBusy
+                            ? null
+                            : () => _restoreNewerBackup(context),
+                        icon: state.restoreBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.restore, size: 20),
+                      ),
+                    if (lastSyncAt != null &&
+                        MediaQuery.sizeOf(context).width >= 520)
+                      Tooltip(
+                        message: '上次成功同步：${_fullSyncTime(lastSyncAt)}',
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6, right: 2),
+                          child: Text(
+                            '上次成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
+                            '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
                             style: const TextStyle(
                               fontSize: 10,
                               color: AppTheme.muted,
                             ),
                           ),
-                        ],
+                        ),
                       ),
+                    IconButton(
+                      tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
+                      visualDensity: VisualDensity.compact,
+                      onPressed:
+                          state.restoreBusy ? null : () => _sync(context),
+                      icon: state.syncBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              state.isSyncConfigured
+                                  ? Icons.cloud_sync_outlined
+                                  : Icons.cloud_off_outlined,
+                              size: 20,
+                            ),
                     ),
-                    const SizedBox(width: 3),
-                    const Icon(Icons.keyboard_arrow_down, size: 18),
                   ],
                 ),
-              ),
-            ),
-            if (state.newerRemoteBackup != null)
-              IconButton(
-                tooltip: '发现更新的云端备份，点击恢复',
-                visualDensity: VisualDensity.compact,
-                onPressed: state.restoreBusy || state.syncBusy
-                    ? null
-                    : () => _restoreNewerBackup(context),
-                icon: state.restoreBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.restore, size: 20),
-              ),
-            if (lastSyncAt != null && MediaQuery.sizeOf(context).width >= 520)
-              Tooltip(
-                message: '上次成功同步：${_fullSyncTime(lastSyncAt)}',
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 6, right: 2),
-                  child: Text(
-                    '上次成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
-                    '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.muted,
+                if (lastSyncAt != null &&
+                    MediaQuery.sizeOf(context).width < 520) ...[
+                  const SizedBox(height: 2),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        '上次同步成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
+                        '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.muted,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            IconButton(
-              tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
-              visualDensity: VisualDensity.compact,
-              onPressed: state.restoreBusy ? null : () => _sync(context),
-              icon: state.syncBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      state.isSyncConfigured
-                          ? Icons.cloud_sync_outlined
-                          : Icons.cloud_off_outlined,
-                      size: 20,
-                    ),
-            ),
+                ],
               ],
             ),
-            if (lastSyncAt != null &&
-                MediaQuery.sizeOf(context).width < 520) ...[
-              const SizedBox(height: 2),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(
-                    '上次同步成功 ${twoDigits(lastSyncAt.month)}/${twoDigits(lastSyncAt.day)} '
-                    '${twoDigits(lastSyncAt.hour)}:${twoDigits(lastSyncAt.minute)}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.muted,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 14),
+            child: Text(
+              '$characterCount 个角色 · $taskCount 个任务',
+              key: const ValueKey('home-game-counts'),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: AppTheme.muted),
+            ),
+          ),
+        ],
       ),
     );
   }
