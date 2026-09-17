@@ -14,6 +14,7 @@ import 'package:jx3_tasks/app.dart';
 import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
 import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
+import 'package:jx3_tasks/ui/screens/characters_screen.dart';
 import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
@@ -1778,6 +1779,36 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('character actions move below the subtitle on narrow screens',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: CharactersScreen(state: state)),
+    );
+    await tester.pump();
+
+    final actions = find.byKey(const ValueKey('mobile-character-actions'));
+    expect(actions, findsOneWidget);
+    expect(find.text('批量管理'), findsOneWidget);
+    expect(find.text('添加角色'), findsOneWidget);
+    expect(
+      tester.getTopLeft(actions).dy,
+      greaterThan(tester.getBottomLeft(find.text('按游戏管理角色，每个角色拥有独立的任务完成记录')).dy),
+    );
+    expect(tester.takeException(), isNull);
+    state.dispose();
   });
 
   testWidgets('首页只显示仍有未完成待办的角色', (tester) async {

@@ -58,31 +58,26 @@ class _CharactersScreenState extends State<CharactersScreen> {
           appBar: AppBar(title: const Text('角色管理')),
           body: Column(
             children: [
-              PageHeader(
-                title: '角色列表',
-                subtitle: '按游戏管理角色，每个角色拥有独立的任务完成记录',
-                action: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!_batchMode) ...[
-                      OutlinedButton.icon(
-                        onPressed: () => _setBatchMode(true),
-                        icon: const Icon(Icons.checklist, size: 17),
-                        label: const Text('批量管理'),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 600;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PageHeader(
+                        title: '角色列表',
+                        subtitle: '按游戏管理角色，每个角色拥有独立的任务完成记录',
+                        action: compact ? null : _headerActions(context),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: () => showCharacterEditor(context, state),
-                        icon: const Icon(Icons.add, size: 17),
-                        label: const Text('添加角色'),
-                      ),
-                    ] else
-                      TextButton(
-                        onPressed: () => _setBatchMode(false),
-                        child: const Text('退出批量管理'),
-                      ),
-                  ],
-                ),
+                      if (compact)
+                        Padding(
+                          key: const ValueKey('mobile-character-actions'),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+                          child: _headerActions(context),
+                        ),
+                    ],
+                  );
+                },
               ),
               if (_batchMode)
                 _BatchToolbar(
@@ -121,6 +116,29 @@ class _CharactersScreenState extends State<CharactersScreen> {
             ],
           ),
         ),
+      );
+
+  Widget _headerActions(BuildContext context) => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          if (!_batchMode) ...[
+            OutlinedButton.icon(
+              onPressed: () => _setBatchMode(true),
+              icon: const Icon(Icons.checklist, size: 17),
+              label: const Text('批量管理'),
+            ),
+            FilledButton.icon(
+              onPressed: () => showCharacterEditor(context, state),
+              icon: const Icon(Icons.add, size: 17),
+              label: const Text('添加角色'),
+            ),
+          ] else
+            TextButton(
+              onPressed: () => _setBatchMode(false),
+              child: const Text('退出批量管理'),
+            ),
+        ],
       );
 
   Future<void> _archiveSelected() async {
