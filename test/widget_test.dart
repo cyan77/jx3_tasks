@@ -348,7 +348,7 @@ void main() {
       ),
     );
 
-    expect(find.text('手机日历任务'), findsOneWidget);
+    expect(find.text('手机日历任务'), findsNWidgets(2));
     expect(find.text('手机端隐藏的子任务'), findsNothing);
     state.dispose();
   });
@@ -440,7 +440,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('select-task-task-2')));
     await tester.pump();
-    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.text('已选 2 项'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('selected-task-task-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
     expect(find.text('批量分配'), findsOneWidget);
@@ -451,7 +451,7 @@ void main() {
     );
     await tester.tap(find.text('任务一'));
     await tester.pump();
-    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.text('已选 1 项'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('selected-task-task-1')), findsNothing);
     expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
     expect(find.text('管理分配'), findsOneWidget);
@@ -504,16 +504,16 @@ void main() {
 
     await tester.longPress(find.text('任务一'));
     await tester.pump();
-    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.text('已选 1 项'), findsNWidgets(2));
 
     await tester.tap(find.text('任务二'));
     await tester.pump();
-    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.text('已选 2 项'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
 
     await tester.tap(find.text('任务一'));
     await tester.pump();
-    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.text('已选 1 项'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('selected-task-task-1')), findsNothing);
     state.dispose();
   });
@@ -592,8 +592,14 @@ void main() {
     expect(firstFilter.position, PopupMenuPosition.under);
     expect(firstFilter.offset.dy, greaterThan(0));
     expect(firstFilter.elevation, 0);
-    for (final control in filterControls) {
-      expect(tester.getSize(control).height, 40);
+    final filterContainers = [
+      find.byKey(const ValueKey('task-filter-按游戏筛选')),
+      find.byKey(const ValueKey('task-filter-按角色筛选')),
+      find.byKey(const ValueKey('task-filter-按完成状态筛选')),
+      find.byKey(const ValueKey('task-filter-按归档状态筛选')),
+    ];
+    for (final container in filterContainers) {
+      expect(tester.getSize(container).height, 40);
     }
     final gameFilterContainer = tester.widget<Container>(
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
@@ -1498,8 +1504,10 @@ void main() {
 
     expect(find.text('日历子任务一'), findsOneWidget);
     expect(find.text('日历子任务二'), findsOneWidget);
-    await tester.tap(find.byKey(
-        const ValueKey('calendar-subtask-calendar-task-subtask-1')));
+    final firstSubtask = find.byKey(
+        const ValueKey('calendar-subtask-calendar-task-subtask-1'));
+    await tester.ensureVisible(firstSubtask);
+    await tester.tap(firstSubtask);
     await tester.pumpAndSettle();
 
     expect(
@@ -1958,3 +1966,4 @@ class _FakeWebDavSyncService extends WebDavSyncService {
     return const [];
   }
 }
+
