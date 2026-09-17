@@ -38,6 +38,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final firstDay = DateTime(month.year, month.month, 1);
     final days = DateTime(month.year, month.month + 1, 0).day;
     final leading = firstDay.weekday - 1;
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final scheme = Theme.of(context).colorScheme;
+    final filterFill =
+        Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
     return Column(
       children: [
         Padding(
@@ -61,51 +65,54 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     child: Container(
                       key: const ValueKey('calendar-game-filter'),
                       height: 40,
-                      padding: const EdgeInsets.only(left: 10, right: 6),
+                      padding: const EdgeInsets.only(left: 10, right: 5),
                       decoration: BoxDecoration(
-                        color: Color.lerp(
-                          Theme.of(context).colorScheme.surface,
-                          Theme.of(context).colorScheme.primaryContainer,
-                          0.42,
-                        )!
-                            .withValues(alpha: 0.78),
+                        color: filterFill.withValues(alpha: 0.78),
                         border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.20),
+                          color: scheme.primary.withValues(alpha: 0.20),
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
                         position: PopupMenuPosition.under,
                         offset: const Offset(0, 6),
                         elevation: 0,
-                        color: Color.lerp(
-                          Theme.of(context).colorScheme.surface,
-                          Theme.of(context).colorScheme.primaryContainer,
-                          0.42,
-                        ),
+                        menuPadding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                        constraints: const BoxConstraints.tightFor(width: 150),
+                        color: filterFill,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.20),
+                            color: scheme.primary.withValues(alpha: 0.20),
                           ),
                         ),
                         itemBuilder: (_) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _allGames,
-                            child: Text('全部游戏', textAlign: TextAlign.right),
+                            height: 40,
+                            child: Text(
+                              '全部游戏',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
                           ...state.games.map((game) => PopupMenuItem(
                                 value: game.id,
+                                height: 40,
                                 child: Text(
                                   game.name,
-                                  textAlign: TextAlign.right,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
                                 ),
                               )),
                         ],
@@ -115,22 +122,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         child: Row(children: [
                           Expanded(
                             child: Text(
-                              filteredGame?.name ?? '全部游戏',
-                              textAlign: TextAlign.right,
+                              filteredGame?.name ??
+                                  (compact ? '游戏' : '全部游戏'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w400,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: scheme.onSurfaceVariant,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.filter_list,
-                              size: 17, color: AppTheme.accent),
+                          const SizedBox(width: 3),
+                          const Icon(Icons.expand_more,
+                              size: 16, color: AppTheme.accent),
                         ]),
                       ),
                     ),
@@ -339,6 +344,7 @@ class _DayTasks extends StatelessWidget {
               state: state,
               task: task,
               date: date,
+              showSubtasks: true,
             )),
       ],
     );
@@ -351,14 +357,18 @@ class _InteractiveTaskTile extends StatelessWidget {
     required this.task,
     required this.date,
     this.showDueDate = false,
+    this.showSubtasks = false,
   });
   final AppState state;
   final TaskRecord task;
   final DateTime date;
   final bool showDueDate;
+  final bool showSubtasks;
 
   @override
   Widget build(BuildContext context) {
+    final canShowSubtasks =
+        showSubtasks && MediaQuery.sizeOf(context).width >= 600;
     final linkedCount = state.store.tasks
         .where((item) =>
             !item.isInbox && item.templateId == task.templateId)
@@ -381,64 +391,110 @@ class _InteractiveTaskTile extends StatelessWidget {
       if (character != null) character.name,
       task.frequency.label,
     ];
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      onTap: () => state.toggleTask(task, date: date),
-      leading: TaskCheck(
-        checked: checked,
-        onTap: () => state.toggleTask(task, date: date),
-      ),
-      title: Text(
-        task.title,
-        style: TextStyle(
-          fontSize: 13,
-          color: checked
-              ? AppTheme.muted
-              : expiry == TaskExpiryStatus.normal
-                  ? Theme.of(context).colorScheme.onSurface
-                  : alertColor,
-          decoration: checked ? TextDecoration.lineThrough : null,
-        ),
-      ),
-      subtitle: Text(details.join(' · '),
-          style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showDueDate)
-            Text(
-              _deadlineLabel(state, task),
-              style: TextStyle(
-                fontSize: 12,
-                color: expiry == TaskExpiryStatus.normal
-                    ? AppTheme.muted
-                    : alertColor,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          onTap: () => state.toggleTask(task, date: date),
+          leading: TaskCheck(
+            checked: checked,
+            onTap: () => state.toggleTask(task, date: date),
+          ),
+          title: Text(
+            task.title,
+            style: TextStyle(
+              fontSize: 13,
+              color: checked
+                  ? AppTheme.muted
+                  : expiry == TaskExpiryStatus.normal
+                      ? Theme.of(context).colorScheme.onSurface
+                      : alertColor,
+              decoration: checked ? TextDecoration.lineThrough : null,
             ),
-          PopupMenuButton<String>(
-            tooltip: '编辑任务',
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            onSelected: (value) => showTaskEditor(
-              context,
-              state,
-              task: task,
-              syncAll: value == 'all',
-            ),
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'single',
-                child: Text('仅编辑当前角色'),
-              ),
-              if (linkedCount > 1)
-                const PopupMenuItem(
-                  value: 'all',
-                  child: Text('编辑所有已分配角色'),
+          ),
+          subtitle: Text(details.join(' · '),
+              style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showDueDate)
+                Text(
+                  _deadlineLabel(state, task),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: expiry == TaskExpiryStatus.normal
+                        ? AppTheme.muted
+                        : alertColor,
+                  ),
                 ),
+              PopupMenuButton<String>(
+                tooltip: '编辑任务',
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                onSelected: (value) => showTaskEditor(
+                  context,
+                  state,
+                  task: task,
+                  syncAll: value == 'all',
+                ),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'single',
+                    child: Text('仅编辑当前角色'),
+                  ),
+                  if (linkedCount > 1)
+                    const PopupMenuItem(
+                      value: 'all',
+                      child: Text('编辑所有已分配角色'),
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        ),
+        if (canShowSubtasks && task.subtasks.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 40, right: 44, bottom: 8),
+            child: Column(
+              children: task.subtasks.map((subtask) {
+                final subtaskDone = task.isSubtaskCompletedOn(subtask, date);
+                return InkWell(
+                  key: ValueKey('calendar-subtask-${task.id}-${subtask.id}'),
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => state.toggleSubtask(task, subtask, date: date),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      children: [
+                        TaskCheck(
+                          checked: subtaskDone,
+                          onTap: () =>
+                              state.toggleSubtask(task, subtask, date: date),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            subtask.title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: subtaskDone
+                                  ? AppTheme.muted
+                                  : Theme.of(context).colorScheme.onSurface,
+                              decoration: subtaskDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 }
