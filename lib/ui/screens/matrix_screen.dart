@@ -43,7 +43,9 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final desktopSelection = MediaQuery.sizeOf(context).width >= 800;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final desktopSelection = screenWidth >= 800;
+    final compactHeader = screenWidth < 560;
     final templates = <String, List<TaskRecord>>{};
     for (final task in state.store.tasks) {
       templates.putIfAbsent(task.templateId, () => []).add(task);
@@ -74,36 +76,48 @@ class _MatrixScreenState extends State<MatrixScreen> {
         title: '全部任务',
         subtitle:
             '显示 ${visibleTemplates.length} / ${templates.length} 项 · 可单选或多选管理',
-        action: OutlinedButton.icon(
-          onPressed: () => showTaskEditor(
-            context,
-            state,
-            preselectCurrentCharacter: false,
-          ),
-          icon: const Icon(Icons.add, size: 17),
-          label: const Text('新建任务'),
-        ),
-        titleAction: SizedBox(
-          width: searchExpanded ? 230 : 40,
+        action: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
           child: searchExpanded
-              ? TextField(
-                  controller: searchController,
-                  focusNode: searchFocusNode,
-                  onChanged: (value) => setState(() => query = value.trim()),
-                  decoration: InputDecoration(
-                    hintText: '搜索任务或角色',
-                    prefixIcon: const Icon(Icons.search, size: 18),
-                    suffixIcon: IconButton(
-                      tooltip: '关闭搜索',
-                      onPressed: _closeSearch,
-                      icon: const Icon(Icons.close, size: 17),
+              ? SizedBox(
+                  key: const ValueKey('task-search-field'),
+                  width: compactHeader ? 210 : 230,
+                  child: TextField(
+                    controller: searchController,
+                    focusNode: searchFocusNode,
+                    onChanged: (value) =>
+                        setState(() => query = value.trim()),
+                    decoration: InputDecoration(
+                      hintText: '搜索任务或角色',
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      suffixIcon: IconButton(
+                        tooltip: '关闭搜索',
+                        onPressed: _closeSearch,
+                        icon: const Icon(Icons.close, size: 17),
+                      ),
                     ),
                   ),
                 )
-              : IconButton(
-                  tooltip: '搜索任务',
-                  onPressed: _openSearch,
-                  icon: const Icon(Icons.search, size: 20),
+              : Row(
+                  key: const ValueKey('task-header-actions'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '搜索任务',
+                      onPressed: _openSearch,
+                      icon: const Icon(Icons.search, size: 20),
+                    ),
+                    const SizedBox(width: 4),
+                    OutlinedButton.icon(
+                      onPressed: () => showTaskEditor(
+                        context,
+                        state,
+                        preselectCurrentCharacter: false,
+                      ),
+                      icon: const Icon(Icons.add, size: 17),
+                      label: const Text('新建任务'),
+                    ),
+                  ],
                 ),
         ),
       ),
