@@ -451,33 +451,47 @@ class _MatrixScreenState extends State<MatrixScreen> {
     }
     final characterIds = await _showCharacterAssignmentDialog(gameIds.single);
     if (characterIds == null || characterIds.isEmpty) return;
+    final taskCountBefore = state.store.tasks.length;
     final skipped = await state.assignTaskTemplatesToCharacters(
       templateIds: Set.of(selectedTemplateIds),
       characterIds: characterIds,
     );
+    final assignedCount = state.store.tasks.length - taskCountBefore;
     if (!mounted) return;
     setState(selectedTemplateIds.clear);
-    final message = skipped.isEmpty
-        ? '已批量分配任务'
-        : '已分配可用任务；${skipped.length} 项收集箱任务尚未设置周期';
+    final message = assignedCount == 0
+        ? '所选角色已经拥有这些任务，无需重复分配'
+        : skipped.isEmpty
+            ? '已新增 $assignedCount 条角色任务'
+            : '已新增 $assignedCount 条角色任务；'
+                '${skipped.length} 项收集箱任务尚未设置周期';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<Set<String>?> _showCharacterAssignmentDialog(String gameId) async {
     final selected = <String>{};
-    final characters = state.store.characters
-        .where((character) =>
-            !character.archived && character.gameId == gameId)
-        .toList();
+    final characters = state.store.characters.where((character) {
+      if (character.archived || character.gameId != gameId) return false;
+      return selectedTemplateIds.any((templateId) => !state.store.tasks.any(
+            (task) =>
+                task.templateId == templateId &&
+                task.characterId == character.id &&
+                !task.isInbox,
+          ));
+    }).toList();
     return showDialog<Set<String>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          insetPadding: const EdgeInsets.all(16),
           title: const Text('批量追加分配角色'),
-          content: SizedBox(
-            width: 420,
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+            ),
             child: characters.isEmpty
-                ? const Text('当前游戏没有可分配的角色')
+                ? const Text('当前游戏中的角色都已分配所选任务')
                 : SingleChildScrollView(
                     child: Wrap(
                       spacing: 8,
