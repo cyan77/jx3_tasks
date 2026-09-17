@@ -15,6 +15,7 @@ import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
 import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
 import 'package:jx3_tasks/ui/screens/characters_screen.dart';
+import 'package:jx3_tasks/ui/screens/sync_screen.dart';
 import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
@@ -63,6 +64,33 @@ void main() {
     await tester.tap(find.byTooltip('所属游戏'));
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.text('崩铁')).dy, greaterThan(fieldBottom));
+  });
+
+  testWidgets('unconfigured WebDAV stays collapsed until requested',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const []
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: SyncScreen(state: state)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('未配置'), findsOneWidget);
+    expect(find.byKey(const ValueKey('configure-webdav')), findsOneWidget);
+    expect(find.byKey(const ValueKey('webdav-config-form')), findsNothing);
+    expect(find.text('云端备份（最近 10 份）'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('configure-webdav')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('webdav-config-form')), findsOneWidget);
+    expect(find.text('WebDAV 地址'), findsOneWidget);
+    expect(find.text('测试并保存'), findsOneWidget);
+    state.dispose();
   });
 
   testWidgets('日期控件统一使用简体中文', (tester) async {
