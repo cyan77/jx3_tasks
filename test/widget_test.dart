@@ -1711,6 +1711,14 @@ void main() {
           occupation: '奶歌',
           color: 0xff2f7d72,
         ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '已完成角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
       ]
       ..tasks = [
         TaskRecord(
@@ -1718,6 +1726,15 @@ void main() {
           templateId: 'completed-task',
           title: '已完成任务',
           characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          completedDates: const ['2026-09-01'],
+        ),
+        TaskRecord(
+          id: 'completed-task-2',
+          templateId: 'completed-task-2',
+          title: '另一角色已完成任务',
+          characterId: 'char-2',
           frequency: TaskFrequency.once,
           createdAt: DateTime(2026, 9, 1),
           completedDates: const ['2026-09-01'],

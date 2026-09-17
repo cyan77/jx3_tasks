@@ -174,10 +174,16 @@ class _HomeGameSelector extends StatelessWidget {
     final selected = state.selectedGame;
     final lastSyncAt = state.lastSyncAt?.toLocal();
     final scheme = Theme.of(context).colorScheme;
-    final characterCount = state.characters.length;
-    final taskCount = state.allTasksForSelectedGame
+    final unfinishedTasks = state.allTasksForSelectedGame
         .where((task) => !task.isCompletedOn(state.taskDateFor(task)))
+        .toList();
+    final visibleCharacterIds = state.characters.map((item) => item.id).toSet();
+    final characterCount = unfinishedTasks
+        .map((task) => task.characterId)
+        .where(visibleCharacterIds.contains)
+        .toSet()
         .length;
+    final taskCount = unfinishedTasks.length;
     final menuColor =
         Color.lerp(scheme.surface, scheme.primaryContainer, 0.32)!;
     return Padding(
