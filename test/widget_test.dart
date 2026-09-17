@@ -407,6 +407,66 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('long press enters selection mode for every task card',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'task-1-char-1',
+          templateId: 'task-1',
+          title: '任务一',
+          characterId: 'char-1',
+          frequency: TaskFrequency.daily,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'task-2-char-1',
+          templateId: 'task-2',
+          title: '任务二',
+          characterId: 'char-1',
+          frequency: TaskFrequency.weekly,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+      ];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: MatrixScreen(state: state))),
+    );
+    await tester.pump();
+
+    await tester.longPress(find.text('任务一'));
+    await tester.pump();
+    expect(find.text('已选 1 项'), findsOneWidget);
+
+    await tester.tap(find.text('任务二'));
+    await tester.pump();
+    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.byKey(const ValueKey('selected-task-task-2')), findsOneWidget);
+
+    await tester.tap(find.text('任务一'));
+    await tester.pump();
+    expect(find.text('已选 1 项'), findsOneWidget);
+    expect(find.byKey(const ValueKey('selected-task-task-1')), findsNothing);
+    state.dispose();
+  });
+
   testWidgets('all tasks page filters by game, character, and completion',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
