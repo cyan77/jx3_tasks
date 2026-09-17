@@ -870,6 +870,7 @@ class _FilterDropdown<T> extends StatelessWidget {
 
 class _SelectionBar extends StatelessWidget {
   const _SelectionBar({
+    super.key,
     required this.selectedCount,
     this.compact = false,
     required this.allVisibleSelected,
