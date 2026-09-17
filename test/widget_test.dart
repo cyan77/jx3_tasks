@@ -1668,6 +1668,57 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('home game summary counts only unfinished tasks',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '账号',
+          name: '角色',
+          occupation: '奶歌',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'completed-task',
+          templateId: 'completed-task',
+          title: '已完成任务',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          completedDates: const ['2026-09-01'],
+        ),
+        TaskRecord(
+          id: 'pending-task',
+          templateId: 'pending-task',
+          title: '未完成任务',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+        ),
+        TaskRecord(
+          id: 'inbox-task',
+          templateId: 'inbox-task',
+          title: '收集箱任务',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          inboxGameId: 'game-jx3',
+        ),
+      ];
+
+    await tester.pumpWidget(Jx3TasksApp(store: store));
+    await tester.pump();
+
+    expect(find.text('1 个角色 · 2 个任务'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('home shell fits a narrow phone width', (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(360, 800);
