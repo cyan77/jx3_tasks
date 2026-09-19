@@ -15,6 +15,7 @@ import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
 import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
 import 'package:jx3_tasks/ui/screens/characters_screen.dart';
+import 'package:jx3_tasks/ui/screens/inbox_screen.dart';
 import 'package:jx3_tasks/ui/screens/sync_screen.dart';
 import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
@@ -90,6 +91,41 @@ void main() {
     expect(find.byKey(const ValueKey('webdav-config-form')), findsOneWidget);
     expect(find.text('WebDAV 地址'), findsOneWidget);
     expect(find.text('测试并保存'), findsOneWidget);
+    state.dispose();
+  });
+
+  testWidgets('inbox quick capture saves uncommitted tag input',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const []
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: InboxScreen(state: state))),
+    );
+    await tester.pump();
+    await tester.tap(find.text('快速记录'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextField, '任务名称'),
+      '收集箱标签测试',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '添加标签'),
+      '紧急，周常',
+    );
+    await tester.ensureVisible(find.text('放入收集箱'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('放入收集箱'));
+    await tester.pumpAndSettle();
+
+    expect(state.inboxTasks.single.tags, unorderedEquals(['紧急', '周常']));
+    expect(find.text('紧急'), findsOneWidget);
+    expect(find.text('周常'), findsOneWidget);
     state.dispose();
   });
 

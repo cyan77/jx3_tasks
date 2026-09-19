@@ -758,6 +758,11 @@ class _TaskEditorState extends State<_TaskEditor> {
       _showValidation('截止日期不能早于开始日期');
       return;
     }
+    final tags = _tags();
+    taskTags
+      ..clear()
+      ..addAll(tags);
+    tagController.clear();
     if (widget.createInInbox) {
       await widget.state.addInboxTask(
         title: title,
@@ -768,7 +773,7 @@ class _TaskEditorState extends State<_TaskEditor> {
         targetCount: targetCount,
         weeklyDays: weeklyDays.toList()..sort(),
         subtasks: _subtasks(),
-        tags: _tags(),
+        tags: tags,
         note: noteController.text.trim(),
       );
     } else if (isInboxEditing) {
@@ -782,7 +787,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim(),
         );
       } else {
@@ -800,7 +805,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim(),
         );
       }
@@ -820,7 +825,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim(),
         );
       } else {
@@ -833,7 +838,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim(),
         );
       }
@@ -848,7 +853,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim(),
         );
       } else {
@@ -861,7 +866,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
-          tags: _tags(),
+          tags: tags,
           note: noteController.text.trim());
       }
     }
