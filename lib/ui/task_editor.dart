@@ -78,6 +78,8 @@ class _TaskEditor extends StatefulWidget {
 class _TaskEditorState extends State<_TaskEditor> {
   late final TextEditingController titleController;
   late final TextEditingController noteController;
+  late final TextEditingController tagController;
+  late final Set<String> taskTags;
   late final Set<String> selected;
   late TaskFrequency frequency;
   late bool frequencyConfigured;
@@ -126,6 +128,8 @@ class _TaskEditorState extends State<_TaskEditor> {
                 ?.gameId;
     titleController = TextEditingController(text: task?.title ?? '');
     noteController = TextEditingController(text: task?.note ?? '');
+    tagController = TextEditingController();
+    taskTags = {...?task?.tags};
     frequency = task?.frequency ?? TaskFrequency.daily;
     frequencyConfigured = task == null
         ? !widget.createInInbox
@@ -352,6 +356,62 @@ class _TaskEditorState extends State<_TaskEditor> {
                   ),
                 ],
                 if (!assignExisting) ...[
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('标签（可选）',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                      Text('${taskTags.length}',
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.muted)),
+                    ],
+                  ),
+                  if (taskTags.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: taskTags
+                          .map((tag) => InputChip(
+                                label: Text(tag),
+                                onDeleted: () =>
+                                    setState(() => taskTags.remove(tag)),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                  if (_availableTags.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _availableTags
+                          .map((tag) => ActionChip(
+                                label: Text(tag),
+                                onPressed: () =>
+                                    setState(() => taskTags.add(tag)),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: tagController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _commitTagInput(),
+                    decoration: InputDecoration(
+                      labelText: '添加标签',
+                      hintText: '输入后回车；多个标签可用逗号分隔',
+                      suffixIcon: IconButton(
+                        tooltip: '添加标签',
+                        onPressed: _commitTagInput,
+                        icon: const Icon(Icons.add, size: 18),
+                      ),
+                    ),
+                  ),
                   if (widget.createInInbox || isInboxEditing) ...[
                     const SizedBox(height: 18),
                     SwitchListTile(
@@ -708,6 +768,7 @@ class _TaskEditorState extends State<_TaskEditor> {
         targetCount: targetCount,
         weeklyDays: weeklyDays.toList()..sort(),
         subtasks: _subtasks(),
+        tags: _tags(),
         note: noteController.text.trim(),
       );
     } else if (isInboxEditing) {
@@ -721,6 +782,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim(),
         );
       } else {
@@ -738,6 +800,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim(),
         );
       }
@@ -757,6 +820,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim(),
         );
       } else {
@@ -769,6 +833,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim(),
         );
       }
@@ -783,6 +848,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim(),
         );
       } else {
@@ -795,6 +861,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           targetCount: targetCount,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
+          tags: _tags(),
           note: noteController.text.trim());
       }
     }
@@ -914,10 +981,42 @@ class _TaskEditorState extends State<_TaskEditor> {
           TaskSubtask(id: draft.id, title: draft.controller.text.trim()))
       .toList();
 
+  List<String> get _availableTags {
+    final tags = widget.state.store.tasks
+        .expand((task) => task.tags)
+        .where((tag) => !taskTags.contains(tag))
+        .toSet()
+        .toList()
+      ..sort();
+    return tags;
+  }
+
+  void _commitTagInput() {
+    final additions = tagController.text
+        .split(RegExp(r'[,，]'))
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty);
+    setState(() {
+      taskTags.addAll(additions);
+      tagController.clear();
+    });
+  }
+
+  List<String> _tags() {
+    final result = <String>{...taskTags};
+    result.addAll(tagController.text
+        .split(RegExp(r'[,，]'))
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty));
+    final tags = result.toList()..sort();
+    return tags;
+  }
+
   @override
   void dispose() {
     titleController.dispose();
     noteController.dispose();
+    tagController.dispose();
     for (final draft in subtaskDrafts) {
       draft.controller.dispose();
     }

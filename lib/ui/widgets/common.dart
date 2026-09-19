@@ -109,6 +109,46 @@ class ProgressLine extends StatelessWidget {
       );
 }
 
+class TaskTags extends StatelessWidget {
+  const TaskTags({required this.tags, this.compact = false, super.key});
+
+  final List<String> tags;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 5,
+      runSpacing: 4,
+      children: tags
+          .map((tag) => Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 6 : 7,
+                  vertical: compact ? 2 : 3,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(
+                    fontSize: compact ? 9.5 : 10.5,
+                    fontWeight: FontWeight.w400,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ))
+          .toList(),
+    );
+  }
+}
+
 class CharacterAvatar extends StatelessWidget {
   const CharacterAvatar({required this.character, this.size = 30, super.key});
   final Character character;

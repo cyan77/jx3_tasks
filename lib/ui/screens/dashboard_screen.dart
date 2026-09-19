@@ -667,15 +667,24 @@ class _TaskList extends StatelessWidget {
                             : expiringSoon || overdue
                                 ? alertColor
                                 : Theme.of(context).colorScheme.onSurface)),
-                subtitle: Text(
-                    task.isCountTask
-                        ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
-                        : _taskMeta(task, date),
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: expiringSoon || overdue
-                            ? alertColor
-                            : AppTheme.muted)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        task.isCountTask
+                            ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
+                            : _taskMeta(task, date),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: expiringSoon || overdue
+                                ? alertColor
+                                : AppTheme.muted)),
+                    if (task.tags.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      TaskTags(tags: task.tags, compact: true),
+                    ],
+                  ],
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
