@@ -69,8 +69,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('全部任务'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('task-tag-filter-button')));
-    await tester.pumpAndSettle();
 
     await expectLater(
       find.byType(MaterialApp),
