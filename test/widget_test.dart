@@ -701,13 +701,10 @@ void main() {
     for (final container in filterContainers) {
       expect(tester.getSize(container).height, 40);
     }
-    final tagFilter =
-        find.byKey(const ValueKey('task-filter-control-按标签筛选'));
-    expect(tagFilter, findsOneWidget);
-    expect(
-      tester.getTopLeft(tagFilter).dy,
-      greaterThan(tester.getBottomLeft(filterControls.first).dy),
-    );
+    final tagFilterButton =
+        find.byKey(const ValueKey('task-tag-filter-button'));
+    expect(tagFilterButton, findsOneWidget);
+    expect(find.byKey(const ValueKey('task-tag-filter-options')), findsNothing);
     final gameFilterContainer = tester.widget<Container>(
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
     );
@@ -777,12 +774,22 @@ void main() {
 
     await tester.tap(find.text('清除筛选'));
     await tester.pumpAndSettle();
-    await tester.tap(tagFilter);
+    await tester.tap(tagFilterButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('日常').last);
+    final tagOptions = find.byKey(const ValueKey('task-tag-filter-options'));
+    expect(tagOptions, findsOneWidget);
+    expect(
+      tester.getBottomLeft(tagOptions).dy,
+      lessThan(tester.getTopLeft(tagFilterButton).dy),
+    );
+    expect(find.text('#日常'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('task-tag-filter-日常')));
     await tester.pumpAndSettle();
     expect(find.text('未完成任务'), findsOneWidget);
     expect(find.text('已完成任务'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('task-tag-filter-日常')));
+    await tester.pumpAndSettle();
+    expect(find.text('已完成任务'), findsOneWidget);
     state.dispose();
   });
 

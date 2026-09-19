@@ -36,7 +36,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
   bool searchExpanded = false;
   String? gameFilterId;
   String? characterFilterId;
-  String? tagFilter;
+  final tagFilters = <String>{};
+  bool tagMenuExpanded = false;
   _CompletionFilter completionFilter = _CompletionFilter.all;
   _ArchiveFilter archiveFilter = _ArchiveFilter.active;
 
@@ -56,6 +57,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
         .toSet()
         .toList()
       ..sort();
+    tagFilters.removeWhere((tag) => !availableTags.contains(tag));
     selectedTemplateIds.removeWhere((id) => !templates.containsKey(id));
     final visibleTemplates = templates.values.where((tasks) {
       if (!_matchesGame(tasks) ||
@@ -139,8 +141,6 @@ class _MatrixScreenState extends State<MatrixScreen> {
             characters: _filterCharacters,
             gameId: gameFilterId,
             characterId: characterFilterId,
-            tags: availableTags,
-            tag: tagFilter,
             completion: completionFilter,
             archive: archiveFilter,
             onGameChanged: (value) => setState(() {
@@ -155,10 +155,6 @@ class _MatrixScreenState extends State<MatrixScreen> {
             }),
             onCharacterChanged: (value) => setState(() {
               characterFilterId = value;
-              selectedTemplateIds.clear();
-            }),
-            onTagChanged: (value) => setState(() {
-              tagFilter = value;
               selectedTemplateIds.clear();
             }),
             onCompletionChanged: (value) => setState(() {
@@ -200,7 +196,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                   20,
                   selectedCount > 0
                       ? (desktopSelection ? 92 : 172)
-                      : 28,
+                      : (desktopSelection ? 90 : 158),
                 ),
                 itemCount: visibleTemplates.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -244,6 +240,34 @@ class _MatrixScreenState extends State<MatrixScreen> {
                     onDelete: () => _deleteTemplates({templateId}),
                   );
                 },
+              ),
+            ),
+            Positioned(
+              right: 20,
+              bottom: desktopSelection ? 16 : 86,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: selectedCount > 0
+                    ? const SizedBox.shrink(
+                        key: ValueKey('task-tag-filter-hidden'),
+                      )
+                    : _TagFilterMenu(
+                        key: const ValueKey('task-tag-filter-menu'),
+                        tags: availableTags,
+                        selected: tagFilters,
+                        expanded: tagMenuExpanded,
+                        onToggleExpanded: availableTags.isEmpty
+                            ? null
+                            : () => setState(
+                                  () => tagMenuExpanded = !tagMenuExpanded,
+                                ),
+                        onToggleTag: (tag) => setState(() {
+                          tagFilters.contains(tag)
+                              ? tagFilters.remove(tag)
+                              : tagFilters.add(tag);
+                          selectedTemplateIds.clear();
+                        }),
+                      ),
               ),
             ),
             Positioned(
@@ -326,7 +350,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   bool get _hasActiveFilters => gameFilterId != null ||
       characterFilterId != null ||
-      tagFilter != null ||
+      tagFilters.isNotEmpty ||
       completionFilter != _CompletionFilter.all ||
       archiveFilter != _ArchiveFilter.active;
 
@@ -385,8 +409,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
     return tasks.any((task) => task.characterId == characterFilterId);
   }
 
-  bool _matchesTag(List<TaskRecord> tasks) =>
-      tagFilter == null || tasks.any((task) => task.tags.contains(tagFilter));
+  bool _matchesTag(List<TaskRecord> tasks) => tagFilters.isEmpty ||
+      tasks.any((task) => task.tags.any(tagFilters.contains));
 
   bool _matchesCompletion(List<TaskRecord> tasks) {
     final completion = _completionFor(tasks);
@@ -412,7 +436,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
   void _resetFilters() => setState(() {
         gameFilterId = null;
         characterFilterId = null;
-        tagFilter = null;
+        tagFilters.clear();
+        tagMenuExpanded = false;
         completionFilter = _CompletionFilter.all;
         archiveFilter = _ArchiveFilter.active;
         selectedTemplateIds.clear();
@@ -420,6 +445,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   void _setSelected(String templateId, bool value) {
     setState(() {
+      tagMenuExpanded = false;
       value
           ? selectedTemplateIds.add(templateId)
           : selectedTemplateIds.remove(templateId);
@@ -671,13 +697,10 @@ class _FilterBar extends StatelessWidget {
     required this.characters,
     required this.gameId,
     required this.characterId,
-    required this.tags,
-    required this.tag,
     required this.completion,
     required this.archive,
     required this.onGameChanged,
     required this.onCharacterChanged,
-    required this.onTagChanged,
     required this.onCompletionChanged,
     required this.onArchiveChanged,
     required this.onReset,
@@ -686,18 +709,14 @@ class _FilterBar extends StatelessWidget {
   static const inboxValue = '__inbox__';
   static const allGamesValue = '__all_games__';
   static const allCharactersValue = '__all_characters__';
-  static const allTagsValue = '__all_tags__';
   final List<Game> games;
   final List<Character> characters;
   final String? gameId;
   final String? characterId;
-  final List<String> tags;
-  final String? tag;
   final _CompletionFilter completion;
   final _ArchiveFilter archive;
   final ValueChanged<String?> onGameChanged;
   final ValueChanged<String?> onCharacterChanged;
-  final ValueChanged<String?> onTagChanged;
   final ValueChanged<_CompletionFilter> onCompletionChanged;
   final ValueChanged<_ArchiveFilter> onArchiveChanged;
   final VoidCallback? onReset;
@@ -786,28 +805,6 @@ class _FilterBar extends StatelessWidget {
             },
           )),
           ]),
-          const SizedBox(height: 6),
-          Row(children: [
-            Expanded(child: _FilterDropdown<String>(
-              tooltip: '按标签筛选',
-              value: tag ?? allTagsValue,
-              selectedLabel: tag == null ? '标签' : null,
-              items: [
-                const DropdownMenuItem(
-                    value: allTagsValue, child: Text('全部标签')),
-                ...tags.map((item) =>
-                    DropdownMenuItem(value: item, child: Text(item))),
-              ],
-              onChanged: (value) =>
-                  onTagChanged(value == allTagsValue ? null : value),
-            )),
-            const SizedBox(width: 6),
-            const Expanded(child: SizedBox.shrink()),
-            const SizedBox(width: 6),
-            const Expanded(child: SizedBox.shrink()),
-            const SizedBox(width: 6),
-            const Expanded(child: SizedBox.shrink()),
-          ]),
           if (onReset != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -819,6 +816,141 @@ class _FilterBar extends StatelessWidget {
             ),
         ],
       );
+}
+
+class _TagFilterMenu extends StatelessWidget {
+  const _TagFilterMenu({
+    required this.tags,
+    required this.selected,
+    required this.expanded,
+    required this.onToggleExpanded,
+    required this.onToggleTag,
+    super.key,
+  });
+
+  final List<String> tags;
+  final Set<String> selected;
+  final bool expanded;
+  final VoidCallback? onToggleExpanded;
+  final ValueChanged<String> onToggleTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          reverseDuration: const Duration(milliseconds: 160),
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.18),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
+          child: expanded
+              ? Container(
+                  key: const ValueKey('task-tag-filter-options'),
+                  width: 190,
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: fill.withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.20),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: tags
+                          .map((tag) => FilterChip(
+                                key: ValueKey('task-tag-filter-$tag'),
+                                label: Text('#$tag'),
+                                selected: selected.contains(tag),
+                                onSelected: (_) => onToggleTag(tag),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(
+                  key: ValueKey('task-tag-filter-options-hidden'),
+                ),
+        ),
+        Material(
+          color: selected.isEmpty
+              ? fill.withValues(alpha: 0.96)
+              : scheme.primaryContainer,
+          shape: CircleBorder(
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.24),
+            ),
+          ),
+          child: InkWell(
+            key: const ValueKey('task-tag-filter-button'),
+            customBorder: const CircleBorder(),
+            onTap: onToggleExpanded,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    expanded ? Icons.close : Icons.sell_outlined,
+                    size: 21,
+                    color: onToggleExpanded == null
+                        ? AppTheme.muted
+                        : scheme.onSurfaceVariant,
+                  ),
+                  if (selected.isNotEmpty)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${selected.length}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: scheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _FilterDropdown<T> extends StatelessWidget {
