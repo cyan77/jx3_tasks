@@ -27,11 +27,18 @@ Future<LocalStore> demoStore() async {
 }
 
 Future<void> loadScreenshotFont() async {
-  final bytes = await File(
+  final textBytes = await File(
     '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
   ).readAsBytes();
   await (FontLoader('Arial')
-        ..addFont(Future.value(ByteData.sublistView(bytes))))
+        ..addFont(Future.value(ByteData.sublistView(textBytes))))
+      .load();
+  final flutterRoot = Platform.environment['FLUTTER_ROOT']!;
+  final iconBytes = await File(
+    '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+  ).readAsBytes();
+  await (FontLoader('MaterialIcons')
+        ..addFont(Future.value(ByteData.sublistView(iconBytes))))
       .load();
 }
 
