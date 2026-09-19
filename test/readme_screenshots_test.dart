@@ -36,8 +36,9 @@ Future<void> loadScreenshotFont() async {
 }
 
 void main() {
+  setUpAll(loadScreenshotFont);
+
   testWidgets('README mobile home screenshot', (tester) async {
-    await loadScreenshotFont();
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -51,7 +52,6 @@ void main() {
   });
 
   testWidgets('README desktop task screenshot', (tester) async {
-    await loadScreenshotFont();
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
