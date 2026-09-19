@@ -33,6 +33,9 @@ Future<void> loadScreenshotFont() async {
   await (FontLoader('Arial')
         ..addFont(Future.value(ByteData.sublistView(textBytes))))
       .load();
+  await (FontLoader('Roboto')
+        ..addFont(Future.value(ByteData.sublistView(textBytes))))
+      .load();
   final flutterRoot = Platform.environment['FLUTTER_ROOT']!;
   final iconBytes = await File(
     '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
