@@ -414,8 +414,18 @@ class _InteractiveTaskTile extends StatelessWidget {
               decoration: checked ? TextDecoration.lineThrough : null,
             ),
           ),
-          subtitle: Text(details.join(' · '),
-              style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(details.join(' · '),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppTheme.muted)),
+              if (task.tags.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                TaskTags(tags: task.tags, compact: true),
+              ],
+            ],
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

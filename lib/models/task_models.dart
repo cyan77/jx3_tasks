@@ -263,6 +263,7 @@ class TaskRecord {
     this.weeklyDays = const [],
     this.completedDates = const [],
     this.subtasks = const [],
+    this.tags = const [],
     this.note = '',
     this.inboxGameId,
     this.inboxFrequencySet = false,
@@ -281,6 +282,7 @@ class TaskRecord {
   final List<int> weeklyDays;
   final List<String> completedDates;
   final List<TaskSubtask> subtasks;
+  final List<String> tags;
   final String note;
   final String? inboxGameId;
   final bool inboxFrequencySet;
@@ -304,6 +306,7 @@ class TaskRecord {
     List<int>? weeklyDays,
     List<String>? completedDates,
     List<TaskSubtask>? subtasks,
+    List<String>? tags,
     String? note,
     String? inboxGameId,
     bool? inboxFrequencySet,
@@ -322,6 +325,7 @@ class TaskRecord {
         weeklyDays: weeklyDays ?? this.weeklyDays,
         completedDates: completedDates ?? this.completedDates,
         subtasks: subtasks ?? this.subtasks,
+        tags: tags ?? this.tags,
         note: note ?? this.note,
         inboxGameId: inboxGameId ?? this.inboxGameId,
         inboxFrequencySet: inboxFrequencySet ?? this.inboxFrequencySet,
@@ -416,6 +420,7 @@ class TaskRecord {
         'weeklyDays': weeklyDays,
         'completedDates': completedDates,
         'subtasks': subtasks.map((item) => item.toJson()).toList(),
+        'tags': tags,
         'note': note,
         'inboxGameId': inboxGameId,
         'inboxFrequencySet': inboxFrequencySet,
@@ -444,6 +449,7 @@ class TaskRecord {
             .map((item) =>
                 TaskSubtask.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(),
+        tags: List<String>.from(json['tags'] as List? ?? const []),
         note: json['note'] as String? ?? '',
         inboxGameId: json['inboxGameId'] as String?,
         inboxFrequencySet: json['inboxFrequencySet'] as bool? ?? false,

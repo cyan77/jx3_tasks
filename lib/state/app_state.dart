@@ -649,6 +649,7 @@ class AppState extends ChangeNotifier {
     required int targetCount,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     final now = DateTime.now();
@@ -668,6 +669,7 @@ class AppState extends ChangeNotifier {
               .map((item) =>
                   TaskSubtask(id: item.id, title: item.title))
               .toList(),
+          tags: [...tags],
           note: note,
         )));
     await _saveDataChange();
@@ -682,6 +684,7 @@ class AppState extends ChangeNotifier {
     int targetCount = 1,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     final now = DateTime.now();
@@ -700,6 +703,7 @@ class AppState extends ChangeNotifier {
       subtasks: subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
+      tags: [...tags],
       note: note,
       inboxGameId: games.any((game) => game.id == gameId)
           ? gameId
@@ -718,6 +722,7 @@ class AppState extends ChangeNotifier {
     int targetCount = 1,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     final index = store.tasks.indexWhere((task) => task.id == source.id);
@@ -732,6 +737,7 @@ class AppState extends ChangeNotifier {
       targetCount: frequency == null ? 1 : targetCount,
       weeklyDays: frequency == null ? const [] : [...weeklyDays],
       subtasks: _mergeSubtasks(source.subtasks, subtasks),
+      tags: [...tags],
       note: note,
       inboxFrequencySet: frequency != null,
     );
@@ -748,6 +754,7 @@ class AppState extends ChangeNotifier {
     required int targetCount,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     if (!source.isInbox || characterIds.isEmpty) return;
@@ -775,6 +782,7 @@ class AppState extends ChangeNotifier {
           subtasks: subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
               .toList(),
+          tags: [...tags],
           note: note,
         )));
     await _saveDataChange();
@@ -790,6 +798,7 @@ class AppState extends ChangeNotifier {
     required int targetCount,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     if (characterIds.isEmpty) return;
@@ -822,6 +831,7 @@ class AppState extends ChangeNotifier {
           subtasks: subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
               .toList(),
+          tags: [...tags],
           note: note,
         ));
         continue;
@@ -838,6 +848,7 @@ class AppState extends ChangeNotifier {
         targetCount: targetCount,
         weeklyDays: [...weeklyDays],
         subtasks: _mergeSubtasks(existing.subtasks, subtasks),
+        tags: [...tags],
         note: note,
       );
     }
@@ -853,6 +864,7 @@ class AppState extends ChangeNotifier {
     required int targetCount,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
+    List<String> tags = const [],
     String note = '',
   }) async {
     final index = store.tasks.indexWhere((task) => task.id == source.id);
@@ -867,6 +879,7 @@ class AppState extends ChangeNotifier {
       targetCount: targetCount,
       weeklyDays: [...weeklyDays],
       subtasks: _mergeSubtasks(source.subtasks, subtasks),
+      tags: [...tags],
       note: note,
     );
     await _saveDataChange();
@@ -905,6 +918,7 @@ class AppState extends ChangeNotifier {
           subtasks: source.subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
               .toList(),
+          tags: [...source.tags],
           note: source.note,
         )));
     await _saveDataChange();
@@ -935,6 +949,7 @@ class AppState extends ChangeNotifier {
           targetCount: source.targetCount,
           weeklyDays: source.weeklyDays,
           subtasks: source.subtasks,
+          tags: source.tags,
           note: source.note,
         );
       } else {
@@ -1011,6 +1026,7 @@ class AppState extends ChangeNotifier {
       subtasks: source.subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
           .toList(),
+      tags: [...source.tags],
       note: source.note,
       inboxGameId: sourceGameId ?? selectedGameId,
       inboxFrequencySet: true,

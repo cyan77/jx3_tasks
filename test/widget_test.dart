@@ -633,6 +633,7 @@ void main() {
           frequency: TaskFrequency.daily,
           createdAt: DateTime.now().subtract(const Duration(days: 1)),
           completedDates: [today],
+          tags: const ['周常'],
         ),
         TaskRecord(
           id: 'open-char-2',
@@ -641,6 +642,7 @@ void main() {
           characterId: 'char-2',
           frequency: TaskFrequency.daily,
           createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          tags: const ['日常'],
         ),
         TaskRecord(
           id: 'expiring-char-2',
@@ -680,6 +682,13 @@ void main() {
     for (final container in filterContainers) {
       expect(tester.getSize(container).height, 40);
     }
+    final tagFilter =
+        find.byKey(const ValueKey('task-filter-control-按标签筛选'));
+    expect(tagFilter, findsOneWidget);
+    expect(
+      tester.getTopLeft(tagFilter).dy,
+      greaterThan(tester.getBottomLeft(filterControls.first).dy),
+    );
     final gameFilterContainer = tester.widget<Container>(
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
     );
@@ -746,6 +755,15 @@ void main() {
     await tester.tap(find.text('角色二').last);
     await tester.pumpAndSettle();
     expect(find.text('未完成任务'), findsOneWidget);
+
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
+    await tester.tap(tagFilter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日常').last);
+    await tester.pumpAndSettle();
+    expect(find.text('未完成任务'), findsOneWidget);
+    expect(find.text('已完成任务'), findsNothing);
     state.dispose();
   });
 
@@ -1000,6 +1018,7 @@ void main() {
       frequency: TaskFrequency.daily,
       createdAt: DateTime(2026, 9, 1),
       startDate: DateTime(2026, 9, 20),
+      tags: const ['日常', '重要'],
     );
 
     expect(task.hasStartedBy(DateTime(2026, 9, 19)), isFalse);
@@ -1008,6 +1027,7 @@ void main() {
 
     final restored = TaskRecord.fromJson(task.toJson());
     expect(restored.startDate, DateTime(2026, 9, 20));
+    expect(restored.tags, ['日常', '重要']);
     expect(restored.isScheduledOn(DateTime(2026, 9, 20)), isTrue);
   });
 
