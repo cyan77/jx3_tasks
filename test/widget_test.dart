@@ -98,7 +98,7 @@ void main() {
     final store = LocalStore()
       ..games = const [Game(id: 'game-jx3', name: '剑网3')]
       ..characters = const []
-      ..tasks = const [];
+      ..tasks = [];
     final state = AppState(store);
 
     final tags = normalizeTaskTags(const [], '紧急，周常');
