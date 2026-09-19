@@ -1902,7 +1902,7 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('首页只显示仍有未完成待办的角色', (tester) async {
+  testWidgets('首页保留当天完成的角色并在下一任务日隐藏', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final today = dateKey(DateTime.now());
     final store = LocalStore()
@@ -1924,6 +1924,14 @@ void main() {
           occupation: '',
           color: 0xff5a78aa,
         ),
+        Character(
+          id: 'previously-done-character',
+          gameId: 'game',
+          account: '',
+          name: '昨日已清空角色',
+          occupation: '',
+          color: 0xff8a6f4d,
+        ),
       ]
       ..tasks = [
         TaskRecord(
@@ -1943,6 +1951,18 @@ void main() {
           frequency: TaskFrequency.daily,
           createdAt: DateTime.now().subtract(const Duration(days: 1)),
         ),
+        TaskRecord(
+          id: 'previously-done-task',
+          templateId: 'previously-done-task',
+          title: '昨日完成的一次性任务',
+          characterId: 'previously-done-character',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          dueDate: DateTime.now().subtract(const Duration(days: 1)),
+          completedDates: [
+            dateKey(DateTime.now().subtract(const Duration(days: 1))),
+          ],
+        ),
       ];
     final state = AppState(store);
 
@@ -1956,15 +1976,21 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('已清空角色'), findsNothing);
+    expect(find.text('已清空角色'), findsWidgets);
     expect(find.text('仍有待办角色'), findsWidgets);
+    expect(find.text('昨日已清空角色'), findsNothing);
+    expect(find.text('今日已完成'), findsOneWidget);
     expect(find.text('1 个待办'), findsOneWidget);
 
+    await tester.tap(find.text('仍有待办角色'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(TaskCheck).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('仍有待办角色'), findsNothing);
-    expect(find.text('今天的任务都完成了'), findsOneWidget);
+    expect(find.text('已清空角色'), findsWidgets);
+    expect(find.text('仍有待办角色'), findsWidgets);
+    expect(find.text('今日已完成'), findsNWidgets(2));
+    expect(find.text('今天的任务都完成了'), findsNothing);
     state.dispose();
   });
 
