@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.5.3 build 14 — task labels and filtering
+# Release v0.5.4 build 15 — dashboard completion visibility
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.3]')
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.4]')
     needs:
       - build-windows
       - build-android
@@ -178,13 +178,13 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove existing v0.5.3 assets
+      - name: Remove existing v0.5.4 assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset_ids="$(
             gh api repos/${{ github.repository }}/releases --paginate \
-              --jq '.[] | select(.tag_name == "v0.5.3") | .assets[].id'
+              --jq '.[] | select(.tag_name == "v0.5.4") | .assets[].id'
           )"
           for asset_id in $asset_ids; do
             gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
@@ -193,18 +193,15 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.3
+          tag_name: v0.5.4
           target_commitish: ${{ github.sha }}
-          name: v0.5.3 任务标签与筛选优化
+          name: v0.5.4 首页完成体验优化
           files: release-assets/*
           body: |
-            v0.5.3 任务标签与筛选优化
+            v0.5.4 首页完成体验优化
 
-            - 任务支持添加多个标签，可输入新标签或复用已有标签
-            - 标签会在首页、日历、收集箱和全部任务中显示
-            - 全部任务右下角新增标签筛选按钮，标签以动画向上展开
-            - 支持多标签组合筛选，再次点击已选标签即可取消
-            - 搜索支持匹配标签内容
-            - 分配、复制、同步编辑及移入收集箱时会保留任务标签
-            - 修复收集箱快速记录中标签未确认时可能无法保存的问题
-            - 保持旧数据及历史备份兼容
+            - 角色完成当天全部任务后继续保留在首页
+            - 待办归零后角色卡显示“今日已完成”，避免最后一项勾选后突然消失
+            - 进入下一个任务日后，无新待办的角色才会自动隐藏
+            - 每日等周期任务刷新后，角色会按新的待办状态继续显示
+            - 首页游戏概览仍只统计未完成任务及相关角色
