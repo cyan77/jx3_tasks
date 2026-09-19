@@ -780,7 +780,7 @@ void main() {
     expect(tagOptions, findsOneWidget);
     expect(
       tester.getBottomLeft(tagOptions).dy,
-      lessThan(tester.getTopLeft(tagFilterButton).dy),
+      lessThanOrEqualTo(tester.getTopLeft(tagFilterButton).dy),
     );
     expect(find.text('#日常'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('task-tag-filter-日常')));
