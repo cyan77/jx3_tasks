@@ -1007,15 +1007,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     });
   }
 
-  List<String> _tags() {
-    final result = <String>{...taskTags};
-    result.addAll(tagController.text
-        .split(RegExp(r'[,，]'))
-        .map((tag) => tag.trim())
-        .where((tag) => tag.isNotEmpty));
-    final tags = result.toList()..sort();
-    return tags;
-  }
+  List<String> _tags() => normalizeTaskTags(taskTags, tagController.text);
 
   @override
   void dispose() {

@@ -460,6 +460,21 @@ class TaskRecord {
 String dateKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
+List<String> normalizeTaskTags(
+  Iterable<String> selected, [
+  String input = '',
+]) {
+  final result = selected
+      .map((tag) => tag.trim())
+      .where((tag) => tag.isNotEmpty)
+      .toSet();
+  result.addAll(input
+      .split(RegExp(r'[,，]'))
+      .map((tag) => tag.trim())
+      .where((tag) => tag.isNotEmpty));
+  return result.toList()..sort();
+}
+
 DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
 
 DateTime startOfWeek(DateTime date) {
