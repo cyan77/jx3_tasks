@@ -34,7 +34,7 @@ Future<void> showTaskEditor(
                 const BorderRadius.vertical(top: Radius.circular(22)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: ColoredBox(
+              child: Material(
                 color: glassColor.withValues(alpha: dark ? 0.90 : 0.88),
                 child: _TaskEditor(
                   state: state,
