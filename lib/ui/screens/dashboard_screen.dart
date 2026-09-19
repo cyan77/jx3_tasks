@@ -24,8 +24,7 @@ class DashboardScreen extends StatelessWidget {
     }
     final today = state.currentTaskDate;
     final visibleCharacters = state.characters
-        .where((character) =>
-            _pendingTasksForCharacter(state, character, today).isNotEmpty)
+        .where((character) => _shouldShowCharacter(state, character, today))
         .toList();
     if (visibleCharacters.isEmpty) {
       return Column(children: [
@@ -458,6 +457,23 @@ List<TaskRecord> _pendingTasksForCharacter(
   ].where((task) => !task.isCompletedOn(today)).toList();
 }
 
+bool _shouldShowCharacter(
+  AppState state,
+  Character character,
+  DateTime today,
+) {
+  if (_pendingTasksForCharacter(state, character, today).isNotEmpty) {
+    return true;
+  }
+  final todayKey = dateKey(today);
+  final tasks = state.tasksForCharacter(character.id);
+  final visibleTasks = [
+    ..._todayTasks(state, tasks, today),
+    ..._periodTasks(state, tasks, today),
+  ];
+  return visibleTasks.any((task) => task.completedDates.contains(todayKey));
+}
+
 class _CharacterStrip extends StatefulWidget {
   const _CharacterStrip({required this.state, required this.characters});
   final AppState state;
@@ -545,7 +561,11 @@ class _CharacterStripState extends State<_CharacterStrip> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),
                             Text(
-                                '${_pendingTasksForCharacter(widget.state, character, widget.state.currentTaskDate).length} 个待办',
+                                _characterStatusText(
+                                  widget.state,
+                                  character,
+                                  widget.state.currentTaskDate,
+                                ),
                                 style: const TextStyle(
                                     fontSize: 10, color: AppTheme.muted)),
                           ],
@@ -559,6 +579,15 @@ class _CharacterStripState extends State<_CharacterStrip> {
           ),
         ),
       );
+}
+
+String _characterStatusText(
+  AppState state,
+  Character character,
+  DateTime today,
+) {
+  final pending = _pendingTasksForCharacter(state, character, today).length;
+  return pending == 0 ? '今日已完成' : '$pending 个待办';
 }
 
 class _SummaryCard extends StatelessWidget {
