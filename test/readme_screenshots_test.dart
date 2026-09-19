@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,8 +26,18 @@ Future<LocalStore> demoStore() async {
   return store;
 }
 
+Future<void> loadScreenshotFont() async {
+  final bytes = await File(
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  ).readAsBytes();
+  await (FontLoader('Arial')
+        ..addFont(Future.value(ByteData.sublistView(bytes))))
+      .load();
+}
+
 void main() {
   testWidgets('README mobile home screenshot', (tester) async {
+    await loadScreenshotFont();
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -37,6 +51,7 @@ void main() {
   });
 
   testWidgets('README desktop task screenshot', (tester) async {
+    await loadScreenshotFont();
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
