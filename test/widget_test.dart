@@ -118,9 +118,10 @@ void main() {
       find.widgetWithText(TextField, '添加标签'),
       '紧急，周常',
     );
-    await tester.ensureVisible(find.text('放入收集箱'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('放入收集箱'));
+    final saveButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, '放入收集箱'),
+    );
+    saveButton.onPressed!();
     await tester.pumpAndSettle();
 
     expect(state.inboxTasks.single.tags, unorderedEquals(['紧急', '周常']));
