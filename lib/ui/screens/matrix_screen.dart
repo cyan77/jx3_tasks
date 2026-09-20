@@ -1,0 +1,1524 @@
+import 'package:flutter/material.dart';
+
+import '../../models/task_expiry.dart';
+import '../../models/task_models.dart';
+import '../../state/app_state.dart';
+import '../../theme/app_theme.dart';
+import '../task_editor.dart';
+import '../widgets/common.dart';
+
+enum _CompletionFilter {
+  all,
+  incomplete,
+  partial,
+  complete,
+  expiringSoon,
+  overdue,
+}
+
+enum _TemplateCompletion { unassigned, incomplete, partial, complete }
+
+enum _ArchiveFilter { active, archived, all }
+
+class MatrixScreen extends StatefulWidget {
+  const MatrixScreen({required this.state, super.key});
+  final AppState state;
+
+  @override
+  State<MatrixScreen> createState() => _MatrixScreenState();
+}
+
+class _MatrixScreenState extends State<MatrixScreen> {
+  final searchController = TextEditingController();
+  final searchFocusNode = FocusNode();
+  final selectedTemplateIds = <String>{};
+  String query = '';
+  bool searchExpanded = false;
+  String? gameFilterId;
+  String? characterFilterId;
+  final tagFilters = <String>{};
+  bool tagMenuExpanded = false;
+  _CompletionFilter completionFilter = _CompletionFilter.all;
+  _ArchiveFilter archiveFilter = _ArchiveFilter.active;
+
+  AppState get state => widget.state;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final desktopSelection = screenWidth >= 800;
+    final compactHeader = screenWidth < 560;
+    final templates = <String, List<TaskRecord>>{};
+    for (final task in state.store.tasks) {
+      templates.putIfAbsent(task.templateId, () => []).add(task);
+    }
+    final availableTags =
+        state.store.tasks.expand((task) => task.tags).toSet().toList()..sort();
+    tagFilters.removeWhere((tag) => !availableTags.contains(tag));
+    selectedTemplateIds.removeWhere((id) => !templates.containsKey(id));
+    final visibleTemplates = templates.values.where((tasks) {
+      if (!_matchesGame(tasks) ||
+          !_matchesCharacter(tasks) ||
+          !_matchesTag(tasks) ||
+          !_matchesCompletion(tasks) ||
+          !_matchesArchive(tasks)) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      final normalized = query.toLowerCase();
+      final characterNames = _charactersFor(tasks)
+          .map((character) => character.name.toLowerCase());
+      return tasks.first.title.toLowerCase().contains(normalized) ||
+          tasks.any((task) =>
+              task.tags.any((tag) => tag.toLowerCase().contains(normalized))) ||
+          characterNames.any((name) => name.contains(normalized));
+    }).toList()
+      ..sort((a, b) => a.first.title.compareTo(b.first.title));
+    final visibleIds =
+        visibleTemplates.map((tasks) => tasks.first.templateId).toSet();
+    final selectedCount = selectedTemplateIds.length;
+
+    return Column(children: [
+      PageHeader(
+        title: '全部任务',
+        subtitle:
+            '显示 ${visibleTemplates.length} / ${templates.length} 项 · 可单选或多选管理',
+        action: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: searchExpanded
+              ? SizedBox(
+                  key: const ValueKey('task-search-field'),
+                  width: compactHeader ? 210 : 230,
+                  child: TextField(
+                    controller: searchController,
+                    focusNode: searchFocusNode,
+                    onChanged: (value) => setState(() => query = value.trim()),
+                    decoration: InputDecoration(
+                      hintText: '搜索任务或角色',
+                      prefixIcon: const Icon(Icons.search, size: 18),
+                      suffixIcon: IconButton(
+                        tooltip: '关闭搜索',
+                        onPressed: _closeSearch,
+                        icon: const Icon(Icons.close, size: 17),
+                      ),
+                    ),
+                  ),
+                )
+              : Row(
+                  key: const ValueKey('task-header-actions'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '搜索任务',
+                      onPressed: _openSearch,
+                      icon: const Icon(Icons.search, size: 20),
+                    ),
+                    const SizedBox(width: 4),
+                    OutlinedButton.icon(
+                      onPressed: () => showTaskEditor(
+                        context,
+                        state,
+                        preselectCurrentCharacter: false,
+                      ),
+                      icon: const Icon(Icons.add, size: 17),
+                      label: const Text('新建任务'),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: _FilterBar(
+            games: state.games,
+            characters: _filterCharacters,
+            gameId: gameFilterId,
+            characterId: characterFilterId,
+            completion: completionFilter,
+            archive: archiveFilter,
+            onGameChanged: (value) => setState(() {
+              gameFilterId = value;
+              selectedTemplateIds.clear();
+              if (characterFilterId != null &&
+                  characterFilterId != _FilterBar.inboxValue &&
+                  !_filterCharacters
+                      .any((character) => character.id == characterFilterId)) {
+                characterFilterId = null;
+              }
+            }),
+            onCharacterChanged: (value) => setState(() {
+              characterFilterId = value;
+              selectedTemplateIds.clear();
+            }),
+            onCompletionChanged: (value) => setState(() {
+              completionFilter = value;
+              selectedTemplateIds.clear();
+            }),
+            onArchiveChanged: (value) => setState(() {
+              archiveFilter = value;
+              selectedTemplateIds.clear();
+            }),
+            onReset: _hasActiveFilters ? _resetFilters : null,
+          ),
+        ),
+      ),
+      Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, selectedCount > 0 ? 12 : 6),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            selectedCount > 0
+                ? '已选 $selectedCount 项'
+                : desktopSelection
+                    ? '点击任务右上角的选择按钮进行多选管理'
+                    : '长按任务进行管理',
+            style: const TextStyle(fontSize: 11, color: AppTheme.muted),
+          ),
+        ),
+      ),
+      Expanded(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: visibleTemplates.isEmpty
+                  ? const _EmptyTasks()
+                  : ListView.separated(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        0,
+                        20,
+                        selectedCount > 0
+                            ? (desktopSelection ? 92 : 172)
+                            : (desktopSelection ? 90 : 158),
+                      ),
+                      itemCount: visibleTemplates.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final tasks = visibleTemplates[index];
+                        final templateId = tasks.first.templateId;
+                        return _TaskManagementTile(
+                          tasks: tasks,
+                          characters: _charactersFor(tasks),
+                          gameName: _gameNameFor(tasks),
+                          completion: _completionFor(tasks),
+                          completedTaskIds: tasks
+                              .where((task) => task.isCompletedOn(
+                                    state.taskDateFor(task),
+                                  ))
+                              .map((task) => task.id)
+                              .toSet(),
+                          expiry: _expiryFor(tasks),
+                          selected: selectedTemplateIds.contains(templateId),
+                          selectionMode: selectedCount > 0,
+                          showSelectionButton: desktopSelection,
+                          onSelect: () => _setSelected(
+                            templateId,
+                            !selectedTemplateIds.contains(templateId),
+                          ),
+                          onToggleTask: (task) => state.setTaskCompleted(
+                            task,
+                            completed:
+                                !task.isCompletedOn(state.taskDateFor(task)),
+                          ),
+                          onEdit: () => showTaskEditor(
+                            context,
+                            state,
+                            task: tasks.first,
+                            syncAll: !tasks.first.isInbox,
+                          ),
+                          onMoveToInbox: () =>
+                              _moveTemplatesToInbox({templateId}),
+                          onArchiveChanged: (archived) =>
+                              _setTemplatesArchived({templateId}, archived),
+                          onDelete: () => _deleteTemplates({templateId}),
+                        );
+                      },
+                    ),
+            ),
+            Positioned(
+              right: 20,
+              bottom: desktopSelection ? 16 : 86,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: selectedCount > 0
+                    ? const SizedBox.shrink(
+                        key: ValueKey('task-tag-filter-hidden'),
+                      )
+                    : _TagFilterMenu(
+                        key: const ValueKey('task-tag-filter-menu'),
+                        tags: availableTags,
+                        selected: tagFilters,
+                        expanded: tagMenuExpanded,
+                        onToggleExpanded: availableTags.isEmpty
+                            ? null
+                            : () => setState(
+                                  () => tagMenuExpanded = !tagMenuExpanded,
+                                ),
+                        onToggleTag: (tag) => setState(() {
+                          tagFilters.contains(tag)
+                              ? tagFilters.remove(tag)
+                              : tagFilters.add(tag);
+                          selectedTemplateIds.clear();
+                        }),
+                      ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: desktopSelection ? 12 : 82,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                reverseDuration: const Duration(milliseconds: 160),
+                transitionBuilder: (child, animation) {
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity: curved,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.16, 0),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
+                child: selectedCount == 0
+                    ? const SizedBox.shrink(
+                        key: ValueKey('mobile-selection-empty'),
+                      )
+                    : _SelectionBar(
+                        key: const ValueKey('mobile-selection-actions'),
+                        compact: true,
+                        selectedCount: selectedCount,
+                        allVisibleSelected: visibleIds.isNotEmpty &&
+                            visibleIds.every(selectedTemplateIds.contains),
+                        onToggleAll: () => _toggleAll(visibleIds),
+                        onClear: () => setState(selectedTemplateIds.clear),
+                        onAssign: archiveFilter == _ArchiveFilter.archived
+                            ? null
+                            : _assignSelected,
+                        onMoveToInbox: archiveFilter == _ArchiveFilter.archived
+                            ? null
+                            : _moveSelectedToInbox,
+                        onArchive: () => _setTemplatesArchived(
+                          Set.of(selectedTemplateIds),
+                          true,
+                        ),
+                        onRestore: () => _setTemplatesArchived(
+                          Set.of(selectedTemplateIds),
+                          false,
+                        ),
+                        showArchive: archiveFilter != _ArchiveFilter.archived,
+                        showRestore: archiveFilter != _ArchiveFilter.active,
+                        onDelete: _deleteSelected,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  List<Character> _charactersFor(List<TaskRecord> tasks) {
+    final ids = tasks.map((task) => task.characterId).toSet();
+    return state.store.characters
+        .where((character) => ids.contains(character.id))
+        .toList();
+  }
+
+  List<Character> get _filterCharacters => state.store.characters
+      .where((character) =>
+          gameFilterId == null || character.gameId == gameFilterId)
+      .toList();
+
+  bool get _hasActiveFilters =>
+      gameFilterId != null ||
+      characterFilterId != null ||
+      tagFilters.isNotEmpty ||
+      completionFilter != _CompletionFilter.all ||
+      archiveFilter != _ArchiveFilter.active;
+
+  String? _gameIdFor(List<TaskRecord> tasks) {
+    final task = tasks.first;
+    if (task.isInbox) return task.inboxGameId;
+    return state.store.characters
+        .where((character) => character.id == task.characterId)
+        .firstOrNull
+        ?.gameId;
+  }
+
+  String _gameNameFor(List<TaskRecord> tasks) {
+    final gameId = _gameIdFor(tasks);
+    return state.games.where((game) => game.id == gameId).firstOrNull?.name ??
+        '未知游戏';
+  }
+
+  _TemplateCompletion _completionFor(List<TaskRecord> tasks) {
+    final assigned = tasks.where((task) => !task.isInbox).toList();
+    if (assigned.isEmpty) return _TemplateCompletion.unassigned;
+    final completed = assigned
+        .where((task) => task.isCompletedOn(state.taskDateFor(task)))
+        .length;
+    if (completed == 0) return _TemplateCompletion.incomplete;
+    if (completed == assigned.length) return _TemplateCompletion.complete;
+    return _TemplateCompletion.partial;
+  }
+
+  TaskExpiryStatus _expiryFor(List<TaskRecord> tasks) {
+    var status = TaskExpiryStatus.normal;
+    for (final task in tasks) {
+      final current = state.taskDateFor(task);
+      final taskStatus = taskExpiryStatus(task, current);
+      if (taskStatus == TaskExpiryStatus.overdue) {
+        return TaskExpiryStatus.overdue;
+      }
+      if (taskStatus == TaskExpiryStatus.expiringSoon) {
+        status = TaskExpiryStatus.expiringSoon;
+      }
+    }
+    return status;
+  }
+
+  bool _matchesGame(List<TaskRecord> tasks) =>
+      gameFilterId == null || _gameIdFor(tasks) == gameFilterId;
+
+  bool _matchesCharacter(List<TaskRecord> tasks) {
+    if (characterFilterId == null) return true;
+    if (characterFilterId == _FilterBar.inboxValue) {
+      return tasks.any((task) => task.isInbox);
+    }
+    return tasks.any((task) => task.characterId == characterFilterId);
+  }
+
+  bool _matchesTag(List<TaskRecord> tasks) =>
+      tagFilters.isEmpty ||
+      tasks.any((task) => task.tags.any(tagFilters.contains));
+
+  bool _matchesCompletion(List<TaskRecord> tasks) {
+    final completion = _completionFor(tasks);
+    return switch (completionFilter) {
+      _CompletionFilter.all => true,
+      _CompletionFilter.incomplete =>
+        completion == _TemplateCompletion.incomplete,
+      _CompletionFilter.partial => completion == _TemplateCompletion.partial,
+      _CompletionFilter.complete => completion == _TemplateCompletion.complete,
+      _CompletionFilter.expiringSoon =>
+        _expiryFor(tasks) == TaskExpiryStatus.expiringSoon,
+      _CompletionFilter.overdue =>
+        _expiryFor(tasks) == TaskExpiryStatus.overdue,
+    };
+  }
+
+  bool _matchesArchive(List<TaskRecord> tasks) => switch (archiveFilter) {
+        _ArchiveFilter.active => tasks.any((task) => !task.archived),
+        _ArchiveFilter.archived => tasks.every((task) => task.archived),
+        _ArchiveFilter.all => true,
+      };
+
+  void _resetFilters() => setState(() {
+        gameFilterId = null;
+        characterFilterId = null;
+        tagFilters.clear();
+        tagMenuExpanded = false;
+        completionFilter = _CompletionFilter.all;
+        archiveFilter = _ArchiveFilter.active;
+        selectedTemplateIds.clear();
+      });
+
+  void _setSelected(String templateId, bool value) {
+    setState(() {
+      tagMenuExpanded = false;
+      value
+          ? selectedTemplateIds.add(templateId)
+          : selectedTemplateIds.remove(templateId);
+    });
+  }
+
+  void _toggleAll(Set<String> visibleIds) {
+    setState(() {
+      if (visibleIds.isNotEmpty &&
+          visibleIds.every(selectedTemplateIds.contains)) {
+        selectedTemplateIds.removeAll(visibleIds);
+      } else {
+        selectedTemplateIds.addAll(visibleIds);
+      }
+    });
+  }
+
+  Future<void> _assignSelected() async {
+    if (selectedTemplateIds.length == 1) {
+      final templateId = selectedTemplateIds.single;
+      final task = state.store.tasks
+          .where((item) => item.templateId == templateId)
+          .firstOrNull;
+      if (task != null) {
+        await showTaskEditor(
+          context,
+          state,
+          task: task,
+          syncAll: !task.isInbox,
+        );
+      }
+      return;
+    }
+    final selectedTasks = selectedTemplateIds
+        .map((templateId) => state.store.tasks
+            .where((task) => task.templateId == templateId)
+            .firstOrNull)
+        .whereType<TaskRecord>()
+        .toList();
+    final gameIds = selectedTasks
+        .map((task) => _gameIdFor([task]))
+        .whereType<String>()
+        .toSet();
+    if (gameIds.length != 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('批量分配时请选择同一个游戏的任务')),
+      );
+      return;
+    }
+    final characterIds = await _showCharacterAssignmentDialog(gameIds.single);
+    if (characterIds == null || characterIds.isEmpty) return;
+    final taskCountBefore = state.store.tasks.length;
+    final skipped = await state.assignTaskTemplatesToCharacters(
+      templateIds: Set.of(selectedTemplateIds),
+      characterIds: characterIds,
+    );
+    final assignedCount = state.store.tasks.length - taskCountBefore;
+    if (!mounted) return;
+    setState(selectedTemplateIds.clear);
+    final message = assignedCount == 0
+        ? '所选角色已经拥有这些任务，无需重复分配'
+        : skipped.isEmpty
+            ? '已新增 $assignedCount 条角色任务'
+            : '已新增 $assignedCount 条角色任务；'
+                '${skipped.length} 项收集箱任务尚未设置周期';
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<Set<String>?> _showCharacterAssignmentDialog(String gameId) async {
+    final selected = <String>{};
+    final characters = state.store.characters.where((character) {
+      if (character.archived || character.gameId != gameId) return false;
+      return selectedTemplateIds.any((templateId) => !state.store.tasks.any(
+            (task) =>
+                task.templateId == templateId &&
+                task.characterId == character.id &&
+                !task.isInbox,
+          ));
+    }).toList();
+    return showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          insetPadding: const EdgeInsets.all(16),
+          title: const Text('批量追加分配角色'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+            ),
+            child: characters.isEmpty
+                ? const Text('当前游戏中的角色都已分配所选任务')
+                : SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: characters
+                          .map((character) => FilterChip(
+                                label: Text(character.name),
+                                selected: selected.contains(character.id),
+                                onSelected: (value) => setDialogState(() {
+                                  value
+                                      ? selected.add(character.id)
+                                      : selected.remove(character.id);
+                                }),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, Set.of(selected)),
+              child: const Text('分配'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteSelected() =>
+      _deleteTemplates(Set.of(selectedTemplateIds));
+
+  Future<void> _moveSelectedToInbox() =>
+      _moveTemplatesToInbox(Set.of(selectedTemplateIds));
+
+  Future<void> _setTemplatesArchived(
+      Set<String> templateIds, bool archived) async {
+    if (templateIds.isEmpty) return;
+    await state.setTaskTemplatesArchived(templateIds, archived: archived);
+    if (!mounted) return;
+    setState(() => selectedTemplateIds.removeAll(templateIds));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(archived ? '任务已归档' : '任务已恢复'),
+    ));
+  }
+
+  Future<void> _moveTemplatesToInbox(Set<String> templateIds) async {
+    final assignedTemplateIds = templateIds
+        .where((templateId) => state.store.tasks
+            .any((task) => task.templateId == templateId && !task.isInbox))
+        .toSet();
+    if (assignedTemplateIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('所选任务已经在收集箱中')),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(assignedTemplateIds.length == 1 ? '移到收集箱？' : '批量移到收集箱？'),
+        content: Text(
+          '将取消 ${assignedTemplateIds.length} 项任务的全部角色分配，保留任务设置并清除完成记录。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('移到收集箱'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    for (final templateId in assignedTemplateIds) {
+      final task = state.store.tasks
+          .where((item) => item.templateId == templateId && !item.isInbox)
+          .firstOrNull;
+      if (task != null) await state.moveTaskToInbox(task, allLinked: true);
+    }
+    if (mounted) {
+      setState(() => selectedTemplateIds.removeAll(assignedTemplateIds));
+    }
+  }
+
+  Future<void> _deleteTemplates(Set<String> templateIds) async {
+    if (templateIds.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(templateIds.length == 1 ? '删除任务？' : '批量删除任务？'),
+        content: Text(templateIds.length == 1
+            ? '将删除该任务的全部角色分配和完成记录。'
+            : '将删除选中的 ${templateIds.length} 项任务、全部角色分配和完成记录。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xffb94a48),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    for (final templateId in templateIds) {
+      final task = state.store.tasks
+          .where((item) => item.templateId == templateId)
+          .firstOrNull;
+      if (task != null) await state.deleteTask(task, allLinked: !task.isInbox);
+    }
+    if (mounted) setState(() => selectedTemplateIds.removeAll(templateIds));
+  }
+
+  void _openSearch() {
+    setState(() => searchExpanded = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) searchFocusNode.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    searchController.clear();
+    searchFocusNode.unfocus();
+    setState(() {
+      query = '';
+      searchExpanded = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    searchFocusNode.dispose();
+    super.dispose();
+  }
+}
+
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.games,
+    required this.characters,
+    required this.gameId,
+    required this.characterId,
+    required this.completion,
+    required this.archive,
+    required this.onGameChanged,
+    required this.onCharacterChanged,
+    required this.onCompletionChanged,
+    required this.onArchiveChanged,
+    required this.onReset,
+  });
+
+  static const inboxValue = '__inbox__';
+  static const allGamesValue = '__all_games__';
+  static const allCharactersValue = '__all_characters__';
+  final List<Game> games;
+  final List<Character> characters;
+  final String? gameId;
+  final String? characterId;
+  final _CompletionFilter completion;
+  final _ArchiveFilter archive;
+  final ValueChanged<String?> onGameChanged;
+  final ValueChanged<String?> onCharacterChanged;
+  final ValueChanged<_CompletionFilter> onCompletionChanged;
+  final ValueChanged<_ArchiveFilter> onArchiveChanged;
+  final VoidCallback? onReset;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+                child: _FilterDropdown<String>(
+              tooltip: '按游戏筛选',
+              value: gameId ?? allGamesValue,
+              selectedLabel:
+                  MediaQuery.sizeOf(context).width < 600 && gameId == null
+                      ? '游戏'
+                      : null,
+              items: [
+                const DropdownMenuItem(
+                    value: allGamesValue, child: Text('全部游戏')),
+                ...games.map((game) =>
+                    DropdownMenuItem(value: game.id, child: Text(game.name))),
+              ],
+              onChanged: (value) =>
+                  onGameChanged(value == allGamesValue ? null : value),
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<String>(
+              tooltip: '按角色筛选',
+              value: characterId ?? allCharactersValue,
+              selectedLabel:
+                  MediaQuery.sizeOf(context).width < 600 && characterId == null
+                      ? '角色'
+                      : null,
+              items: [
+                const DropdownMenuItem(
+                    value: allCharactersValue, child: Text('全部角色')),
+                const DropdownMenuItem(
+                    value: inboxValue, child: Text('收集箱 / 未分配')),
+                ...characters.map((character) => DropdownMenuItem(
+                    value: character.id, child: Text(character.name))),
+              ],
+              onChanged: (value) => onCharacterChanged(
+                  value == allCharactersValue ? null : value),
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<_CompletionFilter>(
+              tooltip: '按完成状态筛选',
+              value: completion,
+              selectedLabel: MediaQuery.sizeOf(context).width < 600 &&
+                      completion == _CompletionFilter.all
+                  ? '状态'
+                  : null,
+              items: const [
+                DropdownMenuItem(
+                    value: _CompletionFilter.all, child: Text('全部状态')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.incomplete, child: Text('未完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.partial, child: Text('部分完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.complete, child: Text('已完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.expiringSoon, child: Text('即将过期')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.overdue, child: Text('已逾期')),
+              ],
+              onChanged: (value) {
+                if (value != null) onCompletionChanged(value);
+              },
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<_ArchiveFilter>(
+              tooltip: '按归档状态筛选',
+              value: archive,
+              items: const [
+                DropdownMenuItem(
+                    value: _ArchiveFilter.active, child: Text('未归档')),
+                DropdownMenuItem(
+                    value: _ArchiveFilter.archived, child: Text('已归档')),
+                DropdownMenuItem(
+                    value: _ArchiveFilter.all, child: Text('全部归档状态')),
+              ],
+              onChanged: (value) {
+                if (value != null) onArchiveChanged(value);
+              },
+            )),
+          ]),
+          if (onReset != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TextButton.icon(
+                onPressed: onReset,
+                icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+                label: const Text('清除筛选'),
+              ),
+            ),
+        ],
+      );
+}
+
+class _TagFilterMenu extends StatelessWidget {
+  const _TagFilterMenu({
+    required this.tags,
+    required this.selected,
+    required this.expanded,
+    required this.onToggleExpanded,
+    required this.onToggleTag,
+    super.key,
+  });
+
+  final List<String> tags;
+  final Set<String> selected;
+  final bool expanded;
+  final VoidCallback? onToggleExpanded;
+  final ValueChanged<String> onToggleTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          reverseDuration: const Duration(milliseconds: 160),
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.18),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
+          child: expanded
+              ? Container(
+                  key: const ValueKey('task-tag-filter-options'),
+                  width: 190,
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: fill.withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: scheme.primary.withValues(alpha: 0.20),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: tags
+                          .map((tag) => FilterChip(
+                                key: ValueKey('task-tag-filter-$tag'),
+                                label: Text('#$tag'),
+                                selected: selected.contains(tag),
+                                onSelected: (_) => onToggleTag(tag),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(
+                  key: ValueKey('task-tag-filter-options-hidden'),
+                ),
+        ),
+        Material(
+          color: selected.isEmpty
+              ? fill.withValues(alpha: 0.96)
+              : scheme.primaryContainer,
+          shape: CircleBorder(
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.24),
+            ),
+          ),
+          child: InkWell(
+            key: const ValueKey('task-tag-filter-button'),
+            customBorder: const CircleBorder(),
+            onTap: onToggleExpanded,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    expanded ? Icons.close : Icons.sell_outlined,
+                    size: 21,
+                    color: onToggleExpanded == null
+                        ? AppTheme.muted
+                        : scheme.onSurfaceVariant,
+                  ),
+                  if (selected.isNotEmpty)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${selected.length}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: scheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  const _FilterDropdown({
+    required this.tooltip,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.selectedLabel,
+  });
+
+  final String tooltip;
+  final T value;
+  final String? selectedLabel;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    Widget selectedChild =
+        selectedLabel == null ? const SizedBox.shrink() : Text(selectedLabel!);
+    if (selectedLabel == null) {
+      for (final item in items) {
+        if (item.value == value) {
+          selectedChild = item.child;
+          break;
+        }
+      }
+    }
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        key: ValueKey('task-filter-$tooltip'),
+        height: 40,
+        padding: const EdgeInsets.only(left: 10, right: 5),
+        decoration: BoxDecoration(
+          color: fill.withValues(alpha: 0.78),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.20)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: PopupMenuButton<T>(
+          key: ValueKey('task-filter-control-$tooltip'),
+          padding: EdgeInsets.zero,
+          position: PopupMenuPosition.under,
+          offset: const Offset(0, 6),
+          elevation: 0,
+          menuPadding: const EdgeInsets.symmetric(vertical: 4),
+          color: fill,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.20),
+            ),
+          ),
+          onSelected: (selected) => onChanged(selected),
+          itemBuilder: (_) => items
+              .map((item) => PopupMenuItem<T>(
+                    value: item.value,
+                    enabled: item.enabled,
+                    height: 40,
+                    child: DefaultTextStyle.merge(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      child: item.child,
+                    ),
+                  ))
+              .toList(),
+          child: Row(children: [
+            Expanded(
+              child: DefaultTextStyle.merge(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w400,
+                  color: scheme.onSurfaceVariant,
+                ),
+                child: selectedChild,
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.expand_more, size: 16, color: AppTheme.accent),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    super.key,
+    required this.selectedCount,
+    this.compact = false,
+    required this.allVisibleSelected,
+    required this.onToggleAll,
+    required this.onClear,
+    required this.onAssign,
+    required this.onMoveToInbox,
+    required this.onArchive,
+    required this.onRestore,
+    required this.showArchive,
+    required this.showRestore,
+    required this.onDelete,
+  });
+
+  final int selectedCount;
+  final bool compact;
+  final bool allVisibleSelected;
+  final VoidCallback onToggleAll;
+  final VoidCallback? onClear;
+  final VoidCallback? onAssign;
+  final VoidCallback? onMoveToInbox;
+  final VoidCallback? onArchive;
+  final VoidCallback? onRestore;
+  final bool showArchive;
+  final bool showRestore;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <Widget>[
+      OutlinedButton.icon(
+        onPressed: onToggleAll,
+        icon: Icon(
+          allVisibleSelected
+              ? Icons.deselect_outlined
+              : Icons.select_all_outlined,
+          size: 17,
+        ),
+        label: Text(allVisibleSelected ? '取消全选' : '全选'),
+      ),
+      Text('已选 $selectedCount 项',
+          style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
+      TextButton(onPressed: onClear, child: const Text('退出')),
+      OutlinedButton.icon(
+        onPressed: onAssign,
+        icon: const Icon(Icons.person_add_alt_outlined, size: 17),
+        label: Text(selectedCount == 1 ? '管理分配' : '批量分配'),
+      ),
+      OutlinedButton.icon(
+        onPressed: onMoveToInbox,
+        icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
+        label: const Text('移到收集箱'),
+      ),
+      if (showArchive)
+        OutlinedButton.icon(
+          onPressed: onArchive,
+          icon: const Icon(Icons.archive_outlined, size: 17),
+          label: const Text('归档'),
+        ),
+      if (showRestore)
+        OutlinedButton.icon(
+          onPressed: onRestore,
+          icon: const Icon(Icons.unarchive_outlined, size: 17),
+          label: const Text('恢复'),
+        ),
+      OutlinedButton.icon(
+        onPressed: onDelete,
+        icon: const Icon(Icons.delete_outline, size: 17),
+        label: const Text('删除'),
+      ),
+    ];
+
+    if (!compact) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: actions,
+      );
+    }
+
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 0,
+      color: scheme.surface.withValues(alpha: 0.96),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 58,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              for (var index = 0; index < actions.length; index++) ...[
+                actions[index],
+                if (index < actions.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskManagementTile extends StatelessWidget {
+  const _TaskManagementTile({
+    required this.tasks,
+    required this.characters,
+    required this.gameName,
+    required this.completion,
+    required this.completedTaskIds,
+    required this.expiry,
+    required this.selected,
+    required this.selectionMode,
+    required this.showSelectionButton,
+    required this.onSelect,
+    required this.onToggleTask,
+    required this.onEdit,
+    required this.onMoveToInbox,
+    required this.onArchiveChanged,
+    required this.onDelete,
+  });
+
+  final List<TaskRecord> tasks;
+  final List<Character> characters;
+  final String gameName;
+  final _TemplateCompletion completion;
+  final Set<String> completedTaskIds;
+  final TaskExpiryStatus expiry;
+  final bool selected;
+  final bool selectionMode;
+  final bool showSelectionButton;
+  final VoidCallback onSelect;
+  final ValueChanged<TaskRecord> onToggleTask;
+  final VoidCallback onEdit;
+  final VoidCallback onMoveToInbox;
+  final ValueChanged<bool> onArchiveChanged;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final task = tasks.first;
+    final assignedTasks = tasks.where((item) => !item.isInbox).toList();
+    final completedCount = assignedTasks
+        .where((item) => completedTaskIds.contains(item.id))
+        .length;
+    final scheme = Theme.of(context).colorScheme;
+    final warningColor = Theme.of(context).brightness == Brightness.dark
+        ? AppTheme.warningDark
+        : AppTheme.warning;
+    final alertColor =
+        expiry == TaskExpiryStatus.overdue ? scheme.error : warningColor;
+    final cardColor = selected
+        ? scheme.primaryContainer.withValues(alpha: 0.82)
+        : expiry == TaskExpiryStatus.normal
+            ? scheme.surface
+            : alertColor.withValues(alpha: 0.06);
+    final borderColor = selected
+        ? scheme.primary
+        : expiry == TaskExpiryStatus.normal
+            ? scheme.outlineVariant
+            : alertColor.withValues(alpha: 0.65);
+    final details = <String>[
+      task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
+      if (task.startDate != null) '开始 ${dueLabel(task.startDate)}',
+      if (task.dueDate != null) dueLabel(task.dueDate),
+      if (task.isCountTask) '行为目标 ${task.targetCount} 次',
+      if (task.hasQuantityTarget)
+        '数量 ${task.quantityCompletedOn(DateTime.now())}/${task.targetQuantity}',
+    ];
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: selectionMode ? onSelect : null,
+      onLongPress: onSelect,
+      child: Material(
+        color: cardColor,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: borderColor, width: selected ? 2 : 1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    if (selected) ...[
+                      Icon(
+                        Icons.check_circle,
+                        key: ValueKey('selected-task-${task.templateId}'),
+                        size: 19,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 7),
+                    ],
+                    Expanded(
+                      child: Text(task.title,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 5,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _StatusChip(
+                        icon: Icons.sports_esports_outlined,
+                        label: gameName,
+                      ),
+                      _CompletionChip(
+                        completion: completion,
+                        completedCount: completedCount,
+                        totalCount: assignedTasks.length,
+                      ),
+                      if (expiry != TaskExpiryStatus.normal)
+                        _ExpiryChip(expiry: expiry),
+                      if (task.archived)
+                        const _StatusChip(
+                          icon: Icons.archive_outlined,
+                          label: '已归档',
+                        ),
+                      ...task.tags.map((tag) => _StatusChip(
+                            icon: Icons.sell_outlined,
+                            label: tag,
+                          )),
+                      Text(details.join(' · '),
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.muted)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (task.isInbox)
+                    const _StatusChip(
+                      icon: Icons.inbox_outlined,
+                      label: '收集箱 · 未分配角色',
+                    )
+                  else
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: characters.map((character) {
+                        final characterTask = assignedTasks.firstWhere(
+                          (item) => item.characterId == character.id,
+                        );
+                        final completed =
+                            completedTaskIds.contains(characterTask.id);
+                        return _CharacterChip(
+                          character: character,
+                          task: characterTask,
+                          completed: completed,
+                          onTap: selectionMode
+                              ? onSelect
+                              : () => onToggleTask(characterTask),
+                        );
+                      }).toList(),
+                    ),
+                  if (task.note.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Text(task.note,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.muted)),
+                  ],
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showSelectionButton)
+                  IconButton(
+                    key: ValueKey('select-task-${task.templateId}'),
+                    tooltip: selected ? '取消选择' : '选择任务',
+                    onPressed: onSelect,
+                    icon: Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.library_add_check_outlined,
+                      size: 20,
+                      color: selected ? scheme.primary : AppTheme.muted,
+                    ),
+                  ),
+                PopupMenuButton<String>(
+                  tooltip: '任务操作',
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit();
+                    if (value == 'inbox') onMoveToInbox();
+                    if (value == 'archive') onArchiveChanged(true);
+                    if (value == 'restore') onArchiveChanged(false);
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => [
+                    if (!task.archived)
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('编辑与管理分配')),
+                    if (!task.archived)
+                      const PopupMenuItem(value: 'inbox', child: Text('移到收集箱')),
+                    PopupMenuItem(
+                      value: task.archived ? 'restore' : 'archive',
+                      child: Text(task.archived ? '恢复任务' : '归档任务'),
+                    ),
+                    const PopupMenuItem(value: 'delete', child: Text('删除任务')),
+                  ],
+                ),
+              ],
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _CharacterChip extends StatelessWidget {
+  const _CharacterChip({
+    required this.character,
+    required this.task,
+    required this.completed,
+    required this.onTap,
+  });
+  final Character character;
+  final TaskRecord task;
+  final bool completed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+      key: ValueKey('task-character-${task.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 40, minWidth: 72),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            completed
+                ? Icons.check_circle_outline
+                : Icons.radio_button_unchecked,
+            size: 18,
+            color: completed
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Text(character.name, style: const TextStyle(fontSize: 12)),
+          if (character.archived) ...[
+            const SizedBox(width: 4),
+            const Text('已归档',
+                style: TextStyle(fontSize: 9, color: AppTheme.muted)),
+          ],
+        ]),
+      ));
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: AppTheme.muted),
+          const SizedBox(width: 5),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+        ]),
+      );
+}
+
+class _CompletionChip extends StatelessWidget {
+  const _CompletionChip({
+    required this.completion,
+    required this.completedCount,
+    required this.totalCount,
+  });
+  final _TemplateCompletion completion;
+  final int completedCount;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (label, icon, color) = switch (completion) {
+      _TemplateCompletion.unassigned => (
+          '未分配',
+          Icons.inbox_outlined,
+          AppTheme.muted
+        ),
+      _TemplateCompletion.incomplete => (
+          '未完成',
+          Icons.radio_button_unchecked,
+          scheme.onSurfaceVariant
+        ),
+      _TemplateCompletion.partial => (
+          '已完成 $completedCount/$totalCount',
+          Icons.timelapse_outlined,
+          scheme.tertiary
+        ),
+      _TemplateCompletion.complete => (
+          '已完成',
+          Icons.check_circle_outline,
+          scheme.primary
+        ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(fontSize: 11, color: color)),
+      ]),
+    );
+  }
+}
+
+class _ExpiryChip extends StatelessWidget {
+  const _ExpiryChip({required this.expiry});
+  final TaskExpiryStatus expiry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final warningColor = Theme.of(context).brightness == Brightness.dark
+        ? AppTheme.warningDark
+        : AppTheme.warning;
+    final (label, icon, color) = expiry == TaskExpiryStatus.overdue
+        ? ('已逾期', Icons.error_outline, scheme.error)
+        : ('即将过期', Icons.schedule_outlined, warningColor);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(fontSize: 11, color: color)),
+      ]),
+    );
+  }
+}
+
+class _EmptyTasks extends StatelessWidget {
+  const _EmptyTasks();
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Text(
+          '没有符合搜索或筛选条件的任务',
+          style: const TextStyle(color: AppTheme.muted),
+        ),
+      );
+}
