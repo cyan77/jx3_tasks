@@ -130,7 +130,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     noteController = TextEditingController(text: task?.note ?? '');
     tagController = TextEditingController();
     taskTags = {...?task?.tags};
-    frequency = task?.frequency ?? TaskFrequency.daily;
+    frequency = task?.frequency ?? TaskFrequency.once;
     frequencyConfigured = task == null
         ? !widget.createInInbox
         : task.hasConfiguredFrequency;

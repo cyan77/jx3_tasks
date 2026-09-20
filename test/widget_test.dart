@@ -20,6 +20,42 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('new assigned tasks default to one-time frequency',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const [
+        Character(
+          id: 'character',
+          gameId: 'game',
+          account: '',
+          name: '角色',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = const [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showTaskEditor(context, state),
+            child: const Text('打开任务编辑器'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开任务编辑器'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('一次性'), findsOneWidget);
+    expect(find.text('每日'), findsNothing);
+    state.dispose();
+  });
+
   testWidgets('shared dropdown menus open below their full-width field',
       (tester) async {
     String selected = 'game-jx3';
