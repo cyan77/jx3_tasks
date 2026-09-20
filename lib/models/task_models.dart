@@ -1,0 +1,548 @@
+enum TaskFrequency { once, daily, weekly, monthly, weeklyCount, monthlyCount }
+
+extension TaskFrequencyLabel on TaskFrequency {
+  String get label => switch (this) {
+        TaskFrequency.once => '一次性',
+        TaskFrequency.daily => '每日',
+        TaskFrequency.weekly => '每周',
+        TaskFrequency.monthly => '每月',
+        TaskFrequency.weeklyCount => '每周目标次数',
+        TaskFrequency.monthlyCount => '每月目标次数',
+      };
+}
+
+enum MetadataFieldType {
+  text,
+  multiline,
+  number,
+  choice,
+  multiChoice,
+  boolean,
+  date,
+  time,
+  url,
+}
+
+extension MetadataFieldTypeLabel on MetadataFieldType {
+  String get label => switch (this) {
+        MetadataFieldType.text => '单行文本',
+        MetadataFieldType.multiline => '长文本',
+        MetadataFieldType.number => '数字',
+        MetadataFieldType.choice => '单选',
+        MetadataFieldType.multiChoice => '多选',
+        MetadataFieldType.boolean => '开关',
+        MetadataFieldType.date => '日期',
+        MetadataFieldType.time => '时间',
+        MetadataFieldType.url => '链接',
+      };
+}
+
+class GameMetadataField {
+  const GameMetadataField({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.options = const [],
+  });
+
+  final String id;
+  final String name;
+  final MetadataFieldType type;
+  final List<String> options;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'type': type.name,
+        'options': options,
+      };
+
+  factory GameMetadataField.fromJson(Map<String, dynamic> json) =>
+      GameMetadataField(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        type:
+            MetadataFieldType.values.byName(json['type'] as String? ?? 'text'),
+        options: List<String>.from(json['options'] as List? ?? const []),
+      );
+}
+
+const legacyOccupationMetadataField = GameMetadataField(
+  id: 'legacy-occupation',
+  name: '门派/心法',
+  type: MetadataFieldType.text,
+);
+
+class Game {
+  const Game({
+    required this.id,
+    required this.name,
+    this.color = 0xff2f7d72,
+    this.dailyResetMinutes = 0,
+    this.metadataFields = const [],
+  }) : assert(dailyResetMinutes >= 0 && dailyResetMinutes < 24 * 60);
+
+  final String id;
+  final String name;
+  final int color;
+  final int dailyResetMinutes;
+  final List<GameMetadataField> metadataFields;
+
+  Game copyWith({
+    String? name,
+    int? dailyResetMinutes,
+    List<GameMetadataField>? metadataFields,
+  }) =>
+      Game(
+        id: id,
+        name: name ?? this.name,
+        color: color,
+        dailyResetMinutes: dailyResetMinutes ?? this.dailyResetMinutes,
+        metadataFields: metadataFields ?? this.metadataFields,
+      );
+
+  DateTime taskDayAt(DateTime moment) => startOfDay(
+        moment.subtract(Duration(minutes: dailyResetMinutes)),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'color': color,
+        'dailyResetMinutes': dailyResetMinutes,
+        'metadataFields': metadataFields.map((item) => item.toJson()).toList(),
+      };
+
+  factory Game.fromJson(Map<String, dynamic> json) => Game(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        color: json['color'] as int? ?? 0xff2f7d72,
+        dailyResetMinutes: _readDailyResetMinutes(json['dailyResetMinutes']),
+        metadataFields: (json['metadataFields'] as List? ?? const [])
+            .map((item) => GameMetadataField.fromJson(
+                Map<String, dynamic>.from(item as Map)))
+            .toList(),
+      );
+}
+
+int _readDailyResetMinutes(Object? value) {
+  final minutes = value is int ? value : 0;
+  return minutes.clamp(0, 24 * 60 - 1).toInt();
+}
+
+class Character {
+  const Character({
+    required this.id,
+    required this.gameId,
+    required this.account,
+    required this.name,
+    required this.occupation,
+    required this.color,
+    this.archived = false,
+    this.metadataValues = const {},
+  });
+
+  final String id;
+  final String gameId;
+  final String account;
+  final String name;
+  final String occupation;
+  final int color;
+  final bool archived;
+  final Map<String, String> metadataValues;
+
+  String metadataSummary(Game game) => game.metadataFields
+      .map((field) {
+        final value = metadataValues[field.id]?.trim() ?? '';
+        if (value.isEmpty) return '';
+        final display = field.type == MetadataFieldType.boolean
+            ? (value == 'true' ? '是' : '否')
+            : field.type == MetadataFieldType.multiChoice
+                ? value.split('\\n').where((item) => item.isNotEmpty).join('、')
+                : value;
+        return '${field.name}：$display';
+      })
+      .where((value) => value.isNotEmpty)
+      .join(' · ');
+
+  Character copyWith({
+    String? gameId,
+    String? account,
+    String? name,
+    String? occupation,
+    bool? archived,
+    Map<String, String>? metadataValues,
+  }) =>
+      Character(
+        id: id,
+        gameId: gameId ?? this.gameId,
+        account: account ?? this.account,
+        name: name ?? this.name,
+        occupation: occupation ?? this.occupation,
+        color: color,
+        archived: archived ?? this.archived,
+        metadataValues: metadataValues ?? this.metadataValues,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'gameId': gameId,
+        'account': account,
+        'name': name,
+        'occupation': occupation,
+        'color': color,
+        'archived': archived,
+        'metadataValues': metadataValues,
+      };
+
+  factory Character.fromJson(Map<String, dynamic> json) => Character(
+        id: json['id'] as String,
+        gameId: json['gameId'] as String? ?? 'game-jx3',
+        account: json['account'] as String? ?? '',
+        name: json['name'] as String,
+        occupation: json['occupation'] as String? ?? '未分类',
+        color: json['color'] as int? ?? 0xff2f7d72,
+        archived: json['archived'] as bool? ?? false,
+        metadataValues: Map<String, String>.from(
+            json['metadataValues'] as Map? ?? const {}),
+      );
+}
+
+class TaskSubtask {
+  const TaskSubtask({
+    required this.id,
+    required this.title,
+    this.completedDates = const [],
+  });
+
+  final String id;
+  final String title;
+  final List<String> completedDates;
+
+  bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
+
+  int countInRange(DateTime start, DateTime end) => completedDates
+      .map(DateTime.tryParse)
+      .whereType<DateTime>()
+      .where((date) => !date.isBefore(start) && date.isBefore(end))
+      .length;
+
+  TaskSubtask copyWith({
+    String? title,
+    List<String>? completedDates,
+  }) =>
+      TaskSubtask(
+        id: id,
+        title: title ?? this.title,
+        completedDates: completedDates ?? this.completedDates,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'completedDates': completedDates,
+      };
+
+  factory TaskSubtask.fromJson(Map<String, dynamic> json) => TaskSubtask(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        completedDates:
+            List<String>.from(json['completedDates'] as List? ?? const []),
+      );
+}
+
+class TaskRecord {
+  const TaskRecord({
+    required this.id,
+    required this.templateId,
+    required this.title,
+    required this.characterId,
+    required this.frequency,
+    required this.createdAt,
+    this.startDate,
+    this.dueDate,
+    this.targetCount = 1,
+    this.targetQuantity,
+    this.quantityProgress = const {},
+    this.weeklyDays = const [],
+    this.completedDates = const [],
+    this.subtasks = const [],
+    this.tags = const [],
+    this.note = '',
+    this.inboxGameId,
+    this.inboxFrequencySet = false,
+    this.archived = false,
+  });
+
+  final String id;
+  final String templateId;
+  final String title;
+  final String characterId;
+  final TaskFrequency frequency;
+  final DateTime createdAt;
+  final DateTime? startDate;
+  final DateTime? dueDate;
+
+  /// Optional amount of the task's subject, independent from weekly/monthly
+  /// behavior counts. For example, collecting 200 ores.
+  final int? targetQuantity;
+  final Map<String, int> quantityProgress;
+  final int targetCount;
+  final List<int> weeklyDays;
+  final List<String> completedDates;
+  final List<TaskSubtask> subtasks;
+  final List<String> tags;
+  final String note;
+  final String? inboxGameId;
+  final bool inboxFrequencySet;
+  final bool archived;
+
+  bool get isInbox => characterId.isEmpty;
+  bool get hasConfiguredFrequency => !isInbox || inboxFrequencySet;
+
+  bool get isCountTask =>
+      frequency == TaskFrequency.weeklyCount ||
+      frequency == TaskFrequency.monthlyCount;
+
+  bool get hasQuantityTarget => targetQuantity != null && targetQuantity! > 0;
+
+  String quantityPeriodKey(DateTime date) {
+    if (frequency == TaskFrequency.once) return 'once';
+    return dateKey(taskPeriodStart(this, date));
+  }
+
+  int quantityCompletedOn(DateTime date) =>
+      quantityProgress[quantityPeriodKey(date)] ?? 0;
+
+  TaskRecord copyWith({
+    String? title,
+    TaskFrequency? frequency,
+    DateTime? startDate,
+    bool clearStartDate = false,
+    DateTime? dueDate,
+    bool clearDueDate = false,
+    int? targetCount,
+    int? targetQuantity,
+    bool clearTargetQuantity = false,
+    Map<String, int>? quantityProgress,
+    List<int>? weeklyDays,
+    List<String>? completedDates,
+    List<TaskSubtask>? subtasks,
+    List<String>? tags,
+    String? note,
+    String? inboxGameId,
+    bool? inboxFrequencySet,
+    bool? archived,
+  }) =>
+      TaskRecord(
+        id: id,
+        templateId: templateId,
+        title: title ?? this.title,
+        characterId: characterId,
+        frequency: frequency ?? this.frequency,
+        createdAt: createdAt,
+        startDate: clearStartDate ? null : startDate ?? this.startDate,
+        dueDate: clearDueDate ? null : dueDate ?? this.dueDate,
+        targetCount: targetCount ?? this.targetCount,
+        targetQuantity:
+            clearTargetQuantity ? null : targetQuantity ?? this.targetQuantity,
+        quantityProgress: quantityProgress ?? this.quantityProgress,
+        weeklyDays: weeklyDays ?? this.weeklyDays,
+        completedDates: completedDates ?? this.completedDates,
+        subtasks: subtasks ?? this.subtasks,
+        tags: tags ?? this.tags,
+        note: note ?? this.note,
+        inboxGameId: inboxGameId ?? this.inboxGameId,
+        inboxFrequencySet: inboxFrequencySet ?? this.inboxFrequencySet,
+        archived: archived ?? this.archived,
+      );
+
+  bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
+
+  bool isCompletedOn(DateTime date) => switch (frequency) {
+        TaskFrequency.once => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : completedDates.isNotEmpty,
+        TaskFrequency.daily => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : isDoneOn(date),
+        TaskFrequency.weekly => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(startOfWeek(date),
+                    startOfWeek(date).add(const Duration(days: 7))) >
+                0,
+        TaskFrequency.monthly => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(
+                    startOfMonth(date), DateTime(date.year, date.month + 1)) >
+                0,
+        TaskFrequency.weeklyCount => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(startOfWeek(date),
+                    startOfWeek(date).add(const Duration(days: 7))) >=
+                targetCount,
+        TaskFrequency.monthlyCount => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(
+                    startOfMonth(date), DateTime(date.year, date.month + 1)) >=
+                targetCount,
+      };
+
+  bool isVisibleOn(DateTime date) {
+    if (frequency != TaskFrequency.once) return true;
+    if (hasQuantityTarget) return !isCompletedOn(date);
+    return completedDates.isEmpty || isDoneOn(date);
+  }
+
+  bool isSubtaskCompletedOn(TaskSubtask subtask, DateTime date) =>
+      switch (frequency) {
+        TaskFrequency.once => subtask.completedDates.isNotEmpty,
+        TaskFrequency.daily => subtask.isDoneOn(date),
+        TaskFrequency.weekly ||
+        TaskFrequency.weeklyCount =>
+          subtask.countInRange(
+                startOfWeek(date),
+                startOfWeek(date).add(const Duration(days: 7)),
+              ) >
+              0,
+        TaskFrequency.monthly ||
+        TaskFrequency.monthlyCount =>
+          subtask.countInRange(
+                startOfMonth(date),
+                DateTime(date.year, date.month + 1),
+              ) >
+              0,
+      };
+
+  bool isScheduledOn(DateTime date, {int dailyResetMinutes = 0}) {
+    final day = startOfDay(date);
+    final startDay = startOfDay(
+        startDate ?? createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    if (day.isBefore(startDay)) return false;
+    return switch (frequency) {
+      TaskFrequency.once =>
+        dueDate != null && dateKey(dueDate!) == dateKey(day),
+      TaskFrequency.daily => true,
+      TaskFrequency.weekly => weeklyDays.isEmpty
+          ? day.weekday == (dueDate?.weekday ?? startDay.weekday)
+          : weeklyDays.contains(day.weekday),
+      TaskFrequency.monthly =>
+        day.day == _clampedMonthlyDay(day, startDay: startDay),
+      TaskFrequency.weeklyCount =>
+        weeklyDays.isEmpty || weeklyDays.contains(day.weekday),
+      TaskFrequency.monthlyCount => true,
+    };
+  }
+
+  bool hasStartedBy(DateTime date, {int dailyResetMinutes = 0}) {
+    final day = startOfDay(date);
+    final startDay = startOfDay(
+        startDate ?? createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    return !day.isBefore(startDay);
+  }
+
+  int _clampedMonthlyDay(DateTime month, {required DateTime startDay}) {
+    final anchorDay = dueDate?.day ?? startDay.day;
+    final lastDay = DateTime(month.year, month.month + 1, 0).day;
+    return anchorDay > lastDay ? lastDay : anchorDay;
+  }
+
+  int countInRange(DateTime start, DateTime end) => completedDates
+      .map(DateTime.tryParse)
+      .whereType<DateTime>()
+      .where((date) => !date.isBefore(start) && date.isBefore(end))
+      .length;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'templateId': templateId,
+        'title': title,
+        'characterId': characterId,
+        'frequency': frequency.name,
+        'createdAt': createdAt.toIso8601String(),
+        'startDate': startDate?.toIso8601String(),
+        'dueDate': dueDate?.toIso8601String(),
+        'targetQuantity': targetQuantity,
+        'quantityProgress': quantityProgress,
+        'targetCount': targetCount,
+        'weeklyDays': weeklyDays,
+        'completedDates': completedDates,
+        'subtasks': subtasks.map((item) => item.toJson()).toList(),
+        'tags': tags,
+        'note': note,
+        'inboxGameId': inboxGameId,
+        'inboxFrequencySet': inboxFrequencySet,
+        'archived': archived,
+      };
+
+  factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
+        id: json['id'] as String,
+        templateId: json['templateId'] as String? ?? json['id'] as String,
+        title: json['title'] as String,
+        characterId: json['characterId'] as String,
+        frequency:
+            TaskFrequency.values.byName(json['frequency'] as String? ?? 'once'),
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        startDate: json['startDate'] == null
+            ? null
+            : DateTime.parse(json['startDate'] as String),
+        dueDate: json['dueDate'] == null
+            ? null
+            : DateTime.parse(json['dueDate'] as String),
+        targetQuantity: json['targetQuantity'] as int?,
+        quantityProgress:
+            Map<String, int>.from(json['quantityProgress'] as Map? ?? const {}),
+        targetCount: json['targetCount'] as int? ?? 1,
+        weeklyDays: List<int>.from(json['weeklyDays'] as List? ?? const []),
+        completedDates:
+            List<String>.from(json['completedDates'] as List? ?? const []),
+        subtasks: (json['subtasks'] as List? ?? const [])
+            .map((item) =>
+                TaskSubtask.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList(),
+        tags: List<String>.from(json['tags'] as List? ?? const []),
+        note: json['note'] as String? ?? '',
+        inboxGameId: json['inboxGameId'] as String?,
+        inboxFrequencySet: json['inboxFrequencySet'] as bool? ?? false,
+        archived: json['archived'] as bool? ?? false,
+      );
+}
+
+String dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+List<String> normalizeTaskTags(
+  Iterable<String> selected, [
+  String input = '',
+]) {
+  final result =
+      selected.map((tag) => tag.trim()).where((tag) => tag.isNotEmpty).toSet();
+  result.addAll(input
+      .split(RegExp(r'[,，]'))
+      .map((tag) => tag.trim())
+      .where((tag) => tag.isNotEmpty));
+  return result.toList()..sort();
+}
+
+DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+DateTime startOfWeek(DateTime date) {
+  final dayOffset = date.weekday - DateTime.monday;
+  return startOfDay(date).subtract(Duration(days: dayOffset));
+}
+
+DateTime startOfMonth(DateTime date) => DateTime(date.year, date.month);
+
+String twoDigits(int value) => value.toString().padLeft(2, '0');
+
+DateTime taskPeriodStart(TaskRecord task, DateTime date) =>
+    task.frequency == TaskFrequency.monthly ||
+            task.frequency == TaskFrequency.monthlyCount
+        ? startOfMonth(date)
+        : startOfWeek(date);
+
+DateTime taskPeriodEnd(TaskRecord task, DateTime date) =>
+    task.frequency == TaskFrequency.monthly ||
+            task.frequency == TaskFrequency.monthlyCount
+        ? DateTime(date.year, date.month + 1)
+        : startOfWeek(date).add(const Duration(days: 7));
