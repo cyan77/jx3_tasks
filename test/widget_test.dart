@@ -11,6 +11,7 @@ import 'package:jx3_tasks/models/task_models.dart';
 import 'package:jx3_tasks/state/app_state.dart';
 import 'package:jx3_tasks/theme/app_theme.dart';
 import 'package:jx3_tasks/app.dart';
+import 'package:jx3_tasks/ui/task_editor.dart';
 import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
 import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
