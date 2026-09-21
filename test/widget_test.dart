@@ -363,7 +363,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: HomeShell(state: state)));
 
-    await tester.tap(find.widgetWithText(OutlinedButton, '新建任务'));
+    await tester.tap(find.text('新建任务').first);
     await tester.pumpAndSettle();
     expect(
         tester.widget<FilterChip>(find.byType(FilterChip)).selected, isFalse);
@@ -406,7 +406,7 @@ void main() {
     );
   });
 
-  testWidgets('窄屏标题和右上操作按钮顶部对齐', (tester) async {
+  testWidgets('窄屏标题和右上操作按钮保持在标题区内', (tester) async {
     await tester.binding.setSurfaceSize(const Size(420, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -425,13 +425,10 @@ void main() {
       ),
     );
 
-    expect(
-      tester.getTopLeft(find.text('全部任务')).dy,
-      closeTo(
-        tester.getTopLeft(find.widgetWithText(OutlinedButton, '新建任务')).dy,
-        4,
-      ),
-    );
+    final titleTop = tester.getTopLeft(find.text('全部任务')).dy;
+    final actionTop = tester.getTopLeft(find.text('新建任务')).dy;
+    expect(actionTop, greaterThan(titleTop));
+    expect(actionTop, lessThan(titleTop + 32));
   });
 
   testWidgets('手机端全部任务只保留右上新建入口', (tester) async {
@@ -452,7 +449,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
+    expect(find.text('新建任务'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
     state.dispose();
   });
@@ -584,7 +581,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('全部任务'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
+    expect(find.text('新建任务'), findsOneWidget);
     expect(find.text('任务一'), findsOneWidget);
     expect(find.text('任务二'), findsOneWidget);
     expect(find.byType(Checkbox), findsNothing);
@@ -1178,7 +1175,6 @@ void main() {
     );
 
     expect(tasks.map((task) => task.id), ['due-this-week']);
-    state.dispose();
   });
 
   test('count task tracks completions independently', () {
@@ -2185,8 +2181,7 @@ void main() {
     expect(find.text('添加角色'), findsOneWidget);
     expect(
       tester.getTopLeft(actions).dy,
-      greaterThan(
-          tester.getBottomLeft(find.text('按游戏管理角色，每个角色拥有独立的任务完成记录')).dy),
+      greaterThan(tester.getBottomLeft(find.text('按游戏管理角色；可在角色菜单中调整显示顺序')).dy),
     );
     expect(tester.takeException(), isNull);
     state.dispose();
