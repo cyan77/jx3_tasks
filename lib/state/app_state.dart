@@ -558,6 +558,32 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> setTaskCount(
+    TaskRecord task, {
+    required int value,
+    DateTime? date,
+  }) async {
+    if (!task.isCountTask) return;
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
+    final index = store.tasks.indexWhere((item) => item.id == task.id);
+    if (index < 0) return;
+    final currentTask = store.tasks[index];
+    if (!currentTask.isCountTask) return;
+    final periodStart = taskPeriodStart(currentTask, targetDate);
+    final periodEnd = taskPeriodEnd(currentTask, targetDate);
+    final current = currentTask.countInRange(periodStart, periodEnd);
+    final next = value.clamp(0, currentTask.targetCount).toInt();
+    if (next == current) return;
+
+    final completedDates = [...currentTask.completedDates];
+    _removeDatesInRange(completedDates, periodStart, periodEnd);
+    for (var offset = 0; offset < next; offset++) {
+      completedDates.add(dateKey(periodStart.add(Duration(days: offset))));
+    }
+    store.tasks[index] = currentTask.copyWith(completedDates: completedDates);
+    await _saveDataChange();
+  }
+
   Future<void> setTaskCompleted(
     TaskRecord task, {
     required bool completed,
