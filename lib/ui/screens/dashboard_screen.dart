@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
@@ -692,6 +693,11 @@ class _TaskList extends StatelessWidget {
                                   delta: 1,
                                   date: date,
                                 ),
+                        onSetValue: (value) => state.setTaskQuantity(
+                          task,
+                          value: value,
+                          date: date,
+                        ),
                       )
                     : TaskCheck(
                         checked: checked, onTap: () => state.toggleTask(task)),
@@ -936,26 +942,35 @@ class _QuantityStepper extends StatelessWidget {
     required this.target,
     required this.onDecrement,
     required this.onIncrement,
+    this.onSetValue,
   });
 
   final int value;
   final int target;
   final VoidCallback? onDecrement;
   final VoidCallback? onIncrement;
+  final ValueChanged<int>? onSetValue;
 
   @override
   Widget build(BuildContext context) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           RepeatingIconButton(
-            tooltip: '减少 1',
+            tooltip: '减少 1，长按可连续减少',
             onPressed: onDecrement,
             icon: Icons.remove_circle_outline,
             size: 18,
           ),
-          Text('$value/$target',
-              style:
-                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: onSetValue == null ? null : () => _editValue(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+              child: Text('$value/$target',
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600)),
+            ),
+          ),
           RepeatingIconButton(
             tooltip: '记录 1 个，长按可连续增加',
             onPressed: onIncrement,
@@ -964,6 +979,42 @@ class _QuantityStepper extends StatelessWidget {
           ),
         ],
       );
+
+  Future<void> _editValue(BuildContext context) async {
+    final controller = TextEditingController(text: '$value');
+    final nextValue = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('编辑当前数量'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(labelText: '当前数量（0-$target）'),
+          onSubmitted: (text) {
+            final parsed = int.tryParse(text.trim());
+            if (parsed != null) Navigator.pop(dialogContext, parsed);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text.trim());
+              if (parsed != null) Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (nextValue != null) onSetValue?.call(nextValue);
+  }
 }
 
 int _compareTasks(TaskRecord a, TaskRecord b, DateTime taskDate) {

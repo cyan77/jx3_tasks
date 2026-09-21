@@ -514,10 +514,27 @@ class AppState extends ChangeNotifier {
     // started the gesture.
     final currentTask = store.tasks[index];
     if (!currentTask.hasQuantityTarget) return;
-    final periodKey = currentTask.quantityPeriodKey(targetDate);
     final current = currentTask.quantityCompletedOn(targetDate);
     final next =
         (current + delta).clamp(0, currentTask.targetQuantity!).toInt();
+    if (next == current) return;
+    await setTaskQuantity(task, value: next, date: targetDate);
+  }
+
+  Future<void> setTaskQuantity(
+    TaskRecord task, {
+    required int value,
+    DateTime? date,
+  }) async {
+    if (!task.hasQuantityTarget) return;
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
+    final index = store.tasks.indexWhere((item) => item.id == task.id);
+    if (index < 0) return;
+    final currentTask = store.tasks[index];
+    if (!currentTask.hasQuantityTarget) return;
+    final periodKey = currentTask.quantityPeriodKey(targetDate);
+    final current = currentTask.quantityCompletedOn(targetDate);
+    final next = value.clamp(0, currentTask.targetQuantity!).toInt();
     if (next == current) return;
     final progress = {...currentTask.quantityProgress};
     if (next == 0) {
