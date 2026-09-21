@@ -195,12 +195,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: ${{ github.ref_name }} 数量目标与直接编辑
+          name: ${{ github.ref_name }}
           files: release-assets/*
+          generate_release_notes: true
           body: |
-            ${{ github.ref_name }} 数量目标与直接编辑
-
-            - 支持一次性、每周、每月等通用数量目标
-            - 数量目标与周期行为次数独立统计
-            - 数量和行为次数的当前进度支持直接编辑
-            - 加减按钮支持长按连续调整
+            本版本更新日志由 GitHub 根据版本标签之间的实际提交自动生成。
