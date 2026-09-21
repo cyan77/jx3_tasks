@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.5.4 build 15 — dashboard completion visibility
+# Release builds are published under the version tag that triggered them.
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.4]')
+    if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - build-windows
       - build-android
@@ -178,13 +178,13 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove existing v0.5.4 assets
+      - name: Remove existing release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset_ids="$(
             gh api repos/${{ github.repository }}/releases --paginate \
-              --jq '.[] | select(.tag_name == "v0.5.4") | .assets[].id'
+              --jq '.[] | select(.tag_name == "${{ github.ref_name }}") | .assets[].id'
           )"
           for asset_id in $asset_ids; do
             gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
@@ -193,15 +193,14 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.4
+          tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: v0.5.4 首页完成体验优化
+          name: ${{ github.ref_name }} 数量目标与直接编辑
           files: release-assets/*
           body: |
-            v0.5.4 首页完成体验优化
+            ${{ github.ref_name }} 数量目标与直接编辑
 
-            - 角色完成当天全部任务后继续保留在首页
-            - 待办归零后角色卡显示“今日已完成”，避免最后一项勾选后突然消失
-            - 进入下一个任务日后，无新待办的角色才会自动隐藏
-            - 每日等周期任务刷新后，角色会按新的待办状态继续显示
-            - 首页游戏概览仍只统计未完成任务及相关角色
+            - 支持一次性、每周、每月等通用数量目标
+            - 数量目标与周期行为次数独立统计
+            - 数量和行为次数的当前进度支持直接编辑
+            - 加减按钮支持长按连续调整
