@@ -509,26 +509,32 @@ class AppState extends ChangeNotifier {
     final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
     final index = store.tasks.indexWhere((item) => item.id == task.id);
     if (index < 0) return;
-    final periodKey = task.quantityPeriodKey(targetDate);
-    final current = task.quantityCompletedOn(targetDate);
-    final next = (current + delta).clamp(0, task.targetQuantity!).toInt();
+    // Read the latest record from the store. This matters for press-and-hold
+    // repeat actions, whose callback can outlive the widget snapshot that
+    // started the gesture.
+    final currentTask = store.tasks[index];
+    if (!currentTask.hasQuantityTarget) return;
+    final periodKey = currentTask.quantityPeriodKey(targetDate);
+    final current = currentTask.quantityCompletedOn(targetDate);
+    final next =
+        (current + delta).clamp(0, currentTask.targetQuantity!).toInt();
     if (next == current) return;
-    final progress = {...task.quantityProgress};
+    final progress = {...currentTask.quantityProgress};
     if (next == 0) {
       progress.remove(periodKey);
     } else {
       progress[periodKey] = next;
     }
-    final completedDates = [...task.completedDates];
+    final completedDates = [...currentTask.completedDates];
     final key = dateKey(targetDate);
     if (next > 0) {
       if (!completedDates.contains(key)) completedDates.add(key);
-    } else if (task.frequency == TaskFrequency.once) {
+    } else if (currentTask.frequency == TaskFrequency.once) {
       completedDates.clear();
     } else {
       completedDates.remove(key);
     }
-    store.tasks[index] = task.copyWith(
+    store.tasks[index] = currentTask.copyWith(
       quantityProgress: progress,
       completedDates: completedDates,
     );

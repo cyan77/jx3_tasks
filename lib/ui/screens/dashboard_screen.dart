@@ -947,22 +947,20 @@ class _QuantityStepper extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
+          RepeatingIconButton(
             tooltip: '减少 1',
             onPressed: onDecrement,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 32),
-            icon: const Icon(Icons.remove_circle_outline, size: 18),
+            icon: Icons.remove_circle_outline,
+            size: 18,
           ),
           Text('$value/$target',
               style:
                   const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-          IconButton(
-            tooltip: '记录 1 个',
+          RepeatingIconButton(
+            tooltip: '记录 1 个，长按可连续增加',
             onPressed: onIncrement,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 32),
-            icon: const Icon(Icons.add_circle_outline, size: 18),
+            icon: Icons.add_circle_outline,
+            size: 18,
           ),
         ],
       );
