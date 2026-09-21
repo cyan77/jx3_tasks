@@ -1197,9 +1197,21 @@ void main() {
 
     await state.adjustTaskQuantity(task, date: DateTime(2026, 9, 20), delta: 2);
     expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
+    await state.setTaskQuantity(
+      task,
+      value: 1,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 1);
     expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isFalse);
     await state.toggleTask(store.tasks.single, date: DateTime(2026, 9, 20));
-    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 3);
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
+    expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isFalse);
+    await state.setTaskQuantity(
+      store.tasks.single,
+      value: 3,
+      date: DateTime(2026, 9, 20),
+    );
     expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isTrue);
     await state.toggleTask(store.tasks.single, date: DateTime(2026, 9, 20));
     expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
