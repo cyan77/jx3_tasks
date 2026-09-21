@@ -752,6 +752,14 @@ void main() {
     expect(firstFilter.position, PopupMenuPosition.under);
     expect(firstFilter.offset.dy, greaterThan(0));
     expect(firstFilter.elevation, 0);
+    expect(firstFilter.constraints?.maxHeight, greaterThan(0));
+    expect(firstFilter.constraints?.maxHeight, lessThanOrEqualTo(420));
+    for (final control in filterControls.skip(1)) {
+      final filter = tester.widget<PopupMenuButton<dynamic>>(control);
+      expect(filter.position, PopupMenuPosition.under);
+      expect(filter.constraints?.maxHeight, greaterThan(0));
+      expect(filter.constraints?.maxHeight, lessThanOrEqualTo(420));
+    }
     final filterContainers = [
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
       find.byKey(const ValueKey('task-filter-按角色筛选')),

@@ -965,6 +965,8 @@ class _FilterDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
+    final maxMenuHeight =
+        (MediaQuery.sizeOf(context).height * 0.55).clamp(240.0, 420.0);
     Widget selectedChild =
         selectedLabel == null ? const SizedBox.shrink() : Text(selectedLabel!);
     if (selectedLabel == null) {
@@ -992,6 +994,7 @@ class _FilterDropdown<T> extends StatelessWidget {
           position: PopupMenuPosition.under,
           offset: const Offset(0, 6),
           elevation: 0,
+          constraints: BoxConstraints(maxHeight: maxMenuHeight),
           menuPadding: const EdgeInsets.symmetric(vertical: 4),
           color: fill,
           shape: RoundedRectangleBorder(
