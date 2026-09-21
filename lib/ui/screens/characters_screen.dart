@@ -410,10 +410,12 @@ class _CharacterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = state.store.tasks
-        .where((task) => task.characterId == character.id)
-        .toList();
     final week = startOfWeek(game.taskDayAt(DateTime.now()));
+    final tasks = state.scheduledTasksInRange(
+      state.store.tasks.where((task) => task.characterId == character.id),
+      week,
+      week.add(const Duration(days: 7)),
+    );
     final progress =
         state.progressFor(tasks, week, week.add(const Duration(days: 7)));
 

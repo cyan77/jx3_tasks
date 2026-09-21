@@ -87,6 +87,25 @@ class AppState extends ChangeNotifier {
         date,
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
       );
+
+  List<TaskRecord> scheduledTasksInRange(
+    Iterable<TaskRecord> source,
+    DateTime start,
+    DateTime end,
+  ) {
+    final rangeStart = startOfDay(start);
+    final rangeEnd = startOfDay(end);
+    return source.where((task) {
+      if (task.archived) return false;
+      for (var date = rangeStart;
+          date.isBefore(rangeEnd);
+          date = date.add(const Duration(days: 1))) {
+        if (isTaskScheduledOn(task, date)) return true;
+      }
+      return false;
+    }).toList();
+  }
+
   bool hasTaskStartedBy(TaskRecord task, DateTime date) => task.hasStartedBy(
         date,
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,

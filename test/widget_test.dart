@@ -1126,6 +1126,61 @@ void main() {
     expect(restored.isScheduledOn(DateTime(2026, 9, 20)), isTrue);
   });
 
+  test('character summaries only include tasks scheduled in the current week',
+      () {
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'due-last-week',
+          templateId: 'due-last-week',
+          title: '截止上周',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 20),
+        ),
+        TaskRecord(
+          id: 'due-this-week',
+          templateId: 'due-this-week',
+          title: '截止本周',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 21),
+        ),
+        TaskRecord(
+          id: 'monthly-later',
+          templateId: 'monthly-later',
+          title: '本月稍后',
+          characterId: 'char-1',
+          frequency: TaskFrequency.monthly,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 30),
+        ),
+      ];
+    final state = AppState(store);
+
+    final tasks = state.scheduledTasksInRange(
+      store.tasks,
+      DateTime(2026, 9, 21),
+      DateTime(2026, 9, 28),
+    );
+
+    expect(tasks.map((task) => task.id), ['due-this-week']);
+    state.dispose();
+  });
+
   test('count task tracks completions independently', () {
     final task = TaskRecord(
       id: '1',
