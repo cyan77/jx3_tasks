@@ -21,6 +21,30 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('repeating icon button accelerates while held', (tester) async {
+    var count = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RepeatingIconButton(
+          icon: Icons.add,
+          tooltip: '增加',
+          onPressed: () => count++,
+        ),
+      ),
+    ));
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(RepeatingIconButton)),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    final countAfterLongPress = count;
+    await tester.pump(const Duration(milliseconds: 500));
+    await gesture.up();
+
+    expect(countAfterLongPress, greaterThanOrEqualTo(1));
+    expect(count, greaterThan(countAfterLongPress));
+  });
+
   testWidgets('new assigned tasks default to one-time frequency',
       (tester) async {
     SharedPreferences.setMockInitialValues({});

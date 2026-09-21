@@ -456,19 +456,21 @@ class _TaskEditorState extends State<_TaskEditor> {
                             const Text('周期行为次数',
                                 style: TextStyle(fontSize: 13)),
                             const SizedBox(width: 16),
-                            IconButton(
-                                onPressed: targetCount > 1
-                                    ? () => setState(() => targetCount--)
-                                    : null,
-                                icon: const Icon(Icons.remove_circle_outline,
-                                    size: 19)),
+                            RepeatingIconButton(
+                              tooltip: '减少周期行为次数，长按可连续减少',
+                              onPressed: targetCount > 1
+                                  ? () => setState(() => targetCount--)
+                                  : null,
+                              icon: Icons.remove_circle_outline,
+                            ),
                             Text('$targetCount',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700)),
-                            IconButton(
-                                onPressed: () => setState(() => targetCount++),
-                                icon: const Icon(Icons.add_circle_outline,
-                                    size: 19))
+                            RepeatingIconButton(
+                              tooltip: '增加周期行为次数，长按可连续增加',
+                              onPressed: () => setState(() => targetCount++),
+                              icon: Icons.add_circle_outline,
+                            )
                           ]),
                         ],
                         const SizedBox(height: 12),
