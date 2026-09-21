@@ -1356,6 +1356,39 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  Future<void> moveCharacter(
+    Character character, {
+    required int offset,
+  }) async {
+    if (offset == 0) return;
+    final characterIndexes = <int>[];
+    for (var index = 0; index < store.characters.length; index++) {
+      final item = store.characters[index];
+      if (item.gameId == character.gameId && !item.archived) {
+        characterIndexes.add(index);
+      }
+    }
+    final currentPosition = characterIndexes.indexWhere(
+      (index) => store.characters[index].id == character.id,
+    );
+    if (currentPosition < 0) return;
+    final targetPosition = currentPosition + offset;
+    if (targetPosition < 0 || targetPosition >= characterIndexes.length) {
+      return;
+    }
+
+    final orderedCharacters = [
+      for (final index in characterIndexes) store.characters[index],
+    ];
+    final moved = orderedCharacters.removeAt(currentPosition);
+    orderedCharacters.insert(targetPosition, moved);
+    store.characters = [...store.characters];
+    for (var index = 0; index < characterIndexes.length; index++) {
+      store.characters[characterIndexes[index]] = orderedCharacters[index];
+    }
+    await _saveDataChange();
+  }
+
   Future<void> deleteCharacter(Character character) async {
     store.characters.removeWhere((item) => item.id == character.id);
     store.tasks.removeWhere((task) => task.characterId == character.id);

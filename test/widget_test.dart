@@ -1363,6 +1363,47 @@ void main() {
     expect(state.selectedCharacter?.name, '崩铁角色');
   });
 
+  test('characters can be reordered within the same game', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff66a892,
+        ),
+        Character(
+          id: 'char-3',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色三',
+          occupation: '',
+          color: 0xff7fae9e,
+        ),
+      ];
+    final state = AppState(store);
+
+    await state.moveCharacter(store.characters[1], offset: -1);
+    expect(store.characters.map((character) => character.id),
+        ['char-2', 'char-1', 'char-3']);
+    await state.moveCharacter(store.characters[1], offset: 1);
+    expect(store.characters.map((character) => character.id),
+        ['char-2', 'char-3', 'char-1']);
+    state.dispose();
+  });
+
   test('editing a shared task updates fields and preserves completion',
       () async {
     SharedPreferences.setMockInitialValues({});
