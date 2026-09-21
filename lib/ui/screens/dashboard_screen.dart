@@ -713,17 +713,43 @@ class _TaskList extends StatelessWidget {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                        task.hasQuantityTarget
-                            ? '$count / ${task.targetQuantity} 数量 · ${task.frequency.label}'
-                            : task.isCountTask
-                                ? '$count / ${task.targetCount} 行为次数 · ${task.frequency.label}'
-                                : _taskMeta(task, date),
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: expiringSoon || overdue
-                                ? alertColor
-                                : AppTheme.muted)),
+                    task.hasQuantityTarget
+                        ? Text(
+                            '$count / ${task.targetQuantity} 数量 · ${task.frequency.label}',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: expiringSoon || overdue
+                                    ? alertColor
+                                    : AppTheme.muted))
+                        : task.isCountTask
+                            ? InkWell(
+                                borderRadius: BorderRadius.circular(4),
+                                onTap: () => _editTaskCount(
+                                  context,
+                                  state,
+                                  task,
+                                  count,
+                                  date,
+                                ),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 2),
+                                  child: Text(
+                                    '$count / ${task.targetCount} 行为次数 · ${task.frequency.label}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: expiringSoon || overdue
+                                            ? alertColor
+                                            : AppTheme.muted),
+                                  ),
+                                ),
+                              )
+                            : Text(_taskMeta(task, date),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: expiringSoon || overdue
+                                        ? alertColor
+                                        : AppTheme.muted)),
                     if (task.tags.isNotEmpty) ...[
                       const SizedBox(height: 5),
                       TaskTags(tags: task.tags, compact: true),
@@ -933,6 +959,50 @@ class _TaskList extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editTaskCount(
+    BuildContext context,
+    AppState state,
+    TaskRecord task,
+    int value,
+    DateTime date,
+  ) async {
+    final controller = TextEditingController(text: '$value');
+    final nextValue = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('编辑当前行为次数'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(labelText: '当前次数（0-${task.targetCount}）'),
+          onSubmitted: (text) {
+            final parsed = int.tryParse(text.trim());
+            if (parsed != null) Navigator.pop(dialogContext, parsed);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text.trim());
+              if (parsed != null) Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (nextValue != null) {
+      await state.setTaskCount(task, value: nextValue, date: date);
+    }
   }
 }
 

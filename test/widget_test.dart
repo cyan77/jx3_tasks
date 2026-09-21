@@ -1218,6 +1218,45 @@ void main() {
     state.dispose();
   });
 
+  test('behavior count can be edited directly within its period', () async {
+    SharedPreferences.setMockInitialValues({});
+    final task = TaskRecord(
+      id: 'count-state',
+      templateId: 'count-state',
+      title: '大战',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weeklyCount,
+      targetCount: 4,
+      createdAt: DateTime(2026, 9, 1),
+    );
+    final store = LocalStore()..tasks = [task];
+    final state = AppState(store);
+
+    await state.setTaskCount(
+      task,
+      value: 3,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(
+        store.tasks.single.countInRange(
+          DateTime(2026, 9, 14),
+          DateTime(2026, 9, 21),
+        ),
+        3);
+    await state.setTaskCount(
+      store.tasks.single,
+      value: 1,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(
+        store.tasks.single.countInRange(
+          DateTime(2026, 9, 14),
+          DateTime(2026, 9, 21),
+        ),
+        1);
+    state.dispose();
+  });
+
   test('once task remains completed after its completion date', () async {
     SharedPreferences.setMockInitialValues({});
     final yesterday = DateTime(2026, 9, 12);
