@@ -1,0 +1,207 @@
+name: Release desktop and mobile clients
+# Release v0.5.4 build 15 — dashboard completion visibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.4"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build Windows client
+        run: flutter build windows --release
+
+      # Actions artifacts are ZIP downloads already. Upload the directory itself
+      # so trial builds only need to be extracted once.
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 角色日程-Windows-x64
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error
+
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.4"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure fixed Android release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_STORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/jx3_tasks-release.jks
+          printf 'storeFile=jx3_tasks-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$ANDROID_STORE_PASSWORD" \
+            "$ANDROID_KEY_ALIAS" \
+            "$ANDROID_KEY_PASSWORD" > android/key.properties
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Rename Android APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk 角色日程-Android.apk
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 角色日程-Android
+          path: 角色日程-Android.apk
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.4"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS client
+        run: flutter build macos --release
+
+      - name: Package macOS client as DMG
+        run: |
+          mv build/macos/Build/Products/Release/jx3_tasks.app \
+            build/macos/Build/Products/Release/角色日程.app
+          hdiutil create \
+            -volname "角色日程" \
+            -srcfolder build/macos/Build/Products/Release/角色日程.app \
+            -ov \
+            -format UDZO \
+            角色日程-macOS.dmg
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 角色日程-macOS
+          path: 角色日程-macOS.dmg
+          if-no-files-found: error
+
+  publish-release:
+    # Branch pushes are trial builds. Only an explicit version tag may publish.
+    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.4]')
+    needs:
+      - build-windows
+      - build-android
+      - build-macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows files
+        uses: actions/download-artifact@v4
+        with:
+          name: 角色日程-Windows-x64
+          path: release-input/windows
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: 角色日程-Android
+          path: release-input/android
+
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: 角色日程-macOS
+          path: release-input/macos
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          (
+            cd release-input/windows
+            zip -r ../../release-assets/RoleSchedule-Windows-x64.zip .
+          )
+          cp release-input/android/角色日程-Android.apk release-assets/RoleSchedule-Android.apk
+          cp release-input/macos/角色日程-macOS.dmg release-assets/RoleSchedule-macOS.dmg
+
+      # GitHub strips non-ASCII characters from the actual release asset name.
+      # Remove the superseded assets before re-uploading stable ASCII filenames.
+      - name: Remove existing v0.5.4 assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset_ids="$(
+            gh api repos/${{ github.repository }}/releases --paginate \
+              --jq '.[] | select(.tag_name == "v0.5.4") | .assets[].id'
+          )"
+          for asset_id in $asset_ids; do
+            gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
+          done
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.5.4
+          target_commitish: ${{ github.sha }}
+          name: v0.5.4 首页完成体验优化
+          files: release-assets/*
+          body: |
+            v0.5.4 首页完成体验优化
+
+            - 角色完成当天全部任务后继续保留在首页
+            - 待办归零后角色卡显示“今日已完成”，避免最后一项勾选后突然消失
+            - 进入下一个任务日后，无新待办的角色才会自动隐藏
+            - 每日等周期任务刷新后，角色会按新的待办状态继续显示
+            - 首页游戏概览仍只统计未完成任务及相关角色
