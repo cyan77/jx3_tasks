@@ -318,6 +318,60 @@ void main() {
     expect(webDav.listCount, checksAfterDispose);
   });
 
+  test('sync checks the latest remote backup immediately before uploading',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.reloadSyncSettings();
+    final checksBeforeUpload = webDav.listCount;
+    final synced = await state.syncNow(silent: true);
+
+    expect(synced, isTrue);
+    expect(webDav.listCount, greaterThan(checksBeforeUpload));
+    expect(webDav.uploadCount, 1);
+    state.dispose();
+  });
+
+  test('sync refuses to upload when another device has a newer backup',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.reloadSyncSettings();
+    webDav.remoteBackups = const [
+      RemoteBackup(
+        name: 'backup_20990101_000000000000000_other.json',
+        path: '/other.json',
+      ),
+    ];
+
+    final synced = await state.syncNow(silent: true);
+
+    expect(synced, isFalse);
+    expect(webDav.uploadCount, 0);
+    expect(state.newerRemoteBackup?.path, '/other.json');
+    state.dispose();
+  });
+
   testWidgets('system back returns a secondary tab to the todo home',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -2496,6 +2550,7 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   int downloadCount = 0;
   int uploadCount = 0;
   int listCount = 0;
+  List<RemoteBackup> remoteBackups = const [];
 
   @override
   Future<String> downloadBackup(
@@ -2515,6 +2570,6 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   @override
   Future<List<RemoteBackup>> listBackups(SyncConfig config) async {
     listCount++;
-    return const [];
+    return remoteBackups;
   }
 }

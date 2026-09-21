@@ -354,6 +354,21 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final remoteCheckSucceeded = await checkForNewerBackup(silent: silent);
+    if (!remoteCheckSucceeded) {
+      if (!silent) {
+        syncMessage = '同步前检查云端失败，未上传本地数据';
+        notifyListeners();
+      }
+      return false;
+    }
+    if (_newerRemoteBackup != null) {
+      if (!silent) {
+        syncMessage = '发现更新的云端备份，请先处理后再上传';
+        notifyListeners();
+      }
+      return false;
+    }
     syncBusy = true;
     final revisionAtStart = _dataRevision;
     _syncCompleter = Completer<void>();
