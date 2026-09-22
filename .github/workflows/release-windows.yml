@@ -1,5 +1,5 @@
 name: Release desktop and mobile clients
-# Release v0.5.4 build 15 — dashboard completion visibility
+# Release builds are published under the version tag that triggered them.
 
 on:
   workflow_dispatch:
@@ -140,7 +140,7 @@ jobs:
 
   publish-release:
     # Branch pushes are trial builds. Only an explicit version tag may publish.
-    if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release v0.5.4]')
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-test')
     needs:
       - build-windows
       - build-android
@@ -178,13 +178,13 @@ jobs:
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
-      - name: Remove existing v0.5.4 assets
+      - name: Remove existing release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset_ids="$(
             gh api repos/${{ github.repository }}/releases --paginate \
-              --jq '.[] | select(.tag_name == "v0.5.4") | .assets[].id'
+              --jq '.[] | select(.tag_name == "${{ github.ref_name }}") | .assets[].id'
           )"
           for asset_id in $asset_ids; do
             gh api --method DELETE "repos/${{ github.repository }}/releases/assets/$asset_id"
@@ -193,15 +193,10 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.4
+          tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: v0.5.4 首页完成体验优化
+          name: ${{ github.ref_name }}
           files: release-assets/*
+          generate_release_notes: true
           body: |
-            v0.5.4 首页完成体验优化
-
-            - 角色完成当天全部任务后继续保留在首页
-            - 待办归零后角色卡显示“今日已完成”，避免最后一项勾选后突然消失
-            - 进入下一个任务日后，无新待办的角色才会自动隐藏
-            - 每日等周期任务刷新后，角色会按新的待办状态继续显示
-            - 首页游戏概览仍只统计未完成任务及相关角色
+            本版本更新日志由 GitHub 根据版本标签之间的实际提交自动生成。

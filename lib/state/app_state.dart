@@ -60,6 +60,7 @@ class AppState extends ChangeNotifier {
     final now = DateTime.now();
     return selectedGame?.taskDayAt(now) ?? startOfDay(now);
   }
+
   bool get isSyncConfigured => _syncConfig?.isValid ?? false;
   SyncConfig? get syncConfig => _syncConfig;
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -86,6 +87,25 @@ class AppState extends ChangeNotifier {
         date,
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
       );
+
+  List<TaskRecord> scheduledTasksInRange(
+    Iterable<TaskRecord> source,
+    DateTime start,
+    DateTime end,
+  ) {
+    final rangeStart = startOfDay(start);
+    final rangeEnd = startOfDay(end);
+    return source.where((task) {
+      if (task.archived) return false;
+      for (var date = rangeStart;
+          date.isBefore(rangeEnd);
+          date = date.add(const Duration(days: 1))) {
+        if (isTaskScheduledOn(task, date)) return true;
+      }
+      return false;
+    }).toList();
+  }
+
   bool hasTaskStartedBy(TaskRecord task, DateTime date) => task.hasStartedBy(
         date,
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
@@ -96,15 +116,13 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> get tasks {
     final characterIds = characters.map((item) => item.id).toSet();
     return store.tasks
-        .where((task) =>
-            !task.archived && characterIds.contains(task.characterId))
+        .where(
+            (task) => !task.archived && characterIds.contains(task.characterId))
         .toList();
   }
-  List<TaskRecord> get inboxTasks => store.tasks
-      .where((task) =>
-          !task.archived &&
-          task.isInbox)
-      .toList();
+
+  List<TaskRecord> get inboxTasks =>
+      store.tasks.where((task) => !task.archived && task.isInbox).toList();
 
   List<TaskRecord> get allTasksForSelectedGame {
     final characterIds = store.characters
@@ -112,9 +130,11 @@ class AppState extends ChangeNotifier {
         .map((character) => character.id)
         .toSet();
     return store.tasks
-        .where((task) => !task.archived && (task.isInbox
-            ? task.inboxGameId == selectedGameId
-            : characterIds.contains(task.characterId)))
+        .where((task) =>
+            !task.archived &&
+            (task.isInbox
+                ? task.inboxGameId == selectedGameId
+                : characterIds.contains(task.characterId)))
         .toList();
   }
 
@@ -165,11 +185,9 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> tasksForCharacter(String characterId) =>
       tasks.where((task) => task.characterId == characterId).toList();
 
-  List<TaskRecord> tasksForTemplate(String templateId) =>
-      store.tasks
-          .where((task) =>
-              !task.isInbox && task.templateId == templateId)
-          .toList();
+  List<TaskRecord> tasksForTemplate(String templateId) => store.tasks
+      .where((task) => !task.isInbox && task.templateId == templateId)
+      .toList();
 
   List<TaskRecord> get selectedTasks => selectedCharacterId == null
       ? const []
@@ -183,8 +201,8 @@ class AppState extends ChangeNotifier {
         .map((character) => character.id)
         .toSet();
     return store.tasks
-        .where((task) =>
-            !task.archived && characterIds.contains(task.characterId))
+        .where(
+            (task) => !task.archived && characterIds.contains(task.characterId))
         .toList();
   }
 
@@ -193,8 +211,7 @@ class AppState extends ChangeNotifier {
   Future<void> _initializeSync() async {
     _syncConfig = await syncSettingsStore.load();
     _lastSyncAt = await syncSettingsStore.loadLastSyncAt();
-    _currentRemoteBackupPath =
-        await syncSettingsStore.loadCurrentBackupPath();
+    _currentRemoteBackupPath = await syncSettingsStore.loadCurrentBackupPath();
     _scheduleAutoSync();
     _scheduleRemoteBackupChecks();
     _scheduleChangeSync();
@@ -273,8 +290,7 @@ class AppState extends ChangeNotifier {
       final minute = game.dailyResetMinutes % 60;
       var candidate = DateTime(now.year, now.month, now.day, hour, minute);
       if (!candidate.isAfter(now)) {
-        candidate =
-            DateTime(now.year, now.month, now.day + 1, hour, minute);
+        candidate = DateTime(now.year, now.month, now.day + 1, hour, minute);
       }
       if (nextReset == null || candidate.isBefore(nextReset)) {
         nextReset = candidate;
@@ -336,6 +352,21 @@ class AppState extends ChangeNotifier {
     if (!config.isValid) {
       syncMessage = '尚未配置 WebDAV';
       notifyListeners();
+      return false;
+    }
+    final remoteCheckSucceeded = await checkForNewerBackup(silent: silent);
+    if (!remoteCheckSucceeded) {
+      if (!silent) {
+        syncMessage = '同步前检查云端失败，未上传本地数据';
+        notifyListeners();
+      }
+      return false;
+    }
+    if (_newerRemoteBackup != null) {
+      if (!silent) {
+        syncMessage = '发现更新的云端备份，请先处理后再上传';
+        notifyListeners();
+      }
       return false;
     }
     syncBusy = true;
@@ -466,6 +497,15 @@ class AppState extends ChangeNotifier {
     final key = dateKey(targetDate);
     final index = store.tasks.indexWhere((item) => item.id == task.id);
     if (index < 0) return;
+    if (task.hasQuantityTarget) {
+      final current = task.quantityCompletedOn(targetDate);
+      await adjustTaskQuantity(
+        task,
+        delta: current >= task.targetQuantity! ? -1 : 1,
+        date: targetDate,
+      );
+      return;
+    }
     final completed = [...task.completedDates];
     if (task.frequency == TaskFrequency.once) {
       if (completed.isEmpty) {
@@ -492,6 +532,92 @@ class AppState extends ChangeNotifier {
     await _saveDataChange();
   }
 
+  /// Records one unit of a quantity-target task. Quantity targets are kept
+  /// separately from behavior counts such as "4 times per week".
+  Future<void> adjustTaskQuantity(
+    TaskRecord task, {
+    required int delta,
+    DateTime? date,
+  }) async {
+    if (!task.hasQuantityTarget || delta == 0) return;
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
+    final index = store.tasks.indexWhere((item) => item.id == task.id);
+    if (index < 0) return;
+    // Read the latest record from the store. This matters for press-and-hold
+    // repeat actions, whose callback can outlive the widget snapshot that
+    // started the gesture.
+    final currentTask = store.tasks[index];
+    if (!currentTask.hasQuantityTarget) return;
+    final current = currentTask.quantityCompletedOn(targetDate);
+    final next =
+        (current + delta).clamp(0, currentTask.targetQuantity!).toInt();
+    if (next == current) return;
+    await setTaskQuantity(task, value: next, date: targetDate);
+  }
+
+  Future<void> setTaskQuantity(
+    TaskRecord task, {
+    required int value,
+    DateTime? date,
+  }) async {
+    if (!task.hasQuantityTarget) return;
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
+    final index = store.tasks.indexWhere((item) => item.id == task.id);
+    if (index < 0) return;
+    final currentTask = store.tasks[index];
+    if (!currentTask.hasQuantityTarget) return;
+    final periodKey = currentTask.quantityPeriodKey(targetDate);
+    final current = currentTask.quantityCompletedOn(targetDate);
+    final next = value.clamp(0, currentTask.targetQuantity!).toInt();
+    if (next == current) return;
+    final progress = {...currentTask.quantityProgress};
+    if (next == 0) {
+      progress.remove(periodKey);
+    } else {
+      progress[periodKey] = next;
+    }
+    final completedDates = [...currentTask.completedDates];
+    final key = dateKey(targetDate);
+    if (next > 0) {
+      if (!completedDates.contains(key)) completedDates.add(key);
+    } else if (currentTask.frequency == TaskFrequency.once) {
+      completedDates.clear();
+    } else {
+      completedDates.remove(key);
+    }
+    store.tasks[index] = currentTask.copyWith(
+      quantityProgress: progress,
+      completedDates: completedDates,
+    );
+    await _saveDataChange();
+  }
+
+  Future<void> setTaskCount(
+    TaskRecord task, {
+    required int value,
+    DateTime? date,
+  }) async {
+    if (!task.isCountTask) return;
+    final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
+    final index = store.tasks.indexWhere((item) => item.id == task.id);
+    if (index < 0) return;
+    final currentTask = store.tasks[index];
+    if (!currentTask.isCountTask) return;
+    final periodStart = taskPeriodStart(currentTask, targetDate);
+    final periodEnd = taskPeriodEnd(currentTask, targetDate);
+    final current = currentTask.countInRange(periodStart, periodEnd);
+    final next = value.clamp(0, currentTask.targetCount).toInt();
+    if (next == current) return;
+
+    final completedDates = [...currentTask.completedDates];
+    _removeDatesInRange(completedDates, periodStart, periodEnd);
+    for (var offset = 0; offset < next; offset++) {
+      completedDates.add(dateKey(periodStart.add(Duration(days: offset))));
+    }
+    store.tasks[index] = currentTask.copyWith(completedDates: completedDates);
+    await _saveDataChange();
+  }
+
   Future<void> setTaskCompleted(
     TaskRecord task, {
     required bool completed,
@@ -500,6 +626,34 @@ class AppState extends ChangeNotifier {
     final targetDate = date == null ? taskDateFor(task) : startOfDay(date);
     final index = store.tasks.indexWhere((item) => item.id == task.id);
     if (index < 0 || task.isCompletedOn(targetDate) == completed) return;
+    if (task.hasQuantityTarget) {
+      final progress = {...task.quantityProgress};
+      final periodKey = task.quantityPeriodKey(targetDate);
+      if (completed) {
+        progress[periodKey] = task.targetQuantity!;
+      } else {
+        progress.remove(periodKey);
+      }
+      final completedDates = [...task.completedDates];
+      if (completed) {
+        final key = dateKey(targetDate);
+        if (!completedDates.contains(key)) completedDates.add(key);
+      } else if (task.frequency == TaskFrequency.once) {
+        completedDates.clear();
+      } else {
+        _removeDatesInRange(
+          completedDates,
+          taskPeriodStart(task, targetDate),
+          taskPeriodEnd(task, targetDate),
+        );
+      }
+      store.tasks[index] = task.copyWith(
+        quantityProgress: progress,
+        completedDates: completedDates,
+      );
+      await _saveDataChange();
+      return;
+    }
     final completedDates = [...task.completedDates];
     if (task.frequency == TaskFrequency.once) {
       if (completed) {
@@ -563,10 +717,9 @@ class AppState extends ChangeNotifier {
     } else {
       completedDates.add(key);
     }
-    subtasks[subtaskIndex] =
-        subtask.copyWith(completedDates: completedDates);
+    subtasks[subtaskIndex] = subtask.copyWith(completedDates: completedDates);
     var updatedTask = task.copyWith(subtasks: subtasks);
-    if (!task.isCountTask && subtasks.isNotEmpty) {
+    if (!task.isCountTask && !task.hasQuantityTarget && subtasks.isNotEmpty) {
       final allSubtasksCompleted = subtasks
           .every((item) => updatedTask.isSubtaskCompletedOn(item, targetDate));
       final parentDates = [...task.completedDates];
@@ -608,7 +761,31 @@ class AppState extends ChangeNotifier {
         continue;
       }
       final completedDates = [...task.completedDates];
-      if (task.frequency == TaskFrequency.once) {
+      if (task.hasQuantityTarget) {
+        final progress = {...task.quantityProgress};
+        final periodKey = task.quantityPeriodKey(date);
+        if (completed) {
+          progress[periodKey] = task.targetQuantity!;
+        } else {
+          progress.remove(periodKey);
+        }
+        if (completed) {
+          if (!completedDates.contains(key)) completedDates.add(key);
+        } else if (task.frequency == TaskFrequency.once) {
+          completedDates.clear();
+        } else {
+          _removeDatesInRange(
+            completedDates,
+            taskPeriodStart(task, date),
+            taskPeriodEnd(task, date),
+          );
+        }
+        store.tasks[index] = task.copyWith(
+          quantityProgress: progress,
+          completedDates: completedDates,
+        );
+        changed = true;
+      } else if (task.frequency == TaskFrequency.once) {
         if (completed && completedDates.isEmpty) {
           completedDates.add(key);
           changed = true;
@@ -616,8 +793,7 @@ class AppState extends ChangeNotifier {
           completedDates.clear();
           changed = true;
         }
-      } else if (task.isCountTask ||
-          task.frequency == TaskFrequency.daily) {
+      } else if (task.isCountTask || task.frequency == TaskFrequency.daily) {
         if (completed && !completedDates.contains(key)) {
           completedDates.add(key);
           changed = true;
@@ -635,7 +811,9 @@ class AppState extends ChangeNotifier {
         );
         changed = true;
       }
-      store.tasks[index] = task.copyWith(completedDates: completedDates);
+      if (!task.hasQuantityTarget) {
+        store.tasks[index] = task.copyWith(completedDates: completedDates);
+      }
     }
     if (changed) await _saveDataChange();
   }
@@ -647,6 +825,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -664,10 +843,10 @@ class AppState extends ChangeNotifier {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays,
           subtasks: subtasks
-              .map((item) =>
-                  TaskSubtask(id: item.id, title: item.title))
+              .map((item) => TaskSubtask(id: item.id, title: item.title))
               .toList(),
           tags: [...tags],
           note: note,
@@ -682,6 +861,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     int targetCount = 1,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -699,6 +879,7 @@ class AppState extends ChangeNotifier {
       startDate: startDate,
       dueDate: dueDate,
       targetCount: frequency == null ? 1 : targetCount,
+      targetQuantity: targetQuantity,
       weeklyDays: frequency == null ? const [] : [...weeklyDays],
       subtasks: subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
@@ -720,6 +901,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     int targetCount = 1,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -735,6 +917,8 @@ class AppState extends ChangeNotifier {
       dueDate: dueDate,
       clearDueDate: dueDate == null,
       targetCount: frequency == null ? 1 : targetCount,
+      targetQuantity: targetQuantity,
+      clearTargetQuantity: targetQuantity == null,
       weeklyDays: frequency == null ? const [] : [...weeklyDays],
       subtasks: _mergeSubtasks(source.subtasks, subtasks),
       tags: [...tags],
@@ -752,6 +936,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -760,8 +945,7 @@ class AppState extends ChangeNotifier {
     if (!source.isInbox || characterIds.isEmpty) return;
     final gameId = source.inboxGameId;
     final validCharacterIds = store.characters
-        .where((character) =>
-            !character.archived && character.gameId == gameId)
+        .where((character) => !character.archived && character.gameId == gameId)
         .map((character) => character.id)
         .where(characterIds.contains)
         .toList();
@@ -778,6 +962,7 @@ class AppState extends ChangeNotifier {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: [...weeklyDays],
           subtasks: subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
@@ -796,6 +981,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -827,6 +1013,7 @@ class AppState extends ChangeNotifier {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: [...weeklyDays],
           subtasks: subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
@@ -846,6 +1033,8 @@ class AppState extends ChangeNotifier {
         dueDate: dueDate,
         clearDueDate: dueDate == null,
         targetCount: targetCount,
+        targetQuantity: targetQuantity,
+        clearTargetQuantity: targetQuantity == null,
         weeklyDays: [...weeklyDays],
         subtasks: _mergeSubtasks(existing.subtasks, subtasks),
         tags: [...tags],
@@ -862,6 +1051,7 @@ class AppState extends ChangeNotifier {
     DateTime? startDate,
     DateTime? dueDate,
     required int targetCount,
+    int? targetQuantity,
     List<int> weeklyDays = const [],
     List<TaskSubtask> subtasks = const [],
     List<String> tags = const [],
@@ -877,6 +1067,8 @@ class AppState extends ChangeNotifier {
       dueDate: dueDate,
       clearDueDate: dueDate == null,
       targetCount: targetCount,
+      targetQuantity: targetQuantity,
+      clearTargetQuantity: targetQuantity == null,
       weeklyDays: [...weeklyDays],
       subtasks: _mergeSubtasks(source.subtasks, subtasks),
       tags: [...tags],
@@ -896,8 +1088,7 @@ class AppState extends ChangeNotifier {
         .toSet();
     final gameId = gameForTask(source)?.id;
     final validCharacterIds = store.characters
-        .where((character) =>
-            !character.archived && character.gameId == gameId)
+        .where((character) => !character.archived && character.gameId == gameId)
         .map((character) => character.id)
         .where((id) =>
             characterIds.contains(id) && !existingCharacterIds.contains(id))
@@ -914,6 +1105,7 @@ class AppState extends ChangeNotifier {
           startDate: source.startDate,
           dueDate: source.dueDate,
           targetCount: source.targetCount,
+          targetQuantity: source.targetQuantity,
           weeklyDays: [...source.weeklyDays],
           subtasks: source.subtasks
               .map((item) => TaskSubtask(id: item.id, title: item.title))
@@ -947,6 +1139,7 @@ class AppState extends ChangeNotifier {
           startDate: source.startDate,
           dueDate: source.dueDate,
           targetCount: source.targetCount,
+          targetQuantity: source.targetQuantity,
           weeklyDays: source.weeklyDays,
           subtasks: source.subtasks,
           tags: source.tags,
@@ -982,8 +1175,7 @@ class AppState extends ChangeNotifier {
     var changed = false;
     for (var index = 0; index < store.tasks.length; index++) {
       final task = store.tasks[index];
-      if (!templateIds.contains(task.templateId) ||
-          task.archived == archived) {
+      if (!templateIds.contains(task.templateId) || task.archived == archived) {
         continue;
       }
       store.tasks[index] = task.copyWith(archived: archived);
@@ -1022,6 +1214,7 @@ class AppState extends ChangeNotifier {
       startDate: source.startDate,
       dueDate: source.dueDate,
       targetCount: source.targetCount,
+      targetQuantity: source.targetQuantity,
       weeklyDays: [...source.weeklyDays],
       subtasks: source.subtasks
           .map((item) => TaskSubtask(id: item.id, title: item.title))
@@ -1043,8 +1236,7 @@ class AppState extends ChangeNotifier {
         .map((definition) => TaskSubtask(
               id: definition.id,
               title: definition.title,
-              completedDates:
-                  [...?existingById[definition.id]?.completedDates],
+              completedDates: [...?existingById[definition.id]?.completedDates],
             ))
         .toList();
   }
@@ -1138,10 +1330,8 @@ class AppState extends ChangeNotifier {
           if (field.type == MetadataFieldType.choice &&
               !field.options.contains(entry.value)) continue;
           if (field.type == MetadataFieldType.multiChoice) {
-            final selected = entry.value
-                .split('\n')
-                .where(field.options.contains)
-                .toList();
+            final selected =
+                entry.value.split('\n').where(field.options.contains).toList();
             if (selected.isNotEmpty) values[entry.key] = selected.join('\n');
             continue;
           }
@@ -1196,6 +1386,39 @@ class AppState extends ChangeNotifier {
     );
     if (selectedCharacterId == character.id) {
       selectedGameId = gameId;
+    }
+    await _saveDataChange();
+  }
+
+  Future<void> moveCharacter(
+    Character character, {
+    required int offset,
+  }) async {
+    if (offset == 0) return;
+    final characterIndexes = <int>[];
+    for (var index = 0; index < store.characters.length; index++) {
+      final item = store.characters[index];
+      if (item.gameId == character.gameId && !item.archived) {
+        characterIndexes.add(index);
+      }
+    }
+    final currentPosition = characterIndexes.indexWhere(
+      (index) => store.characters[index].id == character.id,
+    );
+    if (currentPosition < 0) return;
+    final targetPosition = currentPosition + offset;
+    if (targetPosition < 0 || targetPosition >= characterIndexes.length) {
+      return;
+    }
+
+    final orderedCharacters = [
+      for (final index in characterIndexes) store.characters[index],
+    ];
+    final moved = orderedCharacters.removeAt(currentPosition);
+    orderedCharacters.insert(targetPosition, moved);
+    store.characters = [...store.characters];
+    for (var index = 0; index < characterIndexes.length; index++) {
+      store.characters[characterIndexes[index]] = orderedCharacters[index];
     }
     await _saveDataChange();
   }
@@ -1291,11 +1514,16 @@ class AppState extends ChangeNotifier {
 
   double progressFor(List<TaskRecord> source, DateTime start, DateTime end) {
     if (source.isEmpty) return 0;
-    final completed = source
-        .where((task) => task.isCountTask
-            ? completionCount(task, start, end) >= task.targetCount
-            : task.isCompletedOn(start))
-        .length;
+    final completed = source.map((task) {
+      if (task.hasQuantityTarget) {
+        return (task.quantityCompletedOn(start) / task.targetQuantity!)
+            .clamp(0, 1)
+            .toDouble();
+      }
+      return task.isCountTask
+          ? (completionCount(task, start, end) >= task.targetCount ? 1.0 : 0.0)
+          : (task.isCompletedOn(start) ? 1.0 : 0.0);
+    }).fold<double>(0, (sum, value) => sum + value);
     return completed / source.length;
   }
 }

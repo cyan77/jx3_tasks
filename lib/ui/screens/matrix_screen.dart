@@ -52,11 +52,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
     for (final task in state.store.tasks) {
       templates.putIfAbsent(task.templateId, () => []).add(task);
     }
-    final availableTags = state.store.tasks
-        .expand((task) => task.tags)
-        .toSet()
-        .toList()
-      ..sort();
+    final availableTags =
+        state.store.tasks.expand((task) => task.tags).toSet().toList()..sort();
     tagFilters.removeWhere((tag) => !availableTags.contains(tag));
     selectedTemplateIds.removeWhere((id) => !templates.containsKey(id));
     final visibleTemplates = templates.values.where((tasks) {
@@ -72,14 +69,13 @@ class _MatrixScreenState extends State<MatrixScreen> {
       final characterNames = _charactersFor(tasks)
           .map((character) => character.name.toLowerCase());
       return tasks.first.title.toLowerCase().contains(normalized) ||
-          tasks.any((task) => task.tags
-              .any((tag) => tag.toLowerCase().contains(normalized))) ||
+          tasks.any((task) =>
+              task.tags.any((tag) => tag.toLowerCase().contains(normalized))) ||
           characterNames.any((name) => name.contains(normalized));
     }).toList()
       ..sort((a, b) => a.first.title.compareTo(b.first.title));
-    final visibleIds = visibleTemplates
-        .map((tasks) => tasks.first.templateId)
-        .toSet();
+    final visibleIds =
+        visibleTemplates.map((tasks) => tasks.first.templateId).toSet();
     final selectedCount = selectedTemplateIds.length;
 
     return Column(children: [
@@ -96,8 +92,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                   child: TextField(
                     controller: searchController,
                     focusNode: searchFocusNode,
-                    onChanged: (value) =>
-                        setState(() => query = value.trim()),
+                    onChanged: (value) => setState(() => query = value.trim()),
                     decoration: InputDecoration(
                       hintText: '搜索任务或角色',
                       prefixIcon: const Icon(Icons.search, size: 18),
@@ -148,8 +143,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
               selectedTemplateIds.clear();
               if (characterFilterId != null &&
                   characterFilterId != _FilterBar.inboxValue &&
-                  !_filterCharacters.any(
-                      (character) => character.id == characterFilterId)) {
+                  !_filterCharacters
+                      .any((character) => character.id == characterFilterId)) {
                 characterFilterId = null;
               }
             }),
@@ -188,59 +183,59 @@ class _MatrixScreenState extends State<MatrixScreen> {
           children: [
             Positioned.fill(
               child: visibleTemplates.isEmpty
-            ? const _EmptyTasks()
-            : ListView.separated(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  0,
-                  20,
-                  selectedCount > 0
-                      ? (desktopSelection ? 92 : 172)
-                      : (desktopSelection ? 90 : 158),
-                ),
-                itemCount: visibleTemplates.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final tasks = visibleTemplates[index];
-                  final templateId = tasks.first.templateId;
-                  return _TaskManagementTile(
-                    tasks: tasks,
-                    characters: _charactersFor(tasks),
-                    gameName: _gameNameFor(tasks),
-                    completion: _completionFor(tasks),
-                    completedTaskIds: tasks
-                        .where((task) => task.isCompletedOn(
-                              state.taskDateFor(task),
-                            ))
-                        .map((task) => task.id)
-                        .toSet(),
-                    expiry: _expiryFor(tasks),
-                    selected: selectedTemplateIds.contains(templateId),
-                    selectionMode: selectedCount > 0,
-                    showSelectionButton: desktopSelection,
-                    onSelect: () => _setSelected(
-                      templateId,
-                      !selectedTemplateIds.contains(templateId),
+                  ? const _EmptyTasks()
+                  : ListView.separated(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        0,
+                        20,
+                        selectedCount > 0
+                            ? (desktopSelection ? 92 : 172)
+                            : (desktopSelection ? 90 : 158),
+                      ),
+                      itemCount: visibleTemplates.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final tasks = visibleTemplates[index];
+                        final templateId = tasks.first.templateId;
+                        return _TaskManagementTile(
+                          tasks: tasks,
+                          characters: _charactersFor(tasks),
+                          gameName: _gameNameFor(tasks),
+                          completion: _completionFor(tasks),
+                          completedTaskIds: tasks
+                              .where((task) => task.isCompletedOn(
+                                    state.taskDateFor(task),
+                                  ))
+                              .map((task) => task.id)
+                              .toSet(),
+                          expiry: _expiryFor(tasks),
+                          selected: selectedTemplateIds.contains(templateId),
+                          selectionMode: selectedCount > 0,
+                          showSelectionButton: desktopSelection,
+                          onSelect: () => _setSelected(
+                            templateId,
+                            !selectedTemplateIds.contains(templateId),
+                          ),
+                          onToggleTask: (task) => state.setTaskCompleted(
+                            task,
+                            completed:
+                                !task.isCompletedOn(state.taskDateFor(task)),
+                          ),
+                          onEdit: () => showTaskEditor(
+                            context,
+                            state,
+                            task: tasks.first,
+                            syncAll: !tasks.first.isInbox,
+                          ),
+                          onMoveToInbox: () =>
+                              _moveTemplatesToInbox({templateId}),
+                          onArchiveChanged: (archived) =>
+                              _setTemplatesArchived({templateId}, archived),
+                          onDelete: () => _deleteTemplates({templateId}),
+                        );
+                      },
                     ),
-                    onToggleTask: (task) => state.setTaskCompleted(
-                      task,
-                      completed:
-                          !task.isCompletedOn(state.taskDateFor(task)),
-                    ),
-                    onEdit: () => showTaskEditor(
-                      context,
-                      state,
-                      task: tasks.first,
-                      syncAll: !tasks.first.isInbox,
-                    ),
-                    onMoveToInbox: () =>
-                        _moveTemplatesToInbox({templateId}),
-                    onArchiveChanged: (archived) =>
-                        _setTemplatesArchived({templateId}, archived),
-                    onDelete: () => _deleteTemplates({templateId}),
-                  );
-                },
-              ),
             ),
             Positioned(
               right: 20,
@@ -271,65 +266,61 @@ class _MatrixScreenState extends State<MatrixScreen> {
               ),
             ),
             Positioned(
-                left: 12,
-                right: 12,
-                bottom: desktopSelection ? 12 : 82,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  reverseDuration: const Duration(milliseconds: 160),
-                  transitionBuilder: (child, animation) {
-                    final curved = CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                      reverseCurve: Curves.easeInCubic,
-                    );
-                    return FadeTransition(
-                      opacity: curved,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.16, 0),
-                          end: Offset.zero,
-                        ).animate(curved),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: selectedCount == 0
-                      ? const SizedBox.shrink(
-                          key: ValueKey('mobile-selection-empty'),
-                        )
-                      : _SelectionBar(
-                          key: const ValueKey('mobile-selection-actions'),
-                          compact: true,
-                          selectedCount: selectedCount,
-                          allVisibleSelected: visibleIds.isNotEmpty &&
-                              visibleIds.every(selectedTemplateIds.contains),
-                          onToggleAll: () => _toggleAll(visibleIds),
-                          onClear: () => setState(selectedTemplateIds.clear),
-                          onAssign:
-                              archiveFilter == _ArchiveFilter.archived
-                                  ? null
-                                  : _assignSelected,
-                          onMoveToInbox:
-                              archiveFilter == _ArchiveFilter.archived
-                                  ? null
-                                  : _moveSelectedToInbox,
-                          onArchive: () => _setTemplatesArchived(
-                            Set.of(selectedTemplateIds),
-                            true,
-                          ),
-                          onRestore: () => _setTemplatesArchived(
-                            Set.of(selectedTemplateIds),
-                            false,
-                          ),
-                          showArchive:
-                              archiveFilter != _ArchiveFilter.archived,
-                          showRestore:
-                              archiveFilter != _ArchiveFilter.active,
-                          onDelete: _deleteSelected,
+              left: 12,
+              right: 12,
+              bottom: desktopSelection ? 12 : 82,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                reverseDuration: const Duration(milliseconds: 160),
+                transitionBuilder: (child, animation) {
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity: curved,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.16, 0),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
+                child: selectedCount == 0
+                    ? const SizedBox.shrink(
+                        key: ValueKey('mobile-selection-empty'),
+                      )
+                    : _SelectionBar(
+                        key: const ValueKey('mobile-selection-actions'),
+                        compact: true,
+                        selectedCount: selectedCount,
+                        allVisibleSelected: visibleIds.isNotEmpty &&
+                            visibleIds.every(selectedTemplateIds.contains),
+                        onToggleAll: () => _toggleAll(visibleIds),
+                        onClear: () => setState(selectedTemplateIds.clear),
+                        onAssign: archiveFilter == _ArchiveFilter.archived
+                            ? null
+                            : _assignSelected,
+                        onMoveToInbox: archiveFilter == _ArchiveFilter.archived
+                            ? null
+                            : _moveSelectedToInbox,
+                        onArchive: () => _setTemplatesArchived(
+                          Set.of(selectedTemplateIds),
+                          true,
                         ),
-                ),
+                        onRestore: () => _setTemplatesArchived(
+                          Set.of(selectedTemplateIds),
+                          false,
+                        ),
+                        showArchive: archiveFilter != _ArchiveFilter.archived,
+                        showRestore: archiveFilter != _ArchiveFilter.active,
+                        onDelete: _deleteSelected,
+                      ),
               ),
+            ),
           ],
         ),
       ),
@@ -348,7 +339,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
           gameFilterId == null || character.gameId == gameFilterId)
       .toList();
 
-  bool get _hasActiveFilters => gameFilterId != null ||
+  bool get _hasActiveFilters =>
+      gameFilterId != null ||
       characterFilterId != null ||
       tagFilters.isNotEmpty ||
       completionFilter != _CompletionFilter.all ||
@@ -365,10 +357,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   String _gameNameFor(List<TaskRecord> tasks) {
     final gameId = _gameIdFor(tasks);
-    return state.games
-            .where((game) => game.id == gameId)
-            .firstOrNull
-            ?.name ??
+    return state.games.where((game) => game.id == gameId).firstOrNull?.name ??
         '未知游戏';
   }
 
@@ -409,7 +398,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
     return tasks.any((task) => task.characterId == characterFilterId);
   }
 
-  bool _matchesTag(List<TaskRecord> tasks) => tagFilters.isEmpty ||
+  bool _matchesTag(List<TaskRecord> tasks) =>
+      tagFilters.isEmpty ||
       tasks.any((task) => task.tags.any(tagFilters.contains));
 
   bool _matchesCompletion(List<TaskRecord> tasks) {
@@ -511,7 +501,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
             ? '已新增 $assignedCount 条角色任务'
             : '已新增 $assignedCount 条角色任务；'
                 '${skipped.length} 项收集箱任务尚未设置周期';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<Set<String>?> _showCharacterAssignmentDialog(String gameId) async {
@@ -591,9 +582,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
   }
 
   Future<void> _moveTemplatesToInbox(Set<String> templateIds) async {
-    final assignedTemplateIds = templateIds.where((templateId) => state
-        .store.tasks
-        .any((task) => task.templateId == templateId && !task.isInbox)).toSet();
+    final assignedTemplateIds = templateIds
+        .where((templateId) => state.store.tasks
+            .any((task) => task.templateId == templateId && !task.isInbox))
+        .toSet();
     if (assignedTemplateIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('所选任务已经在收集箱中')),
@@ -603,9 +595,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(assignedTemplateIds.length == 1
-            ? '移到收集箱？'
-            : '批量移到收集箱？'),
+        title: Text(assignedTemplateIds.length == 1 ? '移到收集箱？' : '批量移到收集箱？'),
         content: Text(
           '将取消 ${assignedTemplateIds.length} 项任务的全部角色分配，保留任务设置并清除完成记录。',
         ),
@@ -726,84 +716,87 @@ class _FilterBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-          Expanded(child: _FilterDropdown<String>(
-            tooltip: '按游戏筛选',
-            value: gameId ?? allGamesValue,
-            selectedLabel:
-                MediaQuery.sizeOf(context).width < 600 && gameId == null
-                    ? '游戏'
-                    : null,
-            items: [
-              const DropdownMenuItem(
-                  value: allGamesValue, child: Text('全部游戏')),
-              ...games.map((game) =>
-                  DropdownMenuItem(value: game.id, child: Text(game.name))),
-            ],
-            onChanged: (value) => onGameChanged(
-                value == allGamesValue ? null : value),
-          )),
-          const SizedBox(width: 6),
-          Expanded(child: _FilterDropdown<String>(
-            tooltip: '按角色筛选',
-            value: characterId ?? allCharactersValue,
-            selectedLabel:
-                MediaQuery.sizeOf(context).width < 600 && characterId == null
-                    ? '角色'
-                    : null,
-            items: [
-              const DropdownMenuItem(
-                  value: allCharactersValue, child: Text('全部角色')),
-              const DropdownMenuItem(
-                  value: inboxValue, child: Text('收集箱 / 未分配')),
-              ...characters.map((character) => DropdownMenuItem(
-                  value: character.id, child: Text(character.name))),
-            ],
-            onChanged: (value) => onCharacterChanged(
-                value == allCharactersValue ? null : value),
-          )),
-          const SizedBox(width: 6),
-          Expanded(child: _FilterDropdown<_CompletionFilter>(
-            tooltip: '按完成状态筛选',
-            value: completion,
-            selectedLabel: MediaQuery.sizeOf(context).width < 600 &&
-                    completion == _CompletionFilter.all
-                ? '状态'
-                : null,
-            items: const [
-              DropdownMenuItem(
-                  value: _CompletionFilter.all, child: Text('全部状态')),
-              DropdownMenuItem(
-                  value: _CompletionFilter.incomplete, child: Text('未完成')),
-              DropdownMenuItem(
-                  value: _CompletionFilter.partial, child: Text('部分完成')),
-              DropdownMenuItem(
-                  value: _CompletionFilter.complete, child: Text('已完成')),
-              DropdownMenuItem(
-                  value: _CompletionFilter.expiringSoon,
-                  child: Text('即将过期')),
-              DropdownMenuItem(
-                  value: _CompletionFilter.overdue, child: Text('已逾期')),
-            ],
-            onChanged: (value) {
-              if (value != null) onCompletionChanged(value);
-            },
-          )),
-          const SizedBox(width: 6),
-          Expanded(child: _FilterDropdown<_ArchiveFilter>(
-            tooltip: '按归档状态筛选',
-            value: archive,
-            items: const [
-              DropdownMenuItem(
-                  value: _ArchiveFilter.active, child: Text('未归档')),
-              DropdownMenuItem(
-                  value: _ArchiveFilter.archived, child: Text('已归档')),
-              DropdownMenuItem(
-                  value: _ArchiveFilter.all, child: Text('全部归档状态')),
-            ],
-            onChanged: (value) {
-              if (value != null) onArchiveChanged(value);
-            },
-          )),
+            Expanded(
+                child: _FilterDropdown<String>(
+              tooltip: '按游戏筛选',
+              value: gameId ?? allGamesValue,
+              selectedLabel:
+                  MediaQuery.sizeOf(context).width < 600 && gameId == null
+                      ? '游戏'
+                      : null,
+              items: [
+                const DropdownMenuItem(
+                    value: allGamesValue, child: Text('全部游戏')),
+                ...games.map((game) =>
+                    DropdownMenuItem(value: game.id, child: Text(game.name))),
+              ],
+              onChanged: (value) =>
+                  onGameChanged(value == allGamesValue ? null : value),
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<String>(
+              tooltip: '按角色筛选',
+              value: characterId ?? allCharactersValue,
+              selectedLabel:
+                  MediaQuery.sizeOf(context).width < 600 && characterId == null
+                      ? '角色'
+                      : null,
+              items: [
+                const DropdownMenuItem(
+                    value: allCharactersValue, child: Text('全部角色')),
+                const DropdownMenuItem(
+                    value: inboxValue, child: Text('收集箱 / 未分配')),
+                ...characters.map((character) => DropdownMenuItem(
+                    value: character.id, child: Text(character.name))),
+              ],
+              onChanged: (value) => onCharacterChanged(
+                  value == allCharactersValue ? null : value),
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<_CompletionFilter>(
+              tooltip: '按完成状态筛选',
+              value: completion,
+              selectedLabel: MediaQuery.sizeOf(context).width < 600 &&
+                      completion == _CompletionFilter.all
+                  ? '状态'
+                  : null,
+              items: const [
+                DropdownMenuItem(
+                    value: _CompletionFilter.all, child: Text('全部状态')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.incomplete, child: Text('未完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.partial, child: Text('部分完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.complete, child: Text('已完成')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.expiringSoon, child: Text('即将过期')),
+                DropdownMenuItem(
+                    value: _CompletionFilter.overdue, child: Text('已逾期')),
+              ],
+              onChanged: (value) {
+                if (value != null) onCompletionChanged(value);
+              },
+            )),
+            const SizedBox(width: 6),
+            Expanded(
+                child: _FilterDropdown<_ArchiveFilter>(
+              tooltip: '按归档状态筛选',
+              value: archive,
+              items: const [
+                DropdownMenuItem(
+                    value: _ArchiveFilter.active, child: Text('未归档')),
+                DropdownMenuItem(
+                    value: _ArchiveFilter.archived, child: Text('已归档')),
+                DropdownMenuItem(
+                    value: _ArchiveFilter.all, child: Text('全部归档状态')),
+              ],
+              onChanged: (value) {
+                if (value != null) onArchiveChanged(value);
+              },
+            )),
           ]),
           if (onReset != null)
             Padding(
@@ -972,9 +965,10 @@ class _FilterDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
-    Widget selectedChild = selectedLabel == null
-        ? const SizedBox.shrink()
-        : Text(selectedLabel!);
+    final maxMenuHeight =
+        (MediaQuery.sizeOf(context).height * 0.55).clamp(240.0, 420.0);
+    Widget selectedChild =
+        selectedLabel == null ? const SizedBox.shrink() : Text(selectedLabel!);
     if (selectedLabel == null) {
       for (final item in items) {
         if (item.value == value) {
@@ -984,68 +978,68 @@ class _FilterDropdown<T> extends StatelessWidget {
       }
     }
     return Tooltip(
-        message: tooltip,
-        child: Container(
-          key: ValueKey('task-filter-$tooltip'),
-          height: 40,
-          padding: const EdgeInsets.only(left: 10, right: 5),
-          decoration: BoxDecoration(
-            color: fill.withValues(alpha: 0.78),
-            border: Border.all(color: scheme.primary.withValues(alpha: 0.20)),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: PopupMenuButton<T>(
-              key: ValueKey('task-filter-control-$tooltip'),
-              padding: EdgeInsets.zero,
-              position: PopupMenuPosition.under,
-              offset: const Offset(0, 6),
-              elevation: 0,
-              menuPadding: const EdgeInsets.symmetric(vertical: 4),
-              color: fill,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: scheme.primary.withValues(alpha: 0.20),
-                ),
-              ),
-              onSelected: (selected) => onChanged(selected),
-              itemBuilder: (_) => items
-                  .map((item) => PopupMenuItem<T>(
-                        value: item.value,
-                        enabled: item.enabled,
-                        height: 40,
-                        child: DefaultTextStyle.merge(
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          child: item.child,
-                        ),
-                      ))
-                  .toList(),
-              child: Row(children: [
-                Expanded(
-                  child: DefaultTextStyle.merge(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w400,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    child: selectedChild,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                const Icon(Icons.expand_more,
-                    size: 16, color: AppTheme.accent),
-              ]),
-            ),
+      message: tooltip,
+      child: Container(
+        key: ValueKey('task-filter-$tooltip'),
+        height: 40,
+        padding: const EdgeInsets.only(left: 10, right: 5),
+        decoration: BoxDecoration(
+          color: fill.withValues(alpha: 0.78),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.20)),
+          borderRadius: BorderRadius.circular(12),
         ),
-      );
+        child: PopupMenuButton<T>(
+          key: ValueKey('task-filter-control-$tooltip'),
+          padding: EdgeInsets.zero,
+          position: PopupMenuPosition.under,
+          offset: const Offset(0, 6),
+          elevation: 0,
+          constraints: BoxConstraints(maxHeight: maxMenuHeight),
+          menuPadding: const EdgeInsets.symmetric(vertical: 4),
+          color: fill,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: scheme.primary.withValues(alpha: 0.20),
+            ),
+          ),
+          onSelected: (selected) => onChanged(selected),
+          itemBuilder: (_) => items
+              .map((item) => PopupMenuItem<T>(
+                    value: item.value,
+                    enabled: item.enabled,
+                    height: 40,
+                    child: DefaultTextStyle.merge(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      child: item.child,
+                    ),
+                  ))
+              .toList(),
+          child: Row(children: [
+            Expanded(
+              child: DefaultTextStyle.merge(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w400,
+                  color: scheme.onSurfaceVariant,
+                ),
+                child: selectedChild,
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.expand_more, size: 16, color: AppTheme.accent),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -1208,9 +1202,8 @@ class _TaskManagementTile extends StatelessWidget {
     final warningColor = Theme.of(context).brightness == Brightness.dark
         ? AppTheme.warningDark
         : AppTheme.warning;
-    final alertColor = expiry == TaskExpiryStatus.overdue
-        ? scheme.error
-        : warningColor;
+    final alertColor =
+        expiry == TaskExpiryStatus.overdue ? scheme.error : warningColor;
     final cardColor = selected
         ? scheme.primaryContainer.withValues(alpha: 0.82)
         : expiry == TaskExpiryStatus.normal
@@ -1225,7 +1218,9 @@ class _TaskManagementTile extends StatelessWidget {
       task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
       if (task.startDate != null) '开始 ${dueLabel(task.startDate)}',
       if (task.dueDate != null) dueLabel(task.dueDate),
-      if (task.isCountTask) '目标 ${task.targetCount} 次',
+      if (task.isCountTask) '行为目标 ${task.targetCount} 次',
+      if (task.hasQuantityTarget)
+        '数量 ${task.quantityCompletedOn(DateTime.now())}/${task.targetQuantity}',
     ];
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1301,23 +1296,21 @@ class _TaskManagementTile extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
-                      children: characters
-                          .map((character) {
-                            final characterTask = assignedTasks.firstWhere(
-                              (item) => item.characterId == character.id,
-                            );
-                            final completed =
-                                completedTaskIds.contains(characterTask.id);
-                            return _CharacterChip(
-                              character: character,
-                              task: characterTask,
-                              completed: completed,
-                              onTap: selectionMode
-                                  ? onSelect
-                                  : () => onToggleTask(characterTask),
-                            );
-                          })
-                          .toList(),
+                      children: characters.map((character) {
+                        final characterTask = assignedTasks.firstWhere(
+                          (item) => item.characterId == character.id,
+                        );
+                        final completed =
+                            completedTaskIds.contains(characterTask.id);
+                        return _CharacterChip(
+                          character: character,
+                          task: characterTask,
+                          completed: completed,
+                          onTap: selectionMode
+                              ? onSelect
+                              : () => onToggleTask(characterTask),
+                        );
+                      }).toList(),
                     ),
                   if (task.note.isNotEmpty) ...[
                     const SizedBox(height: 7),
@@ -1333,43 +1326,41 @@ class _TaskManagementTile extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-            if (showSelectionButton)
-              IconButton(
-                key: ValueKey('select-task-${task.templateId}'),
-                tooltip: selected ? '取消选择' : '选择任务',
-                onPressed: onSelect,
-                icon: Icon(
-                  selected
-                      ? Icons.check_circle
-                      : Icons.library_add_check_outlined,
-                  size: 20,
-                  color: selected ? scheme.primary : AppTheme.muted,
+                if (showSelectionButton)
+                  IconButton(
+                    key: ValueKey('select-task-${task.templateId}'),
+                    tooltip: selected ? '取消选择' : '选择任务',
+                    onPressed: onSelect,
+                    icon: Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.library_add_check_outlined,
+                      size: 20,
+                      color: selected ? scheme.primary : AppTheme.muted,
+                    ),
+                  ),
+                PopupMenuButton<String>(
+                  tooltip: '任务操作',
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit();
+                    if (value == 'inbox') onMoveToInbox();
+                    if (value == 'archive') onArchiveChanged(true);
+                    if (value == 'restore') onArchiveChanged(false);
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => [
+                    if (!task.archived)
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('编辑与管理分配')),
+                    if (!task.archived)
+                      const PopupMenuItem(value: 'inbox', child: Text('移到收集箱')),
+                    PopupMenuItem(
+                      value: task.archived ? 'restore' : 'archive',
+                      child: Text(task.archived ? '恢复任务' : '归档任务'),
+                    ),
+                    const PopupMenuItem(value: 'delete', child: Text('删除任务')),
+                  ],
                 ),
-              ),
-            PopupMenuButton<String>(
-              tooltip: '任务操作',
-              onSelected: (value) {
-                if (value == 'edit') onEdit();
-                if (value == 'inbox') onMoveToInbox();
-                if (value == 'archive') onArchiveChanged(true);
-                if (value == 'restore') onArchiveChanged(false);
-                if (value == 'delete') onDelete();
-              },
-              itemBuilder: (_) => [
-                if (!task.archived)
-                  const PopupMenuItem(
-                      value: 'edit', child: Text('编辑与管理分配')),
-                if (!task.archived)
-                  const PopupMenuItem(
-                      value: 'inbox', child: Text('移到收集箱')),
-                PopupMenuItem(
-                  value: task.archived ? 'restore' : 'archive',
-                  child: Text(task.archived ? '恢复任务' : '归档任务'),
-                ),
-                const PopupMenuItem(
-                    value: 'delete', child: Text('删除任务')),
-              ],
-            ),
               ],
             ),
           ]),
@@ -1377,7 +1368,6 @@ class _TaskManagementTile extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _CharacterChip extends StatelessWidget {
@@ -1394,10 +1384,10 @@ class _CharacterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-    key: ValueKey('task-character-${task.id}'),
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(6),
-    child: Container(
+      key: ValueKey('task-character-${task.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
         constraints: const BoxConstraints(minHeight: 40, minWidth: 72),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
@@ -1460,15 +1450,26 @@ class _CompletionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (label, icon, color) = switch (completion) {
-      _TemplateCompletion.unassigned =>
-        ('未分配', Icons.inbox_outlined, AppTheme.muted),
-      _TemplateCompletion.incomplete =>
-        ('未完成', Icons.radio_button_unchecked, scheme.onSurfaceVariant),
-      _TemplateCompletion.partial =>
-        ('已完成 $completedCount/$totalCount',
-          Icons.timelapse_outlined, scheme.tertiary),
-      _TemplateCompletion.complete =>
-        ('已完成', Icons.check_circle_outline, scheme.primary),
+      _TemplateCompletion.unassigned => (
+          '未分配',
+          Icons.inbox_outlined,
+          AppTheme.muted
+        ),
+      _TemplateCompletion.incomplete => (
+          '未完成',
+          Icons.radio_button_unchecked,
+          scheme.onSurfaceVariant
+        ),
+      _TemplateCompletion.partial => (
+          '已完成 $completedCount/$totalCount',
+          Icons.timelapse_outlined,
+          scheme.tertiary
+        ),
+      _TemplateCompletion.complete => (
+          '已完成',
+          Icons.check_circle_outline,
+          scheme.primary
+        ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),

@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
@@ -130,24 +131,20 @@ class DashboardScreen extends StatelessWidget {
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SectionTitle('今天',
-                    trailing: Text(
-                        '$doneToday / ${todayTasks.length}',
+                    trailing: Text('$doneToday / ${todayTasks.length}',
                         style: const TextStyle(
                             fontSize: 12, color: AppTheme.muted)))),
             const SizedBox(height: 8),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _TaskList(
-                    state: state,
-                    tasks: todayTasks,
-                    date: today)),
+                child: _TaskList(state: state, tasks: todayTasks, date: today)),
             const SizedBox(height: 26),
             const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: SectionTitle('周期任务',
                     trailing: Text('按当前周期',
-                        style: TextStyle(
-                            fontSize: 12, color: AppTheme.muted)))),
+                        style:
+                            TextStyle(fontSize: 12, color: AppTheme.muted)))),
             const SizedBox(height: 8),
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -208,8 +205,7 @@ class _HomeGameSelector extends StatelessWidget {
                         size: 19, color: AppTheme.accent),
                     const SizedBox(width: 9),
                     const Text('当前游戏',
-                        style:
-                            TextStyle(fontSize: 12, color: AppTheme.muted)),
+                        style: TextStyle(fontSize: 12, color: AppTheme.muted)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Align(
@@ -222,8 +218,7 @@ class _HomeGameSelector extends StatelessWidget {
                           offset: const Offset(0, 6),
                           elevation: 0,
                           color: menuColor,
-                          menuPadding:
-                              const EdgeInsets.symmetric(vertical: 4),
+                          menuPadding: const EdgeInsets.symmetric(vertical: 4),
                           constraints: const BoxConstraints(
                             minWidth: 120,
                             maxWidth: 220,
@@ -231,15 +226,15 @@ class _HomeGameSelector extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
-                              color: scheme.outlineVariant
-                                  .withValues(alpha: 0.78),
+                              color:
+                                  scheme.outlineVariant.withValues(alpha: 0.78),
                             ),
                           ),
                           onSelected: state.selectGame,
                           itemBuilder: (context) => state.games
                               .map((game) => PopupMenuItem<String>(
-                                    key: ValueKey(
-                                        'home-game-option-${game.id}'),
+                                    key:
+                                        ValueKey('home-game-option-${game.id}'),
                                     value: game.id,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10),
@@ -248,8 +243,7 @@ class _HomeGameSelector extends StatelessWidget {
                                         Expanded(child: Text(game.name)),
                                         if (game.id == selected?.id)
                                           const Icon(Icons.check,
-                                              size: 18,
-                                              color: AppTheme.accent),
+                                              size: 18, color: AppTheme.accent),
                                       ],
                                     ),
                                   ))
@@ -494,9 +488,8 @@ class _CharacterStripState extends State<_CharacterStrip> {
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent || !_controller.hasClients) return;
-    final delta = event.scrollDelta.dx != 0
-        ? event.scrollDelta.dx
-        : event.scrollDelta.dy;
+    final delta =
+        event.scrollDelta.dx != 0 ? event.scrollDelta.dx : event.scrollDelta.dy;
     if (delta == 0) return;
 
     GestureBinding.instance.pointerSignalResolver.register(event, (_) {
@@ -528,8 +521,7 @@ class _CharacterStripState extends State<_CharacterStrip> {
                 );
               }
               final character = widget.characters[index];
-              final selected =
-                  character.id == widget.state.selectedCharacterId;
+              final selected = character.id == widget.state.selectedCharacterId;
               return InkWell(
                 onTap: () => widget.state.selectCharacter(character.id),
                 borderRadius: BorderRadius.circular(7),
@@ -558,8 +550,7 @@ class _CharacterStripState extends State<_CharacterStrip> {
                             Text(character.name,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
                             Text(
                                 _characterStatusText(
                                   widget.state,
@@ -607,8 +598,8 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
       padding: EdgeInsets.all(compact ? 9 : 13),
       decoration: BoxDecoration(
-          border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(compact ? 10 : 7)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(
@@ -658,18 +649,18 @@ class _TaskList extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
-          border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7)),
       child: Column(
         children: tasks.map((task) {
           final linkedTasks = state.tasksForTemplate(task.templateId);
           final canCompleteForMultipleCharacters = linkedTasks.length > 1;
-          final count = task.countInRange(
-              taskPeriodStart(task, date), taskPeriodEnd(task, date));
-          final checked = task.isCountTask
-              ? count >= task.targetCount
-              : task.isCompletedOn(date);
+          final count = task.hasQuantityTarget
+              ? task.quantityCompletedOn(date)
+              : task.countInRange(
+                  taskPeriodStart(task, date), taskPeriodEnd(task, date));
+          final checked = task.isCompletedOn(date);
           final expiry = taskExpiryStatus(task, date);
           final expiringSoon = expiry == TaskExpiryStatus.expiringSoon;
           final overdue = expiry == TaskExpiryStatus.overdue;
@@ -684,13 +675,36 @@ class _TaskList extends StatelessWidget {
                 dense: true,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 13, vertical: 3),
-                leading: TaskCheck(
-                    checked: checked, onTap: () => state.toggleTask(task)),
+                leading: task.hasQuantityTarget
+                    ? _QuantityStepper(
+                        value: count,
+                        target: task.targetQuantity!,
+                        onDecrement: count == 0
+                            ? null
+                            : () => state.adjustTaskQuantity(
+                                  task,
+                                  delta: -1,
+                                  date: date,
+                                ),
+                        onIncrement: count >= task.targetQuantity!
+                            ? null
+                            : () => state.adjustTaskQuantity(
+                                  task,
+                                  delta: 1,
+                                  date: date,
+                                ),
+                        onSetValue: (value) => state.setTaskQuantity(
+                          task,
+                          value: value,
+                          date: date,
+                        ),
+                      )
+                    : TaskCheck(
+                        checked: checked, onTap: () => state.toggleTask(task)),
                 title: Text(task.title,
                     style: TextStyle(
                         fontSize: 14,
-                        decoration:
-                            checked ? TextDecoration.lineThrough : null,
+                        decoration: checked ? TextDecoration.lineThrough : null,
                         color: checked
                             ? AppTheme.muted
                             : expiringSoon || overdue
@@ -699,15 +713,43 @@ class _TaskList extends StatelessWidget {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                        task.isCountTask
-                            ? '$count / ${task.targetCount} 次 · ${task.frequency.label}'
-                            : _taskMeta(task, date),
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: expiringSoon || overdue
-                                ? alertColor
-                                : AppTheme.muted)),
+                    task.hasQuantityTarget
+                        ? Text(
+                            '$count / ${task.targetQuantity} 数量 · ${task.frequency.label}',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: expiringSoon || overdue
+                                    ? alertColor
+                                    : AppTheme.muted))
+                        : task.isCountTask
+                            ? InkWell(
+                                borderRadius: BorderRadius.circular(4),
+                                onTap: () => _editTaskCount(
+                                  context,
+                                  state,
+                                  task,
+                                  count,
+                                  date,
+                                ),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 2),
+                                  child: Text(
+                                    '$count / ${task.targetCount} 行为次数 · ${task.frequency.label}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: expiringSoon || overdue
+                                            ? alertColor
+                                            : AppTheme.muted),
+                                  ),
+                                ),
+                              )
+                            : Text(_taskMeta(task, date),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: expiringSoon || overdue
+                                        ? alertColor
+                                        : AppTheme.muted)),
                     if (task.tags.isNotEmpty) ...[
                       const SizedBox(height: 5),
                       TaskTags(tags: task.tags, compact: true),
@@ -745,10 +787,16 @@ class _TaskList extends StatelessWidget {
                             context, state, task, date),
                         icon: const Icon(Icons.group_outlined, size: 19),
                       ),
-                    if (showPeriod && task.isCountTask)
+                    if (showPeriod &&
+                        (task.isCountTask || task.hasQuantityTarget))
                       SizedBox(
                         width: 64,
-                        child: ProgressLine(value: count / task.targetCount),
+                        child: ProgressLine(
+                          value: count /
+                              (task.hasQuantityTarget
+                                  ? task.targetQuantity!
+                                  : task.targetCount),
+                        ),
                       ),
                   ],
                 ),
@@ -766,8 +814,8 @@ class _TaskList extends StatelessWidget {
                           children: [
                             TaskCheck(
                               checked: subtaskDone,
-                              onTap: () =>
-                                  state.toggleSubtask(task, subtask, date: date),
+                              onTap: () => state.toggleSubtask(task, subtask,
+                                  date: date),
                             ),
                             const SizedBox(width: 9),
                             Expanded(
@@ -911,6 +959,131 @@ class _TaskList extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editTaskCount(
+    BuildContext context,
+    AppState state,
+    TaskRecord task,
+    int value,
+    DateTime date,
+  ) async {
+    final controller = TextEditingController(text: '$value');
+    final nextValue = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('编辑当前行为次数'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(labelText: '当前次数（0-${task.targetCount}）'),
+          onSubmitted: (text) {
+            final parsed = int.tryParse(text.trim());
+            if (parsed != null) Navigator.pop(dialogContext, parsed);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text.trim());
+              if (parsed != null) Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (nextValue != null) {
+      await state.setTaskCount(task, value: nextValue, date: date);
+    }
+  }
+}
+
+class _QuantityStepper extends StatelessWidget {
+  const _QuantityStepper({
+    required this.value,
+    required this.target,
+    required this.onDecrement,
+    required this.onIncrement,
+    this.onSetValue,
+  });
+
+  final int value;
+  final int target;
+  final VoidCallback? onDecrement;
+  final VoidCallback? onIncrement;
+  final ValueChanged<int>? onSetValue;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RepeatingIconButton(
+            tooltip: '减少 1，长按可连续减少',
+            onPressed: onDecrement,
+            icon: Icons.remove_circle_outline,
+            size: 18,
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: onSetValue == null ? null : () => _editValue(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+              child: Text('$value/$target',
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          RepeatingIconButton(
+            tooltip: '记录 1 个，长按可连续增加',
+            onPressed: onIncrement,
+            icon: Icons.add_circle_outline,
+            size: 18,
+          ),
+        ],
+      );
+
+  Future<void> _editValue(BuildContext context) async {
+    final controller = TextEditingController(text: '$value');
+    final nextValue = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('编辑当前数量'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(labelText: '当前数量（0-$target）'),
+          onSubmitted: (text) {
+            final parsed = int.tryParse(text.trim());
+            if (parsed != null) Navigator.pop(dialogContext, parsed);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text.trim());
+              if (parsed != null) Navigator.pop(dialogContext, parsed);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (nextValue != null) onSetValue?.call(nextValue);
   }
 }
 

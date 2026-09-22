@@ -28,12 +28,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         : _allGames;
     final tasks = state.calendarTasks(
         gameId: validGameFilter == _allGames ? null : validGameFilter);
-    final filteredGame = state.games
-        .where((game) => game.id == validGameFilter)
-        .firstOrNull;
+    final filteredGame =
+        state.games.where((game) => game.id == validGameFilter).firstOrNull;
     final now = DateTime.now();
-    final calendarToday =
-        filteredGame?.taskDayAt(now) ?? startOfDay(now);
+    final calendarToday = filteredGame?.taskDayAt(now) ?? startOfDay(now);
     final month = state.focusedMonth;
     final firstDay = DateTime(month.year, month.month, 1);
     final days = DateTime(month.year, month.month + 1, 0).day;
@@ -78,8 +76,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         position: PopupMenuPosition.under,
                         offset: const Offset(0, 6),
                         elevation: 0,
-                        menuPadding:
-                            const EdgeInsets.symmetric(vertical: 4),
+                        menuPadding: const EdgeInsets.symmetric(vertical: 4),
                         constraints: const BoxConstraints.tightFor(width: 150),
                         color: filterFill,
                         shape: RoundedRectangleBorder(
@@ -122,8 +119,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         child: Row(children: [
                           Expanded(
                             child: Text(
-                              filteredGame?.name ??
-                                  (compact ? '游戏' : '全部游戏'),
+                              filteredGame?.name ?? (compact ? '游戏' : '全部游戏'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -245,13 +241,11 @@ class _CalendarGrid extends StatelessWidget {
     }
     for (var day = 1; day <= days; day++) {
       final date = DateTime(year, month, day);
-      final dateTasks = tasks
-          .where((task) => state.isTaskScheduledOn(task, date))
-          .toList();
+      final dateTasks =
+          tasks.where((task) => state.isTaskScheduledOn(task, date)).toList();
       final done = tasks.where((task) => task.isDoneOn(date)).length;
       final isToday = dateKey(date) == dateKey(today);
-      final isSelected =
-          dateKey(date) == dateKey(state.selectedCalendarDate);
+      final isSelected = dateKey(date) == dateKey(state.selectedCalendarDate);
       cells.add(InkWell(
         onTap: () => state.selectCalendarDate(date),
         child: Container(
@@ -270,8 +264,9 @@ class _CalendarGrid extends StatelessWidget {
               Text('$day',
                   style: TextStyle(
                       fontSize: 13,
-                      fontWeight:
-                          isToday || isSelected ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight: isToday || isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
                       color: isToday || isSelected
                           ? AppTheme.accent
                           : Theme.of(context).colorScheme.onSurface)),
@@ -370,15 +365,13 @@ class _InteractiveTaskTile extends StatelessWidget {
     final canShowSubtasks =
         showSubtasks && MediaQuery.sizeOf(context).width >= 600;
     final linkedCount = state.store.tasks
-        .where((item) =>
-            !item.isInbox && item.templateId == task.templateId)
+        .where((item) => !item.isInbox && item.templateId == task.templateId)
         .length;
     final character = state.store.characters
         .where((item) => item.id == task.characterId)
         .firstOrNull;
-    final game = state.games
-        .where((item) => item.id == character?.gameId)
-        .firstOrNull;
+    final game =
+        state.games.where((item) => item.id == character?.gameId).firstOrNull;
     final checked = task.isCompletedOn(date);
     final expiry = taskExpiryStatus(task, state.taskDateFor(task));
     final alertColor = expiry == TaskExpiryStatus.overdue
@@ -390,6 +383,10 @@ class _InteractiveTaskTile extends StatelessWidget {
       if (game != null) game.name,
       if (character != null) character.name,
       task.frequency.label,
+      if (task.hasQuantityTarget)
+        '${task.quantityCompletedOn(date)}/${task.targetQuantity} 数量',
+      if (task.isCountTask)
+        '${task.countInRange(taskPeriodStart(task, date), taskPeriodEnd(task, date))}/${task.targetCount} 行为',
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,8 +415,7 @@ class _InteractiveTaskTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(details.join(' · '),
-                  style:
-                      const TextStyle(fontSize: 11, color: AppTheme.muted)),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
               if (task.tags.isNotEmpty) ...[
                 const SizedBox(height: 5),
                 TaskTags(tags: task.tags, compact: true),
@@ -546,9 +542,8 @@ int _compareCalendarTasks(AppState state, TaskRecord a, TaskRecord b) {
     final character = state.store.characters
         .where((item) => item.id == task.characterId)
         .firstOrNull;
-    final game = state.games
-        .where((item) => item.id == character?.gameId)
-        .firstOrNull;
+    final game =
+        state.games.where((item) => item.id == character?.gameId).firstOrNull;
     return '${game?.name ?? ''}\u0000${character?.name ?? ''}';
   }
 

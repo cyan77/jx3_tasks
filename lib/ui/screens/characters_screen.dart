@@ -21,9 +21,8 @@ class _CharactersScreenState extends State<CharactersScreen> {
 
   AppState get state => widget.state;
 
-  List<Character> get _visibleCharacters => state.store.characters
-      .where((character) => !character.archived)
-      .toList();
+  List<Character> get _visibleCharacters =>
+      state.store.characters.where((character) => !character.archived).toList();
 
   void _setBatchMode(bool enabled) {
     setState(() {
@@ -66,7 +65,7 @@ class _CharactersScreenState extends State<CharactersScreen> {
                     children: [
                       PageHeader(
                         title: '角色列表',
-                        subtitle: '按游戏管理角色，每个角色拥有独立的任务完成记录',
+                        subtitle: '按游戏管理角色；可在角色菜单中调整显示顺序',
                         action: compact ? null : _headerActions(context),
                       ),
                       if (compact)
@@ -195,8 +194,7 @@ class _ArchivedCharactersSection extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
-        border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Column(
@@ -260,8 +258,8 @@ class _BatchToolbar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLow,
-          border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Wrap(
@@ -269,8 +267,7 @@ class _BatchToolbar extends StatelessWidget {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('已选择 $selectedCount 个',
-                style: const TextStyle(fontSize: 12)),
+            Text('已选择 $selectedCount 个', style: const TextStyle(fontSize: 12)),
             TextButton(
               onPressed: onSelectAll,
               child: Text(allSelected ? '取消全选' : '全选'),
@@ -356,16 +353,29 @@ class _GameCharacterSection extends StatelessWidget {
                     spacing: gap,
                     runSpacing: gap,
                     children: [
-                      for (final character in characters)
+                      for (var index = 0; index < characters.length; index++)
                         SizedBox(
                           width: cardWidth,
                           child: _CharacterCard(
                             state: state,
                             game: game,
-                            character: character,
+                            character: characters[index],
                             batchMode: batchMode,
-                            selected: selectedIds.contains(character.id),
-                            onToggle: () => onToggle(character.id),
+                            selected:
+                                selectedIds.contains(characters[index].id),
+                            onToggle: () => onToggle(characters[index].id),
+                            onMoveUp: index == 0
+                                ? null
+                                : () => state.moveCharacter(
+                                      characters[index],
+                                      offset: -1,
+                                    ),
+                            onMoveDown: index == characters.length - 1
+                                ? null
+                                : () => state.moveCharacter(
+                                      characters[index],
+                                      offset: 1,
+                                    ),
                           ),
                         ),
                     ],
@@ -385,6 +395,8 @@ class _CharacterCard extends StatelessWidget {
     required this.batchMode,
     required this.selected,
     required this.onToggle,
+    required this.onMoveUp,
+    required this.onMoveDown,
   });
 
   final AppState state;
@@ -393,13 +405,17 @@ class _CharacterCard extends StatelessWidget {
   final bool batchMode;
   final bool selected;
   final VoidCallback onToggle;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
-    final tasks = state.store.tasks
-        .where((task) => task.characterId == character.id)
-        .toList();
     final week = startOfWeek(game.taskDayAt(DateTime.now()));
+    final tasks = state.scheduledTasksInRange(
+      state.store.tasks.where((task) => task.characterId == character.id),
+      week,
+      week.add(const Duration(days: 7)),
+    );
     final progress =
         state.progressFor(tasks, week, week.add(const Duration(days: 7)));
 
@@ -436,9 +452,7 @@ class _CharacterCard extends StatelessWidget {
                               fontSize: 14, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
                       Text(
-                        character.account.isEmpty
-                            ? '账号未设置'
-                            : character.account,
+                        character.account.isEmpty ? '账号未设置' : character.account,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -456,16 +470,31 @@ class _CharacterCard extends StatelessWidget {
                       if (value == 'edit') {
                         await showCharacterEditor(context, state,
                             character: character);
+                      } else if (value == 'move-up') {
+                        onMoveUp?.call();
+                      } else if (value == 'move-down') {
+                        onMoveDown?.call();
                       } else if (value == 'archive') {
                         await state.archiveCharacter(character);
                       } else if (value == 'delete') {
                         await _confirmDelete(context, state, character);
                       }
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('编辑角色')),
-                      PopupMenuItem(value: 'archive', child: Text('归档角色')),
-                      PopupMenuItem(value: 'delete', child: Text('永久删除')),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text('编辑角色')),
+                      PopupMenuItem(
+                        value: 'move-up',
+                        enabled: onMoveUp != null,
+                        child: const Text('上移一个位置'),
+                      ),
+                      PopupMenuItem(
+                        value: 'move-down',
+                        enabled: onMoveDown != null,
+                        child: const Text('下移一个位置'),
+                      ),
+                      const PopupMenuItem(
+                          value: 'archive', child: Text('归档角色')),
+                      const PopupMenuItem(value: 'delete', child: Text('永久删除')),
                     ],
                   ),
               ],
@@ -498,8 +527,7 @@ class _CharacterCard extends StatelessWidget {
                       Navigator.pop(context);
                       state.setTab(0);
                     },
-                    child:
-                        const Text('查看待办', style: TextStyle(fontSize: 11)),
+                    child: const Text('查看待办', style: TextStyle(fontSize: 11)),
                   ),
               ],
             ),

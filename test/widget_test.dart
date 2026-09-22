@@ -21,6 +21,30 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('repeating icon button accelerates while held', (tester) async {
+    var count = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: RepeatingIconButton(
+          icon: Icons.add,
+          tooltip: '增加',
+          onPressed: () => count++,
+        ),
+      ),
+    ));
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(RepeatingIconButton)),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    final countAfterLongPress = count;
+    await tester.pump(const Duration(milliseconds: 500));
+    await gesture.up();
+
+    expect(countAfterLongPress, greaterThanOrEqualTo(1));
+    expect(count, greaterThan(countAfterLongPress));
+  });
+
   testWidgets('new assigned tasks default to one-time frequency',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -294,6 +318,60 @@ void main() {
     expect(webDav.listCount, checksAfterDispose);
   });
 
+  test('sync checks the latest remote backup immediately before uploading',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.reloadSyncSettings();
+    final checksBeforeUpload = webDav.listCount;
+    final synced = await state.syncNow(silent: true);
+
+    expect(synced, isTrue);
+    expect(webDav.listCount, greaterThan(checksBeforeUpload));
+    expect(webDav.uploadCount, 1);
+    state.dispose();
+  });
+
+  test('sync refuses to upload when another device has a newer backup',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.reloadSyncSettings();
+    webDav.remoteBackups = const [
+      RemoteBackup(
+        name: 'backup_20990101_000000000000000_other.json',
+        path: '/other.json',
+      ),
+    ];
+
+    final synced = await state.syncNow(silent: true);
+
+    expect(synced, isFalse);
+    expect(webDav.uploadCount, 0);
+    expect(state.newerRemoteBackup?.path, '/other.json');
+    state.dispose();
+  });
+
   testWidgets('system back returns a secondary tab to the todo home',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -339,9 +417,10 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: HomeShell(state: state)));
 
-    await tester.tap(find.widgetWithText(OutlinedButton, '新建任务'));
+    await tester.tap(find.text('新建任务').first);
     await tester.pumpAndSettle();
-    expect(tester.widget<FilterChip>(find.byType(FilterChip)).selected, isFalse);
+    expect(
+        tester.widget<FilterChip>(find.byType(FilterChip)).selected, isFalse);
 
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
@@ -381,7 +460,7 @@ void main() {
     );
   });
 
-  testWidgets('窄屏标题和右上操作按钮顶部对齐', (tester) async {
+  testWidgets('窄屏标题和右上操作按钮保持在标题区内', (tester) async {
     await tester.binding.setSurfaceSize(const Size(420, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
@@ -400,15 +479,10 @@ void main() {
       ),
     );
 
-    expect(
-      tester.getTopLeft(find.text('全部任务')).dy,
-      closeTo(
-        tester
-            .getTopLeft(find.widgetWithText(OutlinedButton, '新建任务'))
-            .dy,
-        4,
-      ),
-    );
+    final titleTop = tester.getTopLeft(find.text('全部任务')).dy;
+    final actionTop = tester.getTopLeft(find.text('新建任务')).dy;
+    expect(actionTop, greaterThan(titleTop));
+    expect(actionTop, lessThan(titleTop + 32));
   });
 
   testWidgets('手机端全部任务只保留右上新建入口', (tester) async {
@@ -429,7 +503,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
+    expect(find.text('新建任务'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
     state.dispose();
   });
@@ -561,7 +635,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('全部任务'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '新建任务'), findsOneWidget);
+    expect(find.text('新建任务'), findsOneWidget);
     expect(find.text('任务一'), findsOneWidget);
     expect(find.text('任务二'), findsOneWidget);
     expect(find.byType(Checkbox), findsNothing);
@@ -729,6 +803,14 @@ void main() {
     expect(firstFilter.position, PopupMenuPosition.under);
     expect(firstFilter.offset.dy, greaterThan(0));
     expect(firstFilter.elevation, 0);
+    expect(firstFilter.constraints?.maxHeight, greaterThan(0));
+    expect(firstFilter.constraints?.maxHeight, lessThanOrEqualTo(420));
+    for (final control in filterControls.skip(1)) {
+      final filter = tester.widget<PopupMenuButton<dynamic>>(control);
+      expect(filter.position, PopupMenuPosition.under);
+      expect(filter.constraints?.maxHeight, greaterThan(0));
+      expect(filter.constraints?.maxHeight, lessThanOrEqualTo(420));
+    }
     final filterContainers = [
       find.byKey(const ValueKey('task-filter-按游戏筛选')),
       find.byKey(const ValueKey('task-filter-按角色筛选')),
@@ -751,7 +833,8 @@ void main() {
     expect(gameFilterDecoration.color, isNotNull);
     await tester.tap(filterControls.first);
     await tester.pumpAndSettle();
-    final openMenuItems = find.byWidgetPredicate((widget) => widget is PopupMenuItem);
+    final openMenuItems =
+        find.byWidgetPredicate((widget) => widget is PopupMenuItem);
     expect(openMenuItems, findsWidgets);
     for (final item in openMenuItems.evaluate()) {
       expect(tester.getSize(find.byWidget(item.widget)).height, 40);
@@ -890,7 +973,8 @@ void main() {
       matching: find.byType(InkWell),
     );
     expect(characterTwoControl, findsOneWidget);
-    expect(tester.getSize(characterTwoControl).height, greaterThanOrEqualTo(40));
+    expect(
+        tester.getSize(characterTwoControl).height, greaterThanOrEqualTo(40));
     tester.widget<InkWell>(characterTwoControl).onTap!();
     await tester.pumpAndSettle();
     final characterTwoTask =
@@ -1008,10 +1092,8 @@ void main() {
       dailyResetMinutes: 7 * 60,
     );
 
-    expect(game.taskDayAt(DateTime(2026, 9, 14, 6, 59)),
-        DateTime(2026, 9, 13));
-    expect(game.taskDayAt(DateTime(2026, 9, 14, 7)),
-        DateTime(2026, 9, 14));
+    expect(game.taskDayAt(DateTime(2026, 9, 14, 6, 59)), DateTime(2026, 9, 13));
+    expect(game.taskDayAt(DateTime(2026, 9, 14, 7)), DateTime(2026, 9, 14));
     expect(Game.fromJson(game.toJson()).dailyResetMinutes, 7 * 60);
 
     const lateReset = Game(
@@ -1021,8 +1103,8 @@ void main() {
     );
     expect(lateReset.taskDayAt(DateTime(2026, 9, 14, 22, 59)),
         DateTime(2026, 9, 13));
-    expect(lateReset.taskDayAt(DateTime(2026, 9, 14, 23)),
-        DateTime(2026, 9, 14));
+    expect(
+        lateReset.taskDayAt(DateTime(2026, 9, 14, 23)), DateTime(2026, 9, 14));
   });
 
   test('task state resolves the reset time from the task game', () {
@@ -1072,7 +1154,8 @@ void main() {
     expect(state.isTaskScheduledOn(weeklyTask, DateTime(2026, 9, 14)), isFalse);
   });
 
-  test('task start date controls scheduling and survives backup round trips', () {
+  test('task start date controls scheduling and survives backup round trips',
+      () {
     final task = TaskRecord(
       id: 'daily-starting-later',
       templateId: 'daily-starting-later',
@@ -1094,6 +1177,60 @@ void main() {
     expect(restored.isScheduledOn(DateTime(2026, 9, 20)), isTrue);
   });
 
+  test('character summaries only include tasks scheduled in the current week',
+      () {
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [
+        TaskRecord(
+          id: 'due-last-week',
+          templateId: 'due-last-week',
+          title: '截止上周',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 20),
+        ),
+        TaskRecord(
+          id: 'due-this-week',
+          templateId: 'due-this-week',
+          title: '截止本周',
+          characterId: 'char-1',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 21),
+        ),
+        TaskRecord(
+          id: 'monthly-later',
+          templateId: 'monthly-later',
+          title: '本月稍后',
+          characterId: 'char-1',
+          frequency: TaskFrequency.monthly,
+          createdAt: DateTime(2026, 9, 1),
+          dueDate: DateTime(2026, 9, 30),
+        ),
+      ];
+    final state = AppState(store);
+
+    final tasks = state.scheduledTasksInRange(
+      store.tasks,
+      DateTime(2026, 9, 21),
+      DateTime(2026, 9, 28),
+    );
+
+    expect(tasks.map((task) => task.id), ['due-this-week']);
+  });
+
   test('count task tracks completions independently', () {
     final task = TaskRecord(
       id: '1',
@@ -1107,6 +1244,130 @@ void main() {
     );
     expect(task.countInRange(DateTime(2026, 9, 7), DateTime(2026, 9, 14)), 2);
     expect(task.isCountTask, isTrue);
+  });
+
+  test('quantity target is independent from weekly and monthly behavior counts',
+      () {
+    final once = TaskRecord(
+      id: 'quantity-once',
+      templateId: 'quantity-once',
+      title: '小铁',
+      characterId: 'char-1',
+      frequency: TaskFrequency.once,
+      targetQuantity: 200,
+      quantityProgress: const {'once': 199},
+      createdAt: DateTime(2026, 9, 1),
+    );
+    expect(once.isCompletedOn(DateTime(2026, 9, 20)), isFalse);
+    expect(once.quantityCompletedOn(DateTime(2026, 9, 20)), 199);
+
+    final weeklyQuantity = TaskRecord(
+      id: 'quantity-weekly',
+      templateId: 'quantity-weekly',
+      title: '小铁',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weekly,
+      targetQuantity: 200,
+      quantityProgress: const {'2026-09-07': 200},
+      createdAt: DateTime(2026, 9, 1),
+    );
+    expect(weeklyQuantity.isCompletedOn(DateTime(2026, 9, 13)), isTrue);
+    expect(weeklyQuantity.isCompletedOn(DateTime(2026, 9, 14)), isFalse);
+
+    final weeklyBehavior = TaskRecord(
+      id: 'behavior-weekly',
+      templateId: 'behavior-weekly',
+      title: '大战',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weeklyCount,
+      targetCount: 4,
+      completedDates: const [
+        '2026-09-07',
+        '2026-09-08',
+        '2026-09-09',
+        '2026-09-10',
+      ],
+      createdAt: DateTime(2026, 9, 1),
+    );
+    expect(weeklyBehavior.isCompletedOn(DateTime(2026, 9, 13)), isTrue);
+    expect(weeklyBehavior.hasQuantityTarget, isFalse);
+    expect(TaskRecord.fromJson(once.toJson()).targetQuantity, 200);
+  });
+
+  test('quantity target records progress and can be undone', () async {
+    SharedPreferences.setMockInitialValues({});
+    final task = TaskRecord(
+      id: 'quantity-state',
+      templateId: 'quantity-state',
+      title: '花瓣',
+      characterId: 'char-1',
+      frequency: TaskFrequency.monthly,
+      targetQuantity: 3,
+      createdAt: DateTime(2026, 9, 1),
+    );
+    final store = LocalStore()..tasks = [task];
+    final state = AppState(store);
+
+    await state.adjustTaskQuantity(task, date: DateTime(2026, 9, 20), delta: 2);
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
+    await state.setTaskQuantity(
+      task,
+      value: 1,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 1);
+    expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isFalse);
+    await state.toggleTask(store.tasks.single, date: DateTime(2026, 9, 20));
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
+    expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isFalse);
+    await state.setTaskQuantity(
+      store.tasks.single,
+      value: 3,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(store.tasks.single.isCompletedOn(DateTime(2026, 9, 20)), isTrue);
+    await state.toggleTask(store.tasks.single, date: DateTime(2026, 9, 20));
+    expect(store.tasks.single.quantityCompletedOn(DateTime(2026, 9, 20)), 2);
+    state.dispose();
+  });
+
+  test('behavior count can be edited directly within its period', () async {
+    SharedPreferences.setMockInitialValues({});
+    final task = TaskRecord(
+      id: 'count-state',
+      templateId: 'count-state',
+      title: '大战',
+      characterId: 'char-1',
+      frequency: TaskFrequency.weeklyCount,
+      targetCount: 4,
+      createdAt: DateTime(2026, 9, 1),
+    );
+    final store = LocalStore()..tasks = [task];
+    final state = AppState(store);
+
+    await state.setTaskCount(
+      task,
+      value: 3,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(
+        store.tasks.single.countInRange(
+          DateTime(2026, 9, 14),
+          DateTime(2026, 9, 21),
+        ),
+        3);
+    await state.setTaskCount(
+      store.tasks.single,
+      value: 1,
+      date: DateTime(2026, 9, 20),
+    );
+    expect(
+        store.tasks.single.countInRange(
+          DateTime(2026, 9, 14),
+          DateTime(2026, 9, 21),
+        ),
+        1);
+    state.dispose();
   });
 
   test('once task remains completed after its completion date', () async {
@@ -1207,6 +1468,47 @@ void main() {
     expect(state.selectedCharacter?.name, '崩铁角色');
   });
 
+  test('characters can be reordered within the same game', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = const [
+        Character(
+          id: 'char-1',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色一',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+        Character(
+          id: 'char-2',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色二',
+          occupation: '',
+          color: 0xff66a892,
+        ),
+        Character(
+          id: 'char-3',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色三',
+          occupation: '',
+          color: 0xff7fae9e,
+        ),
+      ];
+    final state = AppState(store);
+
+    await state.moveCharacter(store.characters[1], offset: -1);
+    expect(store.characters.map((character) => character.id),
+        ['char-2', 'char-1', 'char-3']);
+    await state.moveCharacter(store.characters[1], offset: 1);
+    expect(store.characters.map((character) => character.id),
+        ['char-2', 'char-3', 'char-1']);
+    state.dispose();
+  });
+
   test('editing a shared task updates fields and preserves completion',
       () async {
     SharedPreferences.setMockInitialValues({});
@@ -1267,12 +1569,15 @@ void main() {
 
     expect(store.tasks, hasLength(2));
     expect(store.tasks.every((task) => task.title == '十人本'), isTrue);
-    expect(store.tasks.every(
-        (task) => task.frequency == TaskFrequency.weeklyCount), isTrue);
+    expect(
+        store.tasks
+            .every((task) => task.frequency == TaskFrequency.weeklyCount),
+        isTrue);
     expect(store.tasks.every((task) => task.targetCount == 3), isTrue);
     expect(store.tasks.first.completedDates, contains(completed));
     expect(store.tasks.last.completedDates, isEmpty);
-    expect(store.tasks.first.subtasks.first.completedDates, contains(completed));
+    expect(
+        store.tasks.first.subtasks.first.completedDates, contains(completed));
     expect(store.tasks.last.subtasks.first.completedDates, isEmpty);
 
     final firstCharacterTask =
@@ -1289,11 +1594,9 @@ void main() {
       ],
     );
 
-    expect(
-        store.tasks.firstWhere((task) => task.characterId == 'char-1').title,
+    expect(store.tasks.firstWhere((task) => task.characterId == 'char-1').title,
         '角色一专属十人本');
-    expect(
-        store.tasks.firstWhere((task) => task.characterId == 'char-2').title,
+    expect(store.tasks.firstWhere((task) => task.characterId == 'char-2').title,
         '十人本');
     expect(
         store.tasks.firstWhere((task) => task.characterId == 'char-2').subtasks,
@@ -1666,8 +1969,8 @@ void main() {
 
     expect(find.text('日历子任务一'), findsOneWidget);
     expect(find.text('日历子任务二'), findsOneWidget);
-    final firstSubtask = find.byKey(
-        const ValueKey('calendar-subtask-calendar-task-subtask-1'));
+    final firstSubtask =
+        find.byKey(const ValueKey('calendar-subtask-calendar-task-subtask-1'));
     await tester.ensureVisible(firstSubtask);
     await tester.tap(firstSubtask);
     await tester.pumpAndSettle();
@@ -1780,8 +2083,7 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('home game summary counts only unfinished tasks',
-      (tester) async {
+  testWidgets('home game summary counts only unfinished tasks', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore()
       ..games = const [Game(id: 'game-jx3', name: '剑网3')]
@@ -1933,7 +2235,7 @@ void main() {
     expect(find.text('添加角色'), findsOneWidget);
     expect(
       tester.getTopLeft(actions).dy,
-      greaterThan(tester.getBottomLeft(find.text('按游戏管理角色，每个角色拥有独立的任务完成记录')).dy),
+      greaterThan(tester.getBottomLeft(find.text('按游戏管理角色；可在角色菜单中调整显示顺序')).dy),
     );
     expect(tester.takeException(), isNull);
     state.dispose();
@@ -2166,8 +2468,7 @@ void main() {
       id: 'game-meta',
       name: '元数据游戏',
       metadataFields: [
-        GameMetadataField(
-            id: 'text', name: '文本', type: MetadataFieldType.text),
+        GameMetadataField(id: 'text', name: '文本', type: MetadataFieldType.text),
         GameMetadataField(
             id: 'long', name: '备注', type: MetadataFieldType.multiline),
         GameMetadataField(
@@ -2188,8 +2489,7 @@ void main() {
             id: 'date', name: '创建日期', type: MetadataFieldType.date),
         GameMetadataField(
             id: 'time', name: '上线时间', type: MetadataFieldType.time),
-        GameMetadataField(
-            id: 'url', name: '攻略链接', type: MetadataFieldType.url),
+        GameMetadataField(id: 'url', name: '攻略链接', type: MetadataFieldType.url),
       ],
     );
     final restored = Game.fromJson(game.toJson());
@@ -2250,6 +2550,7 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   int downloadCount = 0;
   int uploadCount = 0;
   int listCount = 0;
+  List<RemoteBackup> remoteBackups = const [];
 
   @override
   Future<String> downloadBackup(
@@ -2269,6 +2570,6 @@ class _FakeWebDavSyncService extends WebDavSyncService {
   @override
   Future<List<RemoteBackup>> listBackups(SyncConfig config) async {
     listCount++;
-    return const [];
+    return remoteBackups;
   }
 }

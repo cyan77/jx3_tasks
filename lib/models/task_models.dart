@@ -61,7 +61,8 @@ class GameMetadataField {
       GameMetadataField(
         id: json['id'] as String,
         name: json['name'] as String,
-        type: MetadataFieldType.values.byName(json['type'] as String? ?? 'text'),
+        type:
+            MetadataFieldType.values.byName(json['type'] as String? ?? 'text'),
         options: List<String>.from(json['options'] as List? ?? const []),
       );
 }
@@ -91,7 +92,8 @@ class Game {
     String? name,
     int? dailyResetMinutes,
     List<GameMetadataField>? metadataFields,
-  }) => Game(
+  }) =>
+      Game(
         id: id,
         name: name ?? this.name,
         color: color,
@@ -260,6 +262,8 @@ class TaskRecord {
     this.startDate,
     this.dueDate,
     this.targetCount = 1,
+    this.targetQuantity,
+    this.quantityProgress = const {},
     this.weeklyDays = const [],
     this.completedDates = const [],
     this.subtasks = const [],
@@ -278,6 +282,11 @@ class TaskRecord {
   final DateTime createdAt;
   final DateTime? startDate;
   final DateTime? dueDate;
+
+  /// Optional amount of the task's subject, independent from weekly/monthly
+  /// behavior counts. For example, collecting 200 ores.
+  final int? targetQuantity;
+  final Map<String, int> quantityProgress;
   final int targetCount;
   final List<int> weeklyDays;
   final List<String> completedDates;
@@ -295,6 +304,16 @@ class TaskRecord {
       frequency == TaskFrequency.weeklyCount ||
       frequency == TaskFrequency.monthlyCount;
 
+  bool get hasQuantityTarget => targetQuantity != null && targetQuantity! > 0;
+
+  String quantityPeriodKey(DateTime date) {
+    if (frequency == TaskFrequency.once) return 'once';
+    return dateKey(taskPeriodStart(this, date));
+  }
+
+  int quantityCompletedOn(DateTime date) =>
+      quantityProgress[quantityPeriodKey(date)] ?? 0;
+
   TaskRecord copyWith({
     String? title,
     TaskFrequency? frequency,
@@ -303,6 +322,9 @@ class TaskRecord {
     DateTime? dueDate,
     bool clearDueDate = false,
     int? targetCount,
+    int? targetQuantity,
+    bool clearTargetQuantity = false,
+    Map<String, int>? quantityProgress,
     List<int>? weeklyDays,
     List<String>? completedDates,
     List<TaskSubtask>? subtasks,
@@ -322,6 +344,9 @@ class TaskRecord {
         startDate: clearStartDate ? null : startDate ?? this.startDate,
         dueDate: clearDueDate ? null : dueDate ?? this.dueDate,
         targetCount: targetCount ?? this.targetCount,
+        targetQuantity:
+            clearTargetQuantity ? null : targetQuantity ?? this.targetQuantity,
+        quantityProgress: quantityProgress ?? this.quantityProgress,
         weeklyDays: weeklyDays ?? this.weeklyDays,
         completedDates: completedDates ?? this.completedDates,
         subtasks: subtasks ?? this.subtasks,
@@ -335,33 +360,53 @@ class TaskRecord {
   bool isDoneOn(DateTime date) => completedDates.contains(dateKey(date));
 
   bool isCompletedOn(DateTime date) => switch (frequency) {
-        TaskFrequency.once => completedDates.isNotEmpty,
-        TaskFrequency.daily => isDoneOn(date),
-        TaskFrequency.weekly =>
-          countInRange(startOfWeek(date), startOfWeek(date).add(const Duration(days: 7))) > 0,
-        TaskFrequency.monthly =>
-          countInRange(startOfMonth(date), DateTime(date.year, date.month + 1)) > 0,
-        TaskFrequency.weeklyCount =>
-          countInRange(startOfWeek(date), startOfWeek(date).add(const Duration(days: 7))) >= targetCount,
-        TaskFrequency.monthlyCount =>
-          countInRange(startOfMonth(date), DateTime(date.year, date.month + 1)) >= targetCount,
+        TaskFrequency.once => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : completedDates.isNotEmpty,
+        TaskFrequency.daily => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : isDoneOn(date),
+        TaskFrequency.weekly => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(startOfWeek(date),
+                    startOfWeek(date).add(const Duration(days: 7))) >
+                0,
+        TaskFrequency.monthly => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(
+                    startOfMonth(date), DateTime(date.year, date.month + 1)) >
+                0,
+        TaskFrequency.weeklyCount => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(startOfWeek(date),
+                    startOfWeek(date).add(const Duration(days: 7))) >=
+                targetCount,
+        TaskFrequency.monthlyCount => hasQuantityTarget
+            ? quantityCompletedOn(date) >= targetQuantity!
+            : countInRange(
+                    startOfMonth(date), DateTime(date.year, date.month + 1)) >=
+                targetCount,
       };
 
-  bool isVisibleOn(DateTime date) => frequency != TaskFrequency.once ||
-      completedDates.isEmpty ||
-      isDoneOn(date);
+  bool isVisibleOn(DateTime date) {
+    if (frequency != TaskFrequency.once) return true;
+    if (hasQuantityTarget) return !isCompletedOn(date);
+    return completedDates.isEmpty || isDoneOn(date);
+  }
 
   bool isSubtaskCompletedOn(TaskSubtask subtask, DateTime date) =>
       switch (frequency) {
         TaskFrequency.once => subtask.completedDates.isNotEmpty,
         TaskFrequency.daily => subtask.isDoneOn(date),
-        TaskFrequency.weekly || TaskFrequency.weeklyCount =>
+        TaskFrequency.weekly ||
+        TaskFrequency.weeklyCount =>
           subtask.countInRange(
                 startOfWeek(date),
                 startOfWeek(date).add(const Duration(days: 7)),
               ) >
               0,
-        TaskFrequency.monthly || TaskFrequency.monthlyCount =>
+        TaskFrequency.monthly ||
+        TaskFrequency.monthlyCount =>
           subtask.countInRange(
                 startOfMonth(date),
                 DateTime(date.year, date.month + 1),
@@ -371,11 +416,12 @@ class TaskRecord {
 
   bool isScheduledOn(DateTime date, {int dailyResetMinutes = 0}) {
     final day = startOfDay(date);
-    final startDay = startOfDay(startDate ??
-        createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    final startDay = startOfDay(
+        startDate ?? createdAt.subtract(Duration(minutes: dailyResetMinutes)));
     if (day.isBefore(startDay)) return false;
     return switch (frequency) {
-      TaskFrequency.once => dueDate != null && dateKey(dueDate!) == dateKey(day),
+      TaskFrequency.once =>
+        dueDate != null && dateKey(dueDate!) == dateKey(day),
       TaskFrequency.daily => true,
       TaskFrequency.weekly => weeklyDays.isEmpty
           ? day.weekday == (dueDate?.weekday ?? startDay.weekday)
@@ -390,8 +436,8 @@ class TaskRecord {
 
   bool hasStartedBy(DateTime date, {int dailyResetMinutes = 0}) {
     final day = startOfDay(date);
-    final startDay = startOfDay(startDate ??
-        createdAt.subtract(Duration(minutes: dailyResetMinutes)));
+    final startDay = startOfDay(
+        startDate ?? createdAt.subtract(Duration(minutes: dailyResetMinutes)));
     return !day.isBefore(startDay);
   }
 
@@ -416,6 +462,8 @@ class TaskRecord {
         'createdAt': createdAt.toIso8601String(),
         'startDate': startDate?.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),
+        'targetQuantity': targetQuantity,
+        'quantityProgress': quantityProgress,
         'targetCount': targetCount,
         'weeklyDays': weeklyDays,
         'completedDates': completedDates,
@@ -441,6 +489,9 @@ class TaskRecord {
         dueDate: json['dueDate'] == null
             ? null
             : DateTime.parse(json['dueDate'] as String),
+        targetQuantity: json['targetQuantity'] as int?,
+        quantityProgress:
+            Map<String, int>.from(json['quantityProgress'] as Map? ?? const {}),
         targetCount: json['targetCount'] as int? ?? 1,
         weeklyDays: List<int>.from(json['weeklyDays'] as List? ?? const []),
         completedDates:
@@ -464,10 +515,8 @@ List<String> normalizeTaskTags(
   Iterable<String> selected, [
   String input = '',
 ]) {
-  final result = selected
-      .map((tag) => tag.trim())
-      .where((tag) => tag.isNotEmpty)
-      .toSet();
+  final result =
+      selected.map((tag) => tag.trim()).where((tag) => tag.isNotEmpty).toSet();
   result.addAll(input
       .split(RegExp(r'[,，]'))
       .map((tag) => tag.trim())

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/task_models.dart';
@@ -106,6 +108,98 @@ class ProgressLine extends StatelessWidget {
             backgroundColor:
                 Theme.of(context).colorScheme.surfaceContainerHighest,
             color: color),
+      );
+}
+
+class RepeatingIconButton extends StatefulWidget {
+  const RepeatingIconButton({
+    required this.icon,
+    required this.onPressed,
+    required this.tooltip,
+    this.size = 19,
+    super.key,
+  });
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String tooltip;
+  final double size;
+
+  @override
+  State<RepeatingIconButton> createState() => _RepeatingIconButtonState();
+}
+
+class _RepeatingIconButtonState extends State<RepeatingIconButton> {
+  Timer? _repeatTimer;
+  var _repeatCount = 0;
+
+  void _startRepeating() {
+    _stopRepeating();
+    final callback = widget.onPressed;
+    if (callback == null) return;
+    callback();
+    _repeatCount = 0;
+    _scheduleNextRepeat();
+  }
+
+  void _scheduleNextRepeat() {
+    final milliseconds = 180 - (_repeatCount * 12);
+    _repeatTimer = Timer(
+      Duration(milliseconds: milliseconds < 45 ? 45 : milliseconds),
+      () {
+        final callback = widget.onPressed;
+        if (!mounted || callback == null) {
+          _stopRepeating();
+          return;
+        }
+        callback();
+        _repeatCount++;
+        _scheduleNextRepeat();
+      },
+    );
+  }
+
+  void _stopRepeating() {
+    _repeatTimer?.cancel();
+    _repeatTimer = null;
+  }
+
+  @override
+  void didUpdateWidget(covariant RepeatingIconButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onPressed == null) _stopRepeating();
+  }
+
+  @override
+  void dispose() {
+    _stopRepeating();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: widget.tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onPressed,
+          onLongPress: widget.onPressed == null ? null : _startRepeating,
+          onLongPressUp: _stopRepeating,
+          onLongPressCancel: _stopRepeating,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Icon(
+              widget.icon,
+              size: widget.size,
+              color: widget.onPressed == null
+                  ? Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: .28)
+                  : null,
+            ),
+          ),
+        ),
       );
 }
 
@@ -227,76 +321,75 @@ class AppDropdownField<T> extends StatelessWidget {
         : items[selectedIndex].child;
     return LayoutBuilder(
       builder: (context, constraints) => PopupMenuButton<int>(
-          enabled: onChanged != null,
-          tooltip: label,
-          padding: EdgeInsets.zero,
-          position: PopupMenuPosition.under,
-          offset: const Offset(0, 6),
-          elevation: 0,
-          menuPadding: const EdgeInsets.symmetric(vertical: 4),
-          constraints: BoxConstraints(
-            minWidth: constraints.maxWidth,
-            maxWidth: constraints.maxWidth,
-            maxHeight: menuMaxHeight,
-          ),
-          color: fill,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: scheme.primary.withValues(alpha: 0.20),
-            ),
-          ),
-          onSelected: (index) => onChanged?.call(items[index].value),
-          itemBuilder: (_) => List.generate(items.length, (index) {
-            final item = items[index];
-            return PopupMenuItem<int>(
-              value: index,
-              enabled: item.enabled,
-              height: 40,
-              child: DefaultTextStyle.merge(
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: scheme.onSurface,
-                ),
-                child: item.child,
-              ),
-            );
-          }),
-          child: InputDecorator(
-            decoration:
-                InputDecoration(labelText: label, helperText: helperText),
-            isEmpty: selectedIndex < 0,
-            child: Row(
-              children: [
-                Expanded(
-                  child: DefaultTextStyle.merge(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: onChanged == null
-                          ? scheme.onSurface.withValues(alpha: 0.38)
-                          : scheme.onSurface,
-                    ),
-                    child: selectedChild,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.expand_more,
-                  size: 18,
-                  color: onChanged == null
-                      ? scheme.onSurface.withValues(alpha: 0.38)
-                      : scheme.onSurfaceVariant,
-                ),
-              ],
-            ),
+        enabled: onChanged != null,
+        tooltip: label,
+        padding: EdgeInsets.zero,
+        position: PopupMenuPosition.under,
+        offset: const Offset(0, 6),
+        elevation: 0,
+        menuPadding: const EdgeInsets.symmetric(vertical: 4),
+        constraints: BoxConstraints(
+          minWidth: constraints.maxWidth,
+          maxWidth: constraints.maxWidth,
+          maxHeight: menuMaxHeight,
+        ),
+        color: fill,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: scheme.primary.withValues(alpha: 0.20),
           ),
         ),
+        onSelected: (index) => onChanged?.call(items[index].value),
+        itemBuilder: (_) => List.generate(items.length, (index) {
+          final item = items[index];
+          return PopupMenuItem<int>(
+            value: index,
+            enabled: item.enabled,
+            height: 40,
+            child: DefaultTextStyle.merge(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: scheme.onSurface,
+              ),
+              child: item.child,
+            ),
+          );
+        }),
+        child: InputDecorator(
+          decoration: InputDecoration(labelText: label, helperText: helperText),
+          isEmpty: selectedIndex < 0,
+          child: Row(
+            children: [
+              Expanded(
+                child: DefaultTextStyle.merge(
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: onChanged == null
+                        ? scheme.onSurface.withValues(alpha: 0.38)
+                        : scheme.onSurface,
+                  ),
+                  child: selectedChild,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.expand_more,
+                size: 18,
+                color: onChanged == null
+                    ? scheme.onSurface.withValues(alpha: 0.38)
+                    : scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

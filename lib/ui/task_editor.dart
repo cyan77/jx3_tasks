@@ -30,8 +30,7 @@ Future<void> showTaskEditor(
       barrierColor: Colors.black.withValues(alpha: dark ? 0.34 : 0.16),
       elevation: 0,
       builder: (_) => ClipRRect(
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(22)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Material(
@@ -79,6 +78,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late final TextEditingController titleController;
   late final TextEditingController noteController;
   late final TextEditingController tagController;
+  late final TextEditingController targetQuantityController;
   late final Set<String> taskTags;
   late final Set<String> selected;
   late TaskFrequency frequency;
@@ -129,11 +129,12 @@ class _TaskEditorState extends State<_TaskEditor> {
     titleController = TextEditingController(text: task?.title ?? '');
     noteController = TextEditingController(text: task?.note ?? '');
     tagController = TextEditingController();
+    targetQuantityController =
+        TextEditingController(text: task?.targetQuantity?.toString() ?? '');
     taskTags = {...?task?.tags};
     frequency = task?.frequency ?? TaskFrequency.once;
-    frequencyConfigured = task == null
-        ? !widget.createInInbox
-        : task.hasConfiguredFrequency;
+    frequencyConfigured =
+        task == null ? !widget.createInInbox : task.hasConfiguredFrequency;
     startDate = task?.startDate;
     dueDate = task?.dueDate;
     targetCount = task?.targetCount ?? 5;
@@ -155,11 +156,11 @@ class _TaskEditorState extends State<_TaskEditor> {
         : task.isInbox
             ? <String>{}
             : !widget.syncAll
-            ? {task.characterId}
-            : widget.state
-                .tasksForTemplate(task.templateId)
-                .map((item) => item.characterId)
-                .toSet();
+                ? {task.characterId}
+                : widget.state
+                    .tasksForTemplate(task.templateId)
+                    .map((item) => item.characterId)
+                    .toSet();
   }
 
   List<TaskRecord> get existingTasks {
@@ -215,428 +216,456 @@ class _TaskEditorState extends State<_TaskEditor> {
                 12,
           ),
           child: Padding(
-          padding: EdgeInsets.only(
-              left: 22,
-              right: 22,
-              top: 18,
-              bottom: MediaQuery.viewInsetsOf(context).bottom + 18),
-          child: SingleChildScrollView(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Row(children: [
-                  Expanded(
-                      child: Text(editorTitle,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w600))),
-                  IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, size: 20))
-                ]),
-                const SizedBox(height: 14),
-                if (!isEditing &&
-                    (widget.createInInbox ||
-                        !widget.preselectCurrentCharacter)) ...[
-                  _editorDropdown<String>(
-                    value: selectedEditorGameId,
-                    label: '所属游戏',
-                    items: widget.state.games
-                        .map((game) => DropdownMenuItem(
-                              value: game.id,
-                              child: Text(game.name),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() {
-                      selectedEditorGameId = value;
-                      selected.clear();
-                      existingTemplateId = null;
-                    }),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                if (!isEditing && !widget.createInInbox)
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: false,
-                          icon: Icon(Icons.add, size: 17),
-                          label: Text('新建任务')),
-                      ButtonSegment(
-                          value: true,
-                          icon: Icon(Icons.content_copy_outlined, size: 17),
-                          label: Text('分配已有任务')),
-                    ],
-                    selected: {assignExisting},
-                    onSelectionChanged: (value) =>
-                        _setAssignExisting(value.first),
-                  ),
-                const SizedBox(height: 14),
-                if (assignExisting) ...[
-                  if (existingTasks.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: const Text('没有可以继续分配的任务',
-                          style:
-                              TextStyle(fontSize: 12, color: AppTheme.muted)),
-                    )
-                  else
-                    _editorDropdown<String>(
-                      value: existingTemplateId,
-                      label: '选择已有任务',
-                      items: existingTasks
-                          .map((task) => DropdownMenuItem(
-                                value: task.templateId,
-                                child: Text(
-                                    '${task.title} · ${task.frequency.label}'),
-                              ))
-                          .toList(),
-                      onChanged: _selectExistingTask,
-                    ),
-                ] else
-                  TextField(
-                      controller: titleController,
-                      autofocus: !isEditing,
-                      decoration: const InputDecoration(
-                          labelText: '任务名称',
-                          hintText: '例如：大战、茶馆、门派周常')),
-                if (validationMessage != null) ...[
-                  const SizedBox(height: 9),
-                  Text(validationMessage!,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xffb94a48))),
-                ],
-                if (!widget.createInInbox &&
-                    (!isEditing || widget.syncAll || isInboxEditing)) ...[
-                  const SizedBox(height: 18),
-                  const Text('关联角色',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  if (availableCharacters.isNotEmpty)
-                    Wrap(spacing: 4, runSpacing: 0, children: [
-                      _characterAction(
-                          label: '全选', onPressed: _selectAllCharacters),
-                      _characterAction(
-                          label: '全不选', onPressed: _clearCharacters),
-                      _characterAction(
-                          label: '反选', onPressed: _invertCharacters),
+              padding: EdgeInsets.only(
+                  left: 22,
+                  right: 22,
+                  top: 18,
+                  bottom: MediaQuery.viewInsetsOf(context).bottom + 18),
+              child: SingleChildScrollView(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(editorTitle,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w600))),
+                      IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, size: 20))
                     ]),
-                  if (availableCharacters.isNotEmpty)
-                    const SizedBox(height: 4),
-                  Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availableCharacters
-                          .map((character) => FilterChip(
-                              label: Text(character.name),
-                              selected: selected.contains(character.id),
-                              onSelected: (value) => setState(() {
-                                    value
-                                        ? selected.add(character.id)
-                                        : selected.remove(character.id);
-                                  })))
-                          .toList()),
-                ] else if (isEditing && !isInboxEditing) ...[
-                  const SizedBox(height: 12),
-                  const Text('本次修改不会影响其他角色',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-                ],
-                if (assignExisting && existingTask != null) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    '将沿用：${existingTask!.frequency.label}'
-                    '${existingTask!.dueDate == null ? '' : ' · ${dueLabel(existingTask!.dueDate)}'}'
-                    '${existingTask!.isCountTask ? ' · 目标 ${existingTask!.targetCount} 次' : ''}',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.muted),
-                  ),
-                ],
-                if (!assignExisting) ...[
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('标签（可选）',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                      ),
-                      Text('${taskTags.length}',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.muted)),
-                    ],
-                  ),
-                  if (taskTags.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: taskTags
-                          .map((tag) => InputChip(
-                                label: Text(tag),
-                                onDeleted: () =>
-                                    setState(() => taskTags.remove(tag)),
-                              ))
-                          .toList(),
-                    ),
-                  ],
-                  if (_availableTags.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _availableTags
-                          .map((tag) => ActionChip(
-                                label: Text(tag),
-                                onPressed: () =>
-                                    setState(() => taskTags.add(tag)),
-                              ))
-                          .toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: tagController,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _commitTagInput(),
-                    decoration: InputDecoration(
-                      labelText: '添加标签',
-                      hintText: '输入后回车；多个标签可用逗号分隔',
-                      suffixIcon: IconButton(
-                        tooltip: '添加标签',
-                        onPressed: _commitTagInput,
-                        icon: const Icon(Icons.add, size: 18),
-                      ),
-                    ),
-                  ),
-                  if (widget.createInInbox || isInboxEditing) ...[
-                    const SizedBox(height: 18),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text('设置周期',
-                          style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('可选；不设置也可以留在收集箱',
-                          style:
-                              TextStyle(fontSize: 11, color: AppTheme.muted)),
-                      value: frequencyConfigured,
-                      onChanged: (value) =>
-                          setState(() => frequencyConfigured = value),
-                    ),
-                  ],
-                  if ((!widget.createInInbox && !isInboxEditing) ||
-                      frequencyConfigured) ...[
-                    if (!widget.createInInbox && !isInboxEditing)
-                      const SizedBox(height: 18),
-                    _editorDropdown<TaskFrequency>(
-                      value: frequency,
-                      label: '周期',
-                      items: TaskFrequency.values
-                          .map((item) => DropdownMenuItem(
-                              value: item, child: Text(item.label)))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) setState(() => frequency = value);
-                      },
-                    ),
-                    if (frequency == TaskFrequency.weeklyCount ||
-                        frequency == TaskFrequency.monthlyCount) ...[
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        const Text('目标次数', style: TextStyle(fontSize: 13)),
-                        const SizedBox(width: 16),
-                        IconButton(
-                            onPressed: targetCount > 1
-                                ? () => setState(() => targetCount--)
-                                : null,
-                            icon: const Icon(Icons.remove_circle_outline,
-                                size: 19)),
-                        Text('$targetCount',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                        IconButton(
-                            onPressed: () => setState(() => targetCount++),
-                            icon: const Icon(Icons.add_circle_outline,
-                                size: 19))
-                      ]),
-                    ],
-                    if (frequency == TaskFrequency.weekly ||
-                        frequency == TaskFrequency.weeklyCount) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                          frequency == TaskFrequency.weekly
-                              ? '每周在哪几天显示（不选则按开始当天）'
-                              : '计划完成日期（不选则本周任意几天完成）',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.muted)),
-                      const SizedBox(height: 7),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: List.generate(7, (index) {
-                          final day = index + 1;
-                          const labels = ['一', '二', '三', '四', '五', '六', '日'];
-                          return FilterChip(
-                            label: Text('周${labels[index]}'),
-                            selected: weeklyDays.contains(day),
-                            onSelected: (value) => setState(() {
-                              value
-                                  ? weeklyDays.add(day)
-                                  : weeklyDays.remove(day);
-                            }),
-                          );
+                    const SizedBox(height: 14),
+                    if (!isEditing &&
+                        (widget.createInInbox ||
+                            !widget.preselectCurrentCharacter)) ...[
+                      _editorDropdown<String>(
+                        value: selectedEditorGameId,
+                        label: '所属游戏',
+                        items: widget.state.games
+                            .map((game) => DropdownMenuItem(
+                                  value: game.id,
+                                  child: Text(game.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) => setState(() {
+                          selectedEditorGameId = value;
+                          selected.clear();
+                          existingTemplateId = null;
                         }),
                       ),
+                      const SizedBox(height: 14),
                     ],
-                  ],
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    leading: const Icon(Icons.play_circle_outline,
-                        size: 19, color: AppTheme.muted),
-                    title: const Text('开始日期',
-                        style: TextStyle(fontSize: 13)),
-                    subtitle: Text(
-                        startDate == null
-                            ? '不设置；分配角色当天开始'
-                            : dueLabel(startDate),
+                    if (!isEditing && !widget.createInInbox)
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                              value: false,
+                              icon: Icon(Icons.add, size: 17),
+                              label: Text('新建任务')),
+                          ButtonSegment(
+                              value: true,
+                              icon: Icon(Icons.content_copy_outlined, size: 17),
+                              label: Text('分配已有任务')),
+                        ],
+                        selected: {assignExisting},
+                        onSelectionChanged: (value) =>
+                            _setAssignExisting(value.first),
+                      ),
+                    const SizedBox(height: 14),
+                    if (assignExisting) ...[
+                      if (existingTasks.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: const Text('没有可以继续分配的任务',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppTheme.muted)),
+                        )
+                      else
+                        _editorDropdown<String>(
+                          value: existingTemplateId,
+                          label: '选择已有任务',
+                          items: existingTasks
+                              .map((task) => DropdownMenuItem(
+                                    value: task.templateId,
+                                    child: Text(
+                                        '${task.title} · ${task.frequency.label}'),
+                                  ))
+                              .toList(),
+                          onChanged: _selectExistingTask,
+                        ),
+                    ] else
+                      TextField(
+                          controller: titleController,
+                          autofocus: !isEditing,
+                          decoration: const InputDecoration(
+                              labelText: '任务名称', hintText: '例如：大战、茶馆、门派周常')),
+                    if (validationMessage != null) ...[
+                      const SizedBox(height: 9),
+                      Text(validationMessage!,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xffb94a48))),
+                    ],
+                    if (!widget.createInInbox &&
+                        (!isEditing || widget.syncAll || isInboxEditing)) ...[
+                      const SizedBox(height: 18),
+                      const Text('关联角色',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      if (availableCharacters.isNotEmpty)
+                        Wrap(spacing: 4, runSpacing: 0, children: [
+                          _characterAction(
+                              label: '全选', onPressed: _selectAllCharacters),
+                          _characterAction(
+                              label: '全不选', onPressed: _clearCharacters),
+                          _characterAction(
+                              label: '反选', onPressed: _invertCharacters),
+                        ]),
+                      if (availableCharacters.isNotEmpty)
+                        const SizedBox(height: 4),
+                      Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: availableCharacters
+                              .map((character) => FilterChip(
+                                  label: Text(character.name),
+                                  selected: selected.contains(character.id),
+                                  onSelected: (value) => setState(() {
+                                        value
+                                            ? selected.add(character.id)
+                                            : selected.remove(character.id);
+                                      })))
+                              .toList()),
+                    ] else if (isEditing && !isInboxEditing) ...[
+                      const SizedBox(height: 12),
+                      const Text('本次修改不会影响其他角色',
+                          style:
+                              TextStyle(fontSize: 12, color: AppTheme.muted)),
+                    ],
+                    if (assignExisting && existingTask != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        '将沿用：${existingTask!.frequency.label}'
+                        '${existingTask!.dueDate == null ? '' : ' · ${dueLabel(existingTask!.dueDate)}'}'
+                        '${existingTask!.isCountTask ? ' · 行为 ${existingTask!.targetCount} 次' : ''}'
+                        '${existingTask!.hasQuantityTarget ? ' · 数量 ${existingTask!.targetQuantity}' : ''}',
                         style: const TextStyle(
-                            fontSize: 11, color: AppTheme.muted)),
-                    trailing: TextButton(
-                        onPressed: _pickStartDate,
-                        child: Text(startDate == null ? '选择' : '修改')),
-                  ),
-                  if (startDate != null)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => setState(() => startDate = null),
-                        child: const Text('按分配日期开始'),
-                      ),
-                    ),
-                  const SizedBox(height: 4),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    leading: const Icon(Icons.event_outlined,
-                        size: 19, color: AppTheme.muted),
-                    title:
-                        const Text('截止日期', style: TextStyle(fontSize: 13)),
-                    subtitle: Text(
-                        dueDate == null ? '不设置' : dueLabel(dueDate),
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.muted)),
-                    trailing: TextButton(
-                        onPressed: _pickDate,
-                        child: Text(dueDate == null ? '选择' : '修改')),
-                  ),
-                  if (dueDate != null)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => setState(() => dueDate = null),
-                        child: const Text('清除截止日期'),
-                      ),
-                    ),
-                  if (isInboxEditing && selected.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                        frequencyConfigured
-                            ? '保存后会分配给所选角色，并移出收集箱。'
-                            : '分配给角色前需要先设置周期。',
-                        style:
-                            const TextStyle(fontSize: 12, color: AppTheme.muted)),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('子任务',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                      ),
-                      TextButton.icon(
-                        onPressed: _addSubtask,
-                        icon: const Icon(Icons.add, size: 17),
-                        label: const Text('添加子任务'),
+                            fontSize: 12, color: AppTheme.muted),
                       ),
                     ],
-                  ),
-                  ...subtaskDrafts.asMap().entries.map((entry) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: entry.value.controller,
-                                decoration: InputDecoration(
-                                  labelText: '子任务 ${entry.key + 1}',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: '删除子任务',
-                              onPressed: () => _removeSubtask(entry.key),
-                              icon: const Icon(Icons.delete_outline, size: 19),
-                            ),
-                          ],
-                        ),
-                      )),
-                  TextField(
-                    controller: noteController,
-                    maxLines: 2,
-                    decoration: const InputDecoration(labelText: '备注（可选）')),
-                ],
-                const SizedBox(height: 18),
-                if (isEditing) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton.icon(
-                          onPressed: _deleteTask,
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xffb94a48),
+                    if (!assignExisting) ...[
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text('标签（可选）',
+                                style: TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
                           ),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          label: Text(widget.syncAll
-                              ? '删除所有角色任务'
-                              : '删除任务'),
-                        ),
+                          Text('${taskTags.length}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppTheme.muted)),
+                        ],
                       ),
-                      if (!isInboxEditing) ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _moveToInbox,
-                            icon: const Icon(Icons.move_to_inbox_outlined,
-                                size: 18),
-                            label: Text(widget.syncAll
-                                ? '全部移到收集箱'
-                                : '移到收集箱'),
-                          ),
+                      if (taskTags.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: taskTags
+                              .map((tag) => InputChip(
+                                    label: Text(tag),
+                                    onDeleted: () =>
+                                        setState(() => taskTags.remove(tag)),
+                                  ))
+                              .toList(),
                         ),
                       ],
+                      if (_availableTags.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _availableTags
+                              .map((tag) => ActionChip(
+                                    label: Text(tag),
+                                    onPressed: () =>
+                                        setState(() => taskTags.add(tag)),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: tagController,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _commitTagInput(),
+                        decoration: InputDecoration(
+                          labelText: '添加标签',
+                          hintText: '输入后回车；多个标签可用逗号分隔',
+                          suffixIcon: IconButton(
+                            tooltip: '添加标签',
+                            onPressed: _commitTagInput,
+                            icon: const Icon(Icons.add, size: 18),
+                          ),
+                        ),
+                      ),
+                      if (widget.createInInbox || isInboxEditing) ...[
+                        const SizedBox(height: 18),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: const Text('设置周期',
+                              style: TextStyle(fontSize: 13)),
+                          subtitle: const Text('可选；不设置也可以留在收集箱',
+                              style: TextStyle(
+                                  fontSize: 11, color: AppTheme.muted)),
+                          value: frequencyConfigured,
+                          onChanged: (value) =>
+                              setState(() => frequencyConfigured = value),
+                        ),
+                      ],
+                      if ((!widget.createInInbox && !isInboxEditing) ||
+                          frequencyConfigured) ...[
+                        if (!widget.createInInbox && !isInboxEditing)
+                          const SizedBox(height: 18),
+                        _editorDropdown<TaskFrequency>(
+                          value: frequency,
+                          label: '周期',
+                          items: TaskFrequency.values
+                              .map((item) => DropdownMenuItem(
+                                  value: item, child: Text(item.label)))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => frequency = value);
+                            }
+                          },
+                        ),
+                        if (frequency == TaskFrequency.weeklyCount ||
+                            frequency == TaskFrequency.monthlyCount) ...[
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            const Text('周期行为次数',
+                                style: TextStyle(fontSize: 13)),
+                            const SizedBox(width: 16),
+                            RepeatingIconButton(
+                              tooltip: '减少周期行为次数，长按可连续减少',
+                              onPressed: targetCount > 1
+                                  ? () => setState(() => targetCount--)
+                                  : null,
+                              icon: Icons.remove_circle_outline,
+                            ),
+                            Text('$targetCount',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                            RepeatingIconButton(
+                              tooltip: '增加周期行为次数，长按可连续增加',
+                              onPressed: () => setState(() => targetCount++),
+                              icon: Icons.add_circle_outline,
+                            )
+                          ]),
+                        ],
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: targetQuantityController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: false,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: '目标数量（可选）',
+                            hintText: '例如 200；不填写则按普通完成任务',
+                            helperText: '用于可累计的资源或数量，与周/月行为次数分开统计',
+                          ),
+                        ),
+                        if (frequency == TaskFrequency.weekly ||
+                            frequency == TaskFrequency.weeklyCount) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                              frequency == TaskFrequency.weekly
+                                  ? '每周在哪几天显示（不选则按开始当天）'
+                                  : '计划完成日期（不选则本周任意几天完成）',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppTheme.muted)),
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: List.generate(7, (index) {
+                              final day = index + 1;
+                              const labels = [
+                                '一',
+                                '二',
+                                '三',
+                                '四',
+                                '五',
+                                '六',
+                                '日'
+                              ];
+                              return FilterChip(
+                                label: Text('周${labels[index]}'),
+                                selected: weeklyDays.contains(day),
+                                onSelected: (value) => setState(() {
+                                  value
+                                      ? weeklyDays.add(day)
+                                      : weeklyDays.remove(day);
+                                }),
+                              );
+                            }),
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.play_circle_outline,
+                            size: 19, color: AppTheme.muted),
+                        title:
+                            const Text('开始日期', style: TextStyle(fontSize: 13)),
+                        subtitle: Text(
+                            startDate == null
+                                ? '不设置；分配角色当天开始'
+                                : dueLabel(startDate),
+                            style: const TextStyle(
+                                fontSize: 11, color: AppTheme.muted)),
+                        trailing: TextButton(
+                            onPressed: _pickStartDate,
+                            child: Text(startDate == null ? '选择' : '修改')),
+                      ),
+                      if (startDate != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => setState(() => startDate = null),
+                            child: const Text('按分配日期开始'),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(Icons.event_outlined,
+                            size: 19, color: AppTheme.muted),
+                        title:
+                            const Text('截止日期', style: TextStyle(fontSize: 13)),
+                        subtitle: Text(
+                            dueDate == null ? '不设置' : dueLabel(dueDate),
+                            style: const TextStyle(
+                                fontSize: 11, color: AppTheme.muted)),
+                        trailing: TextButton(
+                            onPressed: _pickDate,
+                            child: Text(dueDate == null ? '选择' : '修改')),
+                      ),
+                      if (dueDate != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => setState(() => dueDate = null),
+                            child: const Text('清除截止日期'),
+                          ),
+                        ),
+                      if (isInboxEditing && selected.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                            frequencyConfigured
+                                ? '保存后会分配给所选角色，并移出收集箱。'
+                                : '分配给角色前需要先设置周期。',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.muted)),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text('子任务',
+                                style: TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                          TextButton.icon(
+                            onPressed: _addSubtask,
+                            icon: const Icon(Icons.add, size: 17),
+                            label: const Text('添加子任务'),
+                          ),
+                        ],
+                      ),
+                      ...subtaskDrafts.asMap().entries.map((entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: entry.value.controller,
+                                    decoration: InputDecoration(
+                                      labelText: '子任务 ${entry.key + 1}',
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: '删除子任务',
+                                  onPressed: () => _removeSubtask(entry.key),
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 19),
+                                ),
+                              ],
+                            ),
+                          )),
+                      TextField(
+                          controller: noteController,
+                          maxLines: 2,
+                          decoration:
+                              const InputDecoration(labelText: '备注（可选）')),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                        onPressed: saving ? null : _submit,
-                        child: saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(saveLabel)))
-              ])))));
+                    const SizedBox(height: 18),
+                    if (isEditing) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              onPressed: _deleteTask,
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xffb94a48),
+                              ),
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              label: Text(widget.syncAll ? '删除所有角色任务' : '删除任务'),
+                            ),
+                          ),
+                          if (!isInboxEditing) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _moveToInbox,
+                                icon: const Icon(Icons.move_to_inbox_outlined,
+                                    size: 18),
+                                label:
+                                    Text(widget.syncAll ? '全部移到收集箱' : '移到收集箱'),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                            onPressed: saving ? null : _submit,
+                            child: saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(saveLabel)))
+                  ])))));
 
   Widget _editorDropdown<T>({
     required T? value,
@@ -687,9 +716,8 @@ class _TaskEditorState extends State<_TaskEditor> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final editorGame = widget.state.games
-        .where((game) => game.id == editorGameId)
-        .firstOrNull;
+    final editorGame =
+        widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
     final date = await showDatePicker(
         context: context,
         firstDate: DateTime(2000),
@@ -700,9 +728,8 @@ class _TaskEditorState extends State<_TaskEditor> {
 
   Future<void> _pickStartDate() async {
     final now = DateTime.now();
-    final editorGame = widget.state.games
-        .where((game) => game.id == editorGameId)
-        .firstOrNull;
+    final editorGame =
+        widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
     final date = await showDatePicker(
         context: context,
         firstDate: DateTime(2000),
@@ -741,8 +768,8 @@ class _TaskEditorState extends State<_TaskEditor> {
         _showValidation('请至少选择一个尚未分配的角色');
         return;
       }
-      await widget.state.assignExistingTask(
-          source: task, characterIds: Set.of(selected));
+      await widget.state
+          .assignExistingTask(source: task, characterIds: Set.of(selected));
       if (mounted) Navigator.pop(context);
       return;
     }
@@ -759,6 +786,14 @@ class _TaskEditorState extends State<_TaskEditor> {
       return;
     }
     final tags = _tags();
+    final targetQuantityText = targetQuantityController.text.trim();
+    final targetQuantity =
+        targetQuantityText.isEmpty ? null : int.tryParse(targetQuantityText);
+    if (targetQuantityText.isNotEmpty &&
+        (targetQuantity == null || targetQuantity <= 0)) {
+      _showValidation('目标数量必须是大于 0 的整数');
+      return;
+    }
     taskTags
       ..clear()
       ..addAll(tags);
@@ -771,6 +806,7 @@ class _TaskEditorState extends State<_TaskEditor> {
         startDate: startDate,
         dueDate: dueDate,
         targetCount: targetCount,
+        targetQuantity: targetQuantity,
         weeklyDays: weeklyDays.toList()..sort(),
         subtasks: _subtasks(),
         tags: tags,
@@ -785,6 +821,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           tags: tags,
@@ -803,6 +840,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           tags: tags,
@@ -823,6 +861,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           tags: tags,
@@ -836,6 +875,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           tags: tags,
@@ -851,6 +891,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           startDate: startDate,
           dueDate: dueDate,
           targetCount: targetCount,
+          targetQuantity: targetQuantity,
           weeklyDays: weeklyDays.toList()..sort(),
           subtasks: _subtasks(),
           tags: tags,
@@ -858,16 +899,17 @@ class _TaskEditorState extends State<_TaskEditor> {
         );
       } else {
         await widget.state.addTask(
-          title: title,
-          characterIds: selected.toList(),
-          frequency: frequency,
-          startDate: startDate,
-          dueDate: dueDate,
-          targetCount: targetCount,
-          weeklyDays: weeklyDays.toList()..sort(),
-          subtasks: _subtasks(),
-          tags: tags,
-          note: noteController.text.trim());
+            title: title,
+            characterIds: selected.toList(),
+            frequency: frequency,
+            startDate: startDate,
+            dueDate: dueDate,
+            targetCount: targetCount,
+            targetQuantity: targetQuantity,
+            weeklyDays: weeklyDays.toList()..sort(),
+            subtasks: _subtasks(),
+            tags: tags,
+            note: noteController.text.trim());
       }
     }
     if (mounted) Navigator.pop(context);
@@ -1014,6 +1056,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     titleController.dispose();
     noteController.dispose();
     tagController.dispose();
+    targetQuantityController.dispose();
     for (final draft in subtaskDrafts) {
       draft.controller.dispose();
     }
@@ -1045,9 +1088,8 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   String? selectedGameId;
   String? validationMessage;
 
-  Game? get selectedGame => widget.state.games
-      .where((item) => item.id == selectedGameId)
-      .firstOrNull;
+  Game? get selectedGame =>
+      widget.state.games.where((item) => item.id == selectedGameId).firstOrNull;
 
   @override
   void initState() {
@@ -1071,19 +1113,16 @@ class _CharacterEditorState extends State<_CharacterEditor> {
     final values = selectedGameId == widget.character?.gameId
         ? widget.character?.metadataValues ?? const <String, String>{}
         : const <String, String>{};
-    for (final field in selectedGame?.metadataFields ??
-        const <GameMetadataField>[]) {
+    for (final field
+        in selectedGame?.metadataFields ?? const <GameMetadataField>[]) {
       final value = values[field.id] ?? '';
       switch (field.type) {
         case MetadataFieldType.choice:
-          choiceValues[field.id] =
-              field.options.contains(value) ? value : null;
+          choiceValues[field.id] = field.options.contains(value) ? value : null;
           break;
         case MetadataFieldType.multiChoice:
-          multiValues[field.id] = value
-              .split('\n')
-              .where(field.options.contains)
-              .toSet();
+          multiValues[field.id] =
+              value.split('\n').where(field.options.contains).toSet();
           break;
         case MetadataFieldType.boolean:
           booleanValues[field.id] = value == 'true';
@@ -1153,8 +1192,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消')),
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
           FilledButton(onPressed: _save, child: const Text('保存')),
         ],
       );
@@ -1172,8 +1210,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
                   child: Text(option),
                 )),
           ],
-          onChanged: (value) =>
-              setState(() => choiceValues[field.id] = value),
+          onChanged: (value) => setState(() => choiceValues[field.id] = value),
         );
       case MetadataFieldType.multiChoice:
         final selected = multiValues.putIfAbsent(field.id, () => <String>{});
@@ -1202,8 +1239,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           title: Text(field.name, style: const TextStyle(fontSize: 13)),
           value: booleanValues[field.id] ?? false,
-          onChanged: (value) =>
-              setState(() => booleanValues[field.id] = value),
+          onChanged: (value) => setState(() => booleanValues[field.id] = value),
         );
       case MetadataFieldType.date:
         return _pickerField(
@@ -1230,8 +1266,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
         return TextField(
           controller: controllers[field.id],
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration:
-              InputDecoration(labelText: field.name, hintText: '请输入数字'),
+          decoration: InputDecoration(labelText: field.name, hintText: '请输入数字'),
         );
       case MetadataFieldType.url:
         return TextField(
@@ -1294,8 +1329,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
             hour: int.tryParse(parts[0]) ?? 0,
             minute: int.tryParse(parts[1]) ?? 0)
         : TimeOfDay.now();
-    final value =
-        await showTimePicker(context: context, initialTime: initial);
+    final value = await showTimePicker(context: context, initialTime: initial);
     if (value != null) {
       setState(() => controller.text =
           '${twoDigits(value.hour)}:${twoDigits(value.minute)}');
@@ -1310,8 +1344,8 @@ class _CharacterEditorState extends State<_CharacterEditor> {
       return;
     }
     final values = <String, String>{};
-    for (final field in selectedGame?.metadataFields ??
-        const <GameMetadataField>[]) {
+    for (final field
+        in selectedGame?.metadataFields ?? const <GameMetadataField>[]) {
       final value = switch (field.type) {
         MetadataFieldType.choice => choiceValues[field.id] ?? '',
         MetadataFieldType.multiChoice =>
@@ -1335,8 +1369,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
       }
       if (value.isNotEmpty) values[field.id] = value;
     }
-    final legacyOccupation =
-        values[legacyOccupationMetadataField.id] ?? '';
+    final legacyOccupation = values[legacyOccupationMetadataField.id] ?? '';
     if (widget.character == null) {
       await widget.state.addCharacter(
         name: name,
