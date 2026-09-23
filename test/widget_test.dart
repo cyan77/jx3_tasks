@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +24,32 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  test('migrates project data to a selected directory', () async {
+    SharedPreferences.setMockInitialValues({});
+    final directory = await Directory.systemTemp.createTemp('role-schedule-');
+    try {
+      final store = LocalStore()
+        ..games = const [Game(id: 'game', name: '测试游戏')]
+        ..characters = const []
+        ..tasks = const [];
+
+      await store.migrateToDirectory(directory.path);
+
+      final file = File(LocalStore.dataFilePathFor(directory.path));
+      expect(store.dataDirectory, Directory(directory.path).absolute.path);
+      expect(await file.exists(), isTrue);
+      final payload = jsonDecode(await file.readAsString()) as Map;
+      expect((payload['games'] as List).single['name'], '测试游戏');
+
+      store.games = const [Game(id: 'game', name: '更新后的游戏')];
+      await store.save();
+      final updated = jsonDecode(await file.readAsString()) as Map;
+      expect((updated['games'] as List).single['name'], '更新后的游戏');
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
   testWidgets('repeating icon button accelerates while held', (tester) async {
     var count = 0;
     await tester.pumpWidget(MaterialApp(

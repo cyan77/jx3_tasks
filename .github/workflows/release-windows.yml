@@ -40,11 +40,29 @@ jobs:
 
       # Actions artifacts are ZIP downloads already. Upload the directory itself
       # so trial builds only need to be extracted once.
-      - name: Upload workflow artifact
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:').Line.Split(':', 2)[1].Trim().Split('+')[0]
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc "/DMyAppVersion=$version" windows/installer/RoleSchedule.iss
+
+      - name: Upload portable workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 角色日程-Windows-x64
+          name: 角色日程-Windows-Portable
           path: build/windows/x64/runner/Release/
+          if-no-files-found: error
+
+      - name: Upload installer workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 角色日程-Windows-Installer
+          path: build/windows/installer/RoleSchedule-Windows-x64-Setup.exe
           if-no-files-found: error
 
   build-android:
@@ -131,11 +149,20 @@ jobs:
             -format UDZO \
             角色日程-macOS.dmg
 
+      - name: Package macOS client as PKG
+        run: |
+          pkgbuild \
+            --component build/macos/Build/Products/Release/角色日程.app \
+            --install-location /Applications \
+            角色日程-macOS.pkg
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: 角色日程-macOS
-          path: 角色日程-macOS.dmg
+          path: |
+            角色日程-macOS.dmg
+            角色日程-macOS.pkg
           if-no-files-found: error
 
   publish-release:
@@ -148,11 +175,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Windows files
+      - name: Download Windows portable files
         uses: actions/download-artifact@v4
         with:
-          name: 角色日程-Windows-x64
-          path: release-input/windows
+          name: 角色日程-Windows-Portable
+          path: release-input/windows-portable
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: 角色日程-Windows-Installer
+          path: release-input/windows-installer
 
       - name: Download Android APK
         uses: actions/download-artifact@v4
@@ -170,11 +203,14 @@ jobs:
         run: |
           mkdir -p release-assets
           (
-            cd release-input/windows
-            zip -r ../../release-assets/RoleSchedule-Windows-x64.zip .
+            cd release-input/windows-portable
+            zip -r ../../release-assets/RoleSchedule-Windows-x64-Portable.zip .
           )
+          cp release-input/windows-installer/RoleSchedule-Windows-x64-Setup.exe \
+            release-assets/RoleSchedule-Windows-x64-Setup.exe
           cp release-input/android/角色日程-Android.apk release-assets/RoleSchedule-Android.apk
           cp release-input/macos/角色日程-macOS.dmg release-assets/RoleSchedule-macOS.dmg
+          cp release-input/macos/角色日程-macOS.pkg release-assets/RoleSchedule-macOS.pkg
 
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,13 +9,37 @@ class LocalStore {
   static const _gamesKey = 'games';
   static const _charactersKey = 'characters';
   static const _tasksKey = 'tasks';
+  static const _dataDirectoryKey = 'data.directory';
+  static const dataFileName = 'role_schedule_data.json';
 
   List<Game> games = [];
   List<Character> characters = [];
   List<TaskRecord> tasks = [];
+  String? _dataDirectory;
+
+  String? get dataDirectory => _dataDirectory;
+
+  static String dataFilePathFor(String directory) =>
+      '${Directory(directory).absolute.path}${Platform.pathSeparator}$dataFileName';
 
   Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
+    _dataDirectory = _normalizeDirectory(
+      preferences.getString(_dataDirectoryKey),
+    );
+    if (_dataDirectory != null) {
+      final file = File(dataFilePathFor(_dataDirectory!));
+      if (!await file.exists()) {
+        throw StateError('找不到本地数据文件：${file.path}');
+      }
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map) {
+        throw const FormatException('本地数据文件格式无效');
+      }
+      _loadPayload(Map<String, dynamic>.from(decoded));
+      return;
+    }
+
     final gamesJson = preferences.getString(_gamesKey);
     final charactersJson = preferences.getString(_charactersKey);
     final tasksJson = preferences.getString(_tasksKey);
@@ -45,6 +70,12 @@ class LocalStore {
   }
 
   Future<void> save() async {
+    if (_dataDirectory != null) {
+      final file = File(dataFilePathFor(_dataDirectory!));
+      await file.parent.create(recursive: true);
+      await file.writeAsString(exportJson(), flush: true);
+      return;
+    }
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
         _gamesKey, jsonEncode(games.map((item) => item.toJson()).toList()));
@@ -73,6 +104,40 @@ class LocalStore {
         decoded['tasks'] is! List) {
       throw const FormatException('不是有效的 角色日程备份文件');
     }
+    _loadPayload(Map<String, dynamic>.from(decoded));
+    await save();
+  }
+
+  /// Moves the current project data to a user-selected directory.
+  ///
+  /// The destination must not already contain the app's data file, so an
+  /// accidental folder selection cannot overwrite another data set. The
+  /// preference that points to this file is written only after the copy
+  /// succeeds; if the app is interrupted during the operation, it continues
+  /// using the old data.
+  Future<void> migrateToDirectory(String directory) async {
+    final normalized = _normalizeDirectory(directory);
+    if (normalized == null) {
+      throw const FormatException('请选择有效的数据文件夹');
+    }
+    if (normalized == _dataDirectory) return;
+
+    final target = File(dataFilePathFor(normalized));
+    if (await target.exists()) {
+      throw StateError('目标文件夹已有角色日程数据，请选择空文件夹');
+    }
+    await target.parent.create(recursive: true);
+    await target.writeAsString(exportJson(), flush: true);
+
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_dataDirectoryKey, normalized);
+    _dataDirectory = normalized;
+  }
+
+  void _loadPayload(Map<String, dynamic> decoded) {
+    if (decoded['characters'] is! List || decoded['tasks'] is! List) {
+      throw const FormatException('本地数据文件缺少角色或任务数据');
+    }
     games = decoded['games'] is List
         ? (decoded['games'] as List)
             .map(
@@ -86,15 +151,19 @@ class LocalStore {
         .toList();
     _migrateCharacterMetadata(
       legacyGames: decoded['games'] is! List ||
-          !(decoded['games'] as List).every((item) =>
-              item is Map && item.containsKey('metadataFields')),
+          !(decoded['games'] as List).every(
+              (item) => item is Map && item.containsKey('metadataFields')),
     );
     tasks = (decoded['tasks'] as List)
         .map((item) =>
             TaskRecord.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
     _migrateInboxGames();
-    await save();
+  }
+
+  String? _normalizeDirectory(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty ? null : Directory(trimmed).absolute.path;
   }
 
   void _migrateCharacterMetadata({required bool legacyGames}) {
@@ -106,7 +175,8 @@ class LocalStore {
     games = games
         .map((game) => gameIdsWithOccupation.contains(game.id) &&
                 game.metadataFields.isEmpty
-            ? game.copyWith(metadataFields: const [legacyOccupationMetadataField])
+            ? game
+                .copyWith(metadataFields: const [legacyOccupationMetadataField])
             : game)
         .toList();
     characters = characters

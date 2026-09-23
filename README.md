@@ -99,8 +99,8 @@
 | 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
 | Android | [RoleSchedule-Android.apk](https://github.com/cyan77/jx3_tasks/releases/latest/download/RoleSchedule-Android.apk) | 下载后允许浏览器安装未知来源应用 |
-| Windows | [RoleSchedule-Windows-x64.zip](https://github.com/cyan77/jx3_tasks/releases/latest/download/RoleSchedule-Windows-x64.zip) | 解压后运行应用程序，请勿只复制单个 EXE |
-| macOS | [RoleSchedule-macOS.dmg](https://github.com/cyan77/jx3_tasks/releases/latest/download/RoleSchedule-macOS.dmg) | 打开 DMG 后将应用拖入“应用程序” |
+| Windows | [RoleSchedule-Windows-x64-Setup.exe](https://github.com/cyan77/jx3_tasks/releases/latest/download/RoleSchedule-Windows-x64-Setup.exe) | 推荐安装版，支持覆盖更新；便携版仍可按需下载 |
+| macOS | [RoleSchedule-macOS.pkg](https://github.com/cyan77/jx3_tasks/releases/latest/download/RoleSchedule-macOS.pkg) | 推荐安装版；DMG 镜像仍可按需下载 |
 
 > 数据默认只保存在当前设备。首次跨设备使用前，建议先在“同步与备份”中导出本地备份，或配置坚果云 WebDAV。
 
