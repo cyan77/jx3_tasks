@@ -25,12 +25,15 @@ class AppRelease {
           ]
         : Platform.isWindows
             ? const [
+                'RoleSchedule-Windows-x64-Setup.exe',
+                'RoleSchedule-Windows-x64-Portable.zip',
                 'RoleSchedule-Windows-x64.zip',
                 '角色日程-Windows-x64.zip',
                 'jx3_tasks-windows-x64.zip',
               ]
             : Platform.isMacOS
                 ? const [
+                    'RoleSchedule-macOS.pkg',
                     'RoleSchedule-macOS.dmg',
                     '角色日程-macOS.dmg',
                     'jx3_tasks-macos.dmg',
@@ -58,7 +61,8 @@ class UpdateService {
       request.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
         ..set(HttpHeaders.userAgentHeader, 'Role-Schedule-Update-Checker');
-      final response = await request.close().timeout(const Duration(seconds: 12));
+      final response =
+          await request.close().timeout(const Duration(seconds: 12));
       final raw = await utf8.decoder.bind(response).join();
       if (response.statusCode != HttpStatus.ok) {
         throw HttpException('GitHub 返回 ${response.statusCode}');

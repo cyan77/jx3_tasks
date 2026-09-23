@@ -1,8 +1,13 @@
+import 'dart:io' as io;
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/update_service.dart';
+import '../../data/app_restart.dart';
+import '../../data/local_store.dart';
 import '../../data/theme_settings.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
@@ -75,6 +80,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
+                    if (io.Platform.isWindows || io.Platform.isMacOS) ...[
+                      const SizedBox(height: 10),
+                      _SettingCard(
+                        icon: Icons.folder_open_outlined,
+                        title: '本地数据位置',
+                        subtitle: state.store.dataDirectory == null
+                            ? '系统默认位置；可迁移到指定文件夹'
+                            : state.store.dataDirectory!,
+                        onTap: _changeDataDirectory,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     _SettingCard(
                       icon: Icons.cloud_sync_outlined,
@@ -205,6 +221,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (selected != null) await state.setThemeMode(selected);
   }
 
+  Future<void> _changeDataDirectory() async {
+    if (!io.Platform.isWindows && !io.Platform.isMacOS) return;
+    final selected = await FilePicker.getDirectoryPath(
+      dialogTitle: '选择角色日程数据文件夹',
+    );
+    if (!mounted || selected == null || selected.trim().isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('迁移本地数据并重启？'),
+        content: Text(
+          '当前所有游戏、角色、任务和完成记录将迁移到：\n\n'
+          '$selected\n\n'
+          '数据文件名为 ${LocalStore.dataFileName}。迁移完成后应用会自动重启。'
+          '\n\n目标文件夹中不能已有同名数据文件。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('迁移并重启'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await state.store.migrateToDirectory(selected);
+      await restartApplication();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('迁移失败：$error')),
+      );
+    }
+  }
+
   Future<void> _showUpdateDialog(
     AppRelease release,
     String currentVersion,
@@ -289,7 +347,8 @@ class _SettingCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Row(
