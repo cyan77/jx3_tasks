@@ -175,6 +175,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out release notes
+        uses: actions/checkout@v4
+
       - name: Download Windows portable files
         uses: actions/download-artifact@v4
         with:
@@ -233,6 +236,5 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ github.ref_name }}
           files: release-assets/*
-          generate_release_notes: true
-          body: |
-            本版本更新日志由 GitHub 根据版本标签之间的实际提交自动生成。
+          generate_release_notes: false
+          body_path: docs/releases/${{ github.ref_name }}.md
