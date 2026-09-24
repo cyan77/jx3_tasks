@@ -401,6 +401,44 @@ void main() {
     state.dispose();
   });
 
+  test('local edits create a protected conflict with the newer cloud backup',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = [const Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = const [];
+    final webDav = _FakeWebDavSyncService('{}');
+    final state = AppState(
+      store,
+      syncSettingsStore: _FakeSyncSettingsStore(),
+      webDavSyncService: webDav,
+    );
+
+    await state.reloadSyncSettings();
+    await state.addGame('本地新增游戏');
+    webDav.remoteBackups = const [
+      RemoteBackup(
+        name: 'backup_20990101_000000000000000_other.json',
+        path: '/other.json',
+      ),
+    ];
+
+    expect(await state.checkForNewerBackup(), isTrue);
+    expect(state.hasSyncConflict, isTrue);
+    expect(state.conflictLocalJson, contains('本地新增游戏'));
+
+    final conflictBundle = await state.exportConflictBundle();
+    expect(conflictBundle, contains('本地新增游戏'));
+    expect(webDav.downloadCount, 1);
+
+    expect(await state.keepLocalAndUploadAsNewBackup(), isTrue);
+    expect(webDav.uploadCount, 1);
+    expect(state.hasSyncConflict, isFalse);
+    expect(state.currentRemoteBackupPath, '/new.json');
+    state.dispose();
+  });
+
   testWidgets('system back returns a secondary tab to the todo home',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
