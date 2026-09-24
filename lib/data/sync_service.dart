@@ -43,6 +43,18 @@ class RemoteBackup {
   final int? size;
 }
 
+class SyncConflictSnapshot {
+  const SyncConflictSnapshot({
+    this.localJson,
+    this.remoteJson,
+    this.remotePath,
+  });
+
+  final String? localJson;
+  final String? remoteJson;
+  final String? remotePath;
+}
+
 class SyncSettingsStore {
   static const _urlKey = 'webdav.url';
   static const _usernameKey = 'webdav.username';
@@ -51,6 +63,10 @@ class SyncSettingsStore {
   static const _autoSyncMinutesKey = 'webdav.autoSyncMinutes';
   static const _lastSyncAtKey = 'webdav.lastSyncAt';
   static const _currentBackupPathKey = 'webdav.currentBackupPath';
+  static const _dataDirtyKey = 'webdav.dataDirty';
+  static const _conflictLocalKey = 'webdav.conflict.local';
+  static const _conflictRemoteKey = 'webdav.conflict.remote';
+  static const _conflictRemotePathKey = 'webdav.conflict.remotePath';
 
   Future<SyncConfig> load() async {
     final preferences = await SharedPreferences.getInstance();
@@ -100,6 +116,51 @@ class SyncSettingsStore {
     } else {
       await preferences.setString(_currentBackupPathKey, path);
     }
+  }
+
+  Future<bool> loadDataDirty() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_dataDirtyKey) ?? false;
+  }
+
+  Future<void> saveDataDirty(bool value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_dataDirtyKey, value);
+  }
+
+  Future<SyncConflictSnapshot> loadConflictSnapshot() async {
+    final preferences = await SharedPreferences.getInstance();
+    return SyncConflictSnapshot(
+      localJson: preferences.getString(_conflictLocalKey),
+      remoteJson: preferences.getString(_conflictRemoteKey),
+      remotePath: preferences.getString(_conflictRemotePathKey),
+    );
+  }
+
+  Future<void> saveConflictLocalSnapshot({
+    required String json,
+    required String remotePath,
+  }) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_conflictLocalKey, json);
+    await preferences.setString(_conflictRemotePathKey, remotePath);
+    await preferences.remove(_conflictRemoteKey);
+  }
+
+  Future<void> saveConflictRemoteSnapshot({
+    required String json,
+    required String remotePath,
+  }) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_conflictRemoteKey, json);
+    await preferences.setString(_conflictRemotePathKey, remotePath);
+  }
+
+  Future<void> clearConflictSnapshot() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_conflictLocalKey);
+    await preferences.remove(_conflictRemoteKey);
+    await preferences.remove(_conflictRemotePathKey);
   }
 }
 

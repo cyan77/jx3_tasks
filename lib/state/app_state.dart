@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -41,6 +42,11 @@ class AppState extends ChangeNotifier {
   int _successfulSyncGeneration = 0;
   int _dataRevision = 0;
   int _syncedRevision = 0;
+  bool _dataDirty = false;
+  String? _conflictLocalJson;
+  String? _conflictRemoteJson;
+  String? _conflictRemotePath;
+  bool _disposed = false;
   bool _taskDayClockStarted = false;
   bool syncBusy = false;
   bool restoreBusy = false;
@@ -66,6 +72,10 @@ class AppState extends ChangeNotifier {
   DateTime? get lastSyncAt => _lastSyncAt;
   RemoteBackup? get newerRemoteBackup => _newerRemoteBackup;
   String? get currentRemoteBackupPath => _currentRemoteBackupPath;
+  bool get hasUnsyncedChanges => _hasUnsyncedChanges;
+  bool get hasSyncConflict => _newerRemoteBackup != null && _hasUnsyncedChanges;
+  String? get conflictLocalJson => _conflictLocalJson;
+  String? get conflictRemoteJson => _conflictRemoteJson;
 
   Game? gameForTask(TaskRecord task) {
     final gameId = task.isInbox
@@ -212,6 +222,12 @@ class AppState extends ChangeNotifier {
     _syncConfig = await syncSettingsStore.load();
     _lastSyncAt = await syncSettingsStore.loadLastSyncAt();
     _currentRemoteBackupPath = await syncSettingsStore.loadCurrentBackupPath();
+    _dataDirty = await syncSettingsStore.loadDataDirty();
+    final conflict = await syncSettingsStore.loadConflictSnapshot();
+    if (_disposed) return;
+    _conflictLocalJson = conflict.localJson;
+    _conflictRemoteJson = conflict.remoteJson;
+    _conflictRemotePath = conflict.remotePath;
     _scheduleAutoSync();
     _scheduleRemoteBackupChecks();
     _scheduleChangeSync();
@@ -228,12 +244,14 @@ class AppState extends ChangeNotifier {
     await checkForNewerBackup();
   }
 
-  bool get _hasUnsyncedChanges => _dataRevision > _syncedRevision;
+  bool get _hasUnsyncedChanges => _dataDirty || _dataRevision > _syncedRevision;
 
   Future<void> _saveDataChange() async {
     _dataRevision++;
+    _dataDirty = true;
     notifyListeners();
     _scheduleChangeSync();
+    await syncSettingsStore.saveDataDirty(true);
     await store.save();
   }
 
@@ -385,6 +403,11 @@ class AppState extends ChangeNotifier {
       syncSucceeded = true;
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
       await syncSettingsStore.saveCurrentBackupPath(backup.path);
+      if (revisionAtStart == _dataRevision) {
+        _dataDirty = false;
+        await syncSettingsStore.saveDataDirty(false);
+        await _clearConflictSnapshot();
+      }
       syncMessage = '已同步 · ${backup.name}';
       return true;
     } catch (error) {
@@ -425,6 +448,17 @@ class AppState extends ChangeNotifier {
                     (latestTime != null && latestTime.isAfter(_lastSyncAt!)))
             ? latest
             : null;
+        if (hasSyncConflict &&
+            latest != null &&
+            _conflictRemotePath != latest.path) {
+          _conflictLocalJson = exportBackup();
+          _conflictRemoteJson = null;
+          _conflictRemotePath = latest.path;
+          await syncSettingsStore.saveConflictLocalSnapshot(
+            json: _conflictLocalJson!,
+            remotePath: latest.path,
+          );
+        }
       }
       return true;
     } catch (_) {
@@ -454,6 +488,9 @@ class AppState extends ChangeNotifier {
       _lastSyncAt = DateTime.now();
       _currentRemoteBackupPath = backup.path;
       _newerRemoteBackup = null;
+      _dataDirty = false;
+      await syncSettingsStore.saveDataDirty(false);
+      await _clearConflictSnapshot();
       await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
       await syncSettingsStore.saveCurrentBackupPath(backup.path);
       syncMessage = '已恢复 · ${backup.name}';
@@ -484,12 +521,128 @@ class AppState extends ChangeNotifier {
     _scheduleTaskDayRefresh();
     if (markAsLocalChange) {
       _dataRevision++;
+      _dataDirty = true;
+      await syncSettingsStore.saveDataDirty(true);
       _currentRemoteBackupPath = null;
       _newerRemoteBackup = null;
+      await _clearConflictSnapshot();
       await syncSettingsStore.saveCurrentBackupPath(null);
       _scheduleChangeSync();
     }
     notifyListeners();
+  }
+
+  Future<String> prepareConflictRemote() async {
+    final backup = _newerRemoteBackup;
+    if (backup == null) throw StateError('当前没有待处理的云端冲突');
+    if (_conflictRemoteJson != null && _conflictRemotePath == backup.path) {
+      return _conflictRemoteJson!;
+    }
+    final config = _syncConfig ?? await syncSettingsStore.load();
+    _syncConfig = config;
+    final raw = await webDavSyncService.downloadBackup(config, backup);
+    _conflictRemoteJson = raw;
+    _conflictRemotePath = backup.path;
+    await syncSettingsStore.saveConflictRemoteSnapshot(
+      json: raw,
+      remotePath: backup.path,
+    );
+    notifyListeners();
+    return raw;
+  }
+
+  Future<void> restoreConflictRemote() async {
+    final backup = _newerRemoteBackup;
+    if (backup == null) throw StateError('当前没有待处理的云端冲突');
+    if (restoreBusy || syncBusy) throw StateError('同步操作正在进行中');
+    final config = _syncConfig ?? await syncSettingsStore.load();
+    _syncConfig = config;
+    if (!config.isValid) throw StateError('尚未配置 WebDAV');
+    _changeSyncTimer?.cancel();
+    restoreBusy = true;
+    notifyListeners();
+    try {
+      final raw = await prepareConflictRemote();
+      await importBackup(raw, markAsLocalChange: false);
+      _dataRevision = 0;
+      _syncedRevision = 0;
+      _dataDirty = false;
+      _lastSyncAt = DateTime.now();
+      _currentRemoteBackupPath = backup.path;
+      _newerRemoteBackup = null;
+      await syncSettingsStore.saveDataDirty(false);
+      await _clearConflictSnapshot();
+      await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
+      await syncSettingsStore.saveCurrentBackupPath(backup.path);
+      syncMessage = '已使用云端版本 · ${backup.name}';
+    } finally {
+      restoreBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> keepLocalAndUploadAsNewBackup() async {
+    final conflict = _newerRemoteBackup;
+    if (conflict == null || !_hasUnsyncedChanges) return false;
+    if (syncBusy || restoreBusy) return false;
+    final config = _syncConfig ?? await syncSettingsStore.load();
+    _syncConfig = config;
+    if (!config.isValid) {
+      syncMessage = '尚未配置 WebDAV';
+      notifyListeners();
+      return false;
+    }
+    final checked = await checkForNewerBackup();
+    if (!checked || _newerRemoteBackup?.path != conflict.path) {
+      syncMessage = '云端又有新版本，请重新处理冲突';
+      notifyListeners();
+      return false;
+    }
+    syncBusy = true;
+    final revisionAtStart = _dataRevision;
+    notifyListeners();
+    try {
+      final backup = await webDavSyncService.upload(config, exportBackup());
+      _lastSyncAt = DateTime.now();
+      _syncedRevision = revisionAtStart;
+      _currentRemoteBackupPath = backup.path;
+      _newerRemoteBackup = null;
+      _successfulSyncGeneration++;
+      if (revisionAtStart == _dataRevision) {
+        _dataDirty = false;
+        await syncSettingsStore.saveDataDirty(false);
+        await _clearConflictSnapshot();
+      }
+      await syncSettingsStore.saveLastSyncAt(_lastSyncAt!);
+      await syncSettingsStore.saveCurrentBackupPath(backup.path);
+      syncMessage = '已保留本地版本并创建新云端备份 · ${backup.name}';
+      return true;
+    } catch (error) {
+      syncMessage = '同步失败：$error';
+      return false;
+    } finally {
+      syncBusy = false;
+      notifyListeners();
+      _scheduleChangeSync();
+    }
+  }
+
+  Future<String> exportConflictBundle() async {
+    final remote = await prepareConflictRemote();
+    final local = _conflictLocalJson ?? exportBackup();
+    return const JsonEncoder.withIndent('  ').convert({
+      'schemaVersion': 1,
+      'type': '角色日程冲突备份',
+      'local': jsonDecode(local),
+      'remote': jsonDecode(remote),
+    });
+  }
+
+  Future<void> _clearConflictSnapshot() async {
+    _conflictLocalJson = null;
+    _conflictRemoteJson = null;
+    _conflictRemotePath = null;
+    await syncSettingsStore.clearConflictSnapshot();
   }
 
   Future<void> toggleTask(TaskRecord task, {DateTime? date}) async {
@@ -1493,6 +1646,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _autoSyncTimer?.cancel();
     _remoteCheckTimer?.cancel();
     _changeSyncTimer?.cancel();

@@ -185,6 +185,11 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   Future<void> _restoreBackup(RemoteBackup backup) async {
+    if (widget.state.hasSyncConflict &&
+        backup.path == widget.state.newerRemoteBackup?.path) {
+      await _useRemoteConflict();
+      return;
+    }
     final confirmed = await _confirm(
       '恢复这份备份？',
       '本地所有游戏、角色、任务和完成记录将被“${backup.name}”替换。这次恢复不会在云端创建新备份；如需保留当前本地数据，请先手动上传备份。',
@@ -195,6 +200,76 @@ class _SyncScreenState extends State<SyncScreen> {
       _showFeedback('已从坚果云恢复');
     });
   }
+
+  Future<void> _useRemoteConflict() async {
+    final confirmed = await _confirm(
+      '使用云端版本？',
+      '当前本地数据会被云端版本替换。建议先点击“导出两份数据”，保留本地和云端副本。',
+    );
+    if (!confirmed) return;
+    await _run(() async {
+      await widget.state.restoreConflictRemote();
+      await _loadBackupsSilently();
+      _showFeedback('已使用云端版本');
+    });
+  }
+
+  Future<void> _keepLocalConflict() async {
+    final confirmed = await _confirm(
+      '保留本地版本并上传？',
+      '当前本地数据会作为一份新的云端备份上传，原来的云端版本不会被覆盖。',
+    );
+    if (!confirmed) return;
+    await _run(() async {
+      final success = await widget.state.keepLocalAndUploadAsNewBackup();
+      if (!success) throw StateError(widget.state.syncMessage ?? '同步失败');
+      await _loadBackupsSilently();
+      _showFeedback('已保留本地版本并创建新的云端备份');
+    });
+  }
+
+  Future<void> _exportConflictCopies() async {
+    await _run(() async {
+      final bytes = Uint8List.fromList(
+          utf8.encode(await widget.state.exportConflictBundle()));
+      final savedPath = await FilePicker.saveFile(
+        dialogTitle: '导出本地和云端冲突备份',
+        fileName: 'role-schedule-conflict-backup.json',
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        bytes: bytes,
+      );
+      if (savedPath == null) return;
+      _showFeedback('本地和云端两份冲突数据已导出');
+    });
+  }
+
+  Widget _buildConflictPanel() => _Panel(
+        title: '发现同步冲突',
+        status: '本地和云端都有改动',
+        subtitle: '系统已暂停自动上传。当前本地数据不会被覆盖，请选择一种处理方式；原云端版本也会保留。',
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: busy ? null : _keepLocalConflict,
+              icon: const Icon(Icons.cloud_upload_outlined, size: 17),
+              label: const Text('保留本地并上传'),
+            ),
+            OutlinedButton.icon(
+              onPressed: busy ? null : _useRemoteConflict,
+              icon: const Icon(Icons.cloud_download_outlined, size: 17),
+              label: const Text('使用云端版本'),
+            ),
+            TextButton.icon(
+              onPressed: busy ? null : _exportConflictCopies,
+              icon: const Icon(Icons.save_alt_outlined, size: 17),
+              label: const Text('导出两份数据'),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _exportLocal() async {
     await _run(() async {
@@ -427,117 +502,126 @@ class _SyncScreenState extends State<SyncScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    return Scaffold(
-      appBar: AppBar(title: const Text('同步与备份')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 32),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: double.infinity),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const PageHeader(
-                  title: '同步与备份',
-                  subtitle: '一次处理所有游戏、角色、任务和完成记录',
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWebDavPanel(),
-                      if (_isConfigured) ...[
+    return AnimatedBuilder(
+      animation: widget.state,
+      builder: (context, child) => Scaffold(
+        appBar: AppBar(title: const Text('同步与备份')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: double.infinity),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const PageHeader(
+                    title: '同步与备份',
+                    subtitle: '一次处理所有游戏、角色、任务和完成记录',
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildWebDavPanel(),
+                        if (widget.state.hasSyncConflict) ...[
+                          const SizedBox(height: 14),
+                          _buildConflictPanel(),
+                        ],
+                        if (_isConfigured) ...[
+                          const SizedBox(height: 14),
+                          _Panel(
+                            title: '云端备份（最近 10 份）',
+                            subtitle: '每次上传都会生成新文件，并自动清理更旧的版本。选择任意一份即可恢复。',
+                            child: backupsLoading
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child:
+                                        LinearProgressIndicator(minHeight: 3),
+                                  )
+                                : backups.isEmpty
+                                    ? const Text(
+                                        '暂无版本化备份，请先点击“上传备份”。',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.muted),
+                                      )
+                                    : Column(
+                                        children: [
+                                          for (var index = 0;
+                                              index < backups.length;
+                                              index++) ...[
+                                            if (index > 0)
+                                              const Divider(height: 1),
+                                            _RemoteBackupTile(
+                                              backup: backups[index],
+                                              isLatest: index == 0,
+                                              isCurrent: backups[index].path ==
+                                                  widget.state
+                                                      .currentRemoteBackupPath,
+                                              onRestore: busy
+                                                  ? null
+                                                  : () => _restoreBackup(
+                                                      backups[index]),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         _Panel(
-                          title: '云端备份（最近 10 份）',
-                          subtitle: '每次上传都会生成新文件，并自动清理更旧的版本。选择任意一份即可恢复。',
-                          child: backupsLoading
-                              ? const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8),
-                                  child: LinearProgressIndicator(minHeight: 3),
-                                )
-                              : backups.isEmpty
-                                  ? const Text(
-                                      '暂无版本化备份，请先点击“上传备份”。',
-                                      style: TextStyle(
-                                          fontSize: 12, color: AppTheme.muted),
-                                    )
-                                  : Column(
-                                      children: [
-                                        for (var index = 0;
-                                            index < backups.length;
-                                            index++) ...[
-                                          if (index > 0)
-                                            const Divider(height: 1),
-                                          _RemoteBackupTile(
-                                            backup: backups[index],
-                                            isLatest: index == 0,
-                                            isCurrent: backups[index].path ==
-                                                widget.state
-                                                    .currentRemoteBackupPath,
-                                            onRestore: busy
-                                                ? null
-                                                : () => _restoreBackup(
-                                                    backups[index]),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      _Panel(
-                        title: '本地备份',
-                        subtitle: '导出为 JSON 文件，可保存到手机、电脑或其他云盘。',
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            FilledButton.icon(
-                              onPressed: busy ? null : _exportLocal,
-                              icon:
-                                  const Icon(Icons.save_alt_outlined, size: 17),
-                              label: const Text('导出备份'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: busy ? null : _importLocal,
-                              icon: const Icon(Icons.folder_open_outlined,
-                                  size: 17),
-                              label: const Text('导入备份'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (busy) ...[
-                        const SizedBox(height: 14),
-                        const LinearProgressIndicator(minHeight: 3),
-                      ],
-                      if (message != null) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          message!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: messageIsError
-                                ? const Color(0xffb94a48)
-                                : AppTheme.accent,
+                          title: '本地备份',
+                          subtitle: '导出为 JSON 文件，可保存到手机、电脑或其他云盘。',
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: busy ? null : _exportLocal,
+                                icon: const Icon(Icons.save_alt_outlined,
+                                    size: 17),
+                                label: const Text('导出备份'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: busy ? null : _importLocal,
+                                icon: const Icon(Icons.folder_open_outlined,
+                                    size: 17),
+                                label: const Text('导入备份'),
+                              ),
+                            ],
                           ),
                         ),
+                        if (busy) ...[
+                          const SizedBox(height: 14),
+                          const LinearProgressIndicator(minHeight: 3),
+                        ],
+                        if (message != null) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            message!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: messageIsError
+                                  ? const Color(0xffb94a48)
+                                  : AppTheme.accent,
+                            ),
+                          ),
+                        ],
+                        if (widget.state.lastSyncAt != null &&
+                            message == null) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            '上次同步：${_formatTime(widget.state.lastSyncAt!)}',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.muted),
+                          ),
+                        ],
                       ],
-                      if (widget.state.lastSyncAt != null &&
-                          message == null) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          '上次同步：${_formatTime(widget.state.lastSyncAt!)}',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.muted),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -592,8 +676,8 @@ class _RemoteBackupTile extends StatelessWidget {
             child: Text(backup.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           if (isCurrent) ...[
             const SizedBox(width: 6),
@@ -653,9 +737,8 @@ class _BackupVersionBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.w600,
-          color: emphasized
-              ? scheme.onPrimaryContainer
-              : scheme.onSurfaceVariant,
+          color:
+              emphasized ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
         ),
       ),
     );
@@ -679,8 +762,8 @@ class _Panel extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant),
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(7),
         ),
         child: Column(

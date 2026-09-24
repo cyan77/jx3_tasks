@@ -271,7 +271,9 @@ class _HomeGameSelector extends StatelessWidget {
                     ),
                     if (state.newerRemoteBackup != null)
                       IconButton(
-                        tooltip: '发现更新的云端备份，点击恢复',
+                        tooltip: state.hasSyncConflict
+                            ? '本地和云端都有改动，点击处理'
+                            : '发现更新的云端备份，点击恢复',
                         visualDensity: VisualDensity.compact,
                         onPressed: state.restoreBusy || state.syncBusy
                             ? null
@@ -374,6 +376,12 @@ class _HomeGameSelector extends StatelessWidget {
   Future<void> _restoreNewerBackup(BuildContext context) async {
     final backup = state.newerRemoteBackup;
     if (backup == null) return;
+    if (state.hasSyncConflict) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => SyncScreen(state: state)),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
