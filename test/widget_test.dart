@@ -2100,6 +2100,37 @@ void main() {
     expect(store.characters.single.archived, isFalse);
   });
 
+  test('completed inbox task stays today and leaves the inbox tomorrow',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '测试游戏')]
+      ..tasks = [
+        TaskRecord(
+          id: 'inbox-task',
+          templateId: 'inbox-task',
+          title: '收集箱任务',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime(2026, 9, 26),
+          inboxGameId: 'game',
+        ),
+      ];
+    final state = AppState(store);
+    final today = DateTime(2026, 9, 26);
+    final task = store.tasks.single;
+    expect(state.visibleInboxTasksOn(today), hasLength(1));
+
+    await state.setTaskCompleted(task, completed: true, date: today);
+    expect(state.visibleInboxTasksOn(today), hasLength(1));
+    expect(state.visibleInboxTasksOn(DateTime(2026, 9, 27)), isEmpty);
+
+    await state.setTaskCompleted(store.tasks.single,
+        completed: false, date: today);
+    expect(state.visibleInboxTasksOn(DateTime(2026, 9, 27)), hasLength(1));
+    state.dispose();
+  });
+
   testWidgets('home game selector lives below the page title and nowhere else',
       (tester) async {
     SharedPreferences.setMockInitialValues({});

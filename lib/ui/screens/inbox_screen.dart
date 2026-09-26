@@ -422,6 +422,7 @@ class _InboxTaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final completed = task.isCompletedOn(state.taskDateFor(task));
     final expiry = taskExpiryStatus(task, state.taskDateFor(task));
     final scheme = Theme.of(context).colorScheme;
     final alertColor = expiry == TaskExpiryStatus.overdue
@@ -469,14 +470,32 @@ class _InboxTaskCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(
-                selected ? Icons.check_circle : Icons.inbox_outlined,
-                key: selected
-                    ? ValueKey('selected-inbox-task-${task.id}')
-                    : null,
-                size: 21,
-                color: selected ? scheme.primary : AppTheme.accent,
-              ),
+              if (selectionMode)
+                Icon(
+                  selected ? Icons.check_circle : Icons.inbox_outlined,
+                  key: selected
+                      ? ValueKey('selected-inbox-task-${task.id}')
+                      : null,
+                  size: 21,
+                  color: selected ? scheme.primary : AppTheme.accent,
+                )
+              else
+                IconButton(
+                  key: ValueKey('complete-inbox-task-${task.id}'),
+                  tooltip: completed ? '取消完成' : '标记完成',
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    completed
+                        ? Icons.check_circle_outline
+                        : Icons.radio_button_unchecked,
+                    color: completed ? scheme.primary : AppTheme.muted,
+                  ),
+                  onPressed: () => state.setTaskCompleted(
+                    task,
+                    completed: !completed,
+                  ),
+                ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -486,6 +505,7 @@ class _InboxTaskCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
+                            decoration: completed ? TextDecoration.lineThrough : null,
                             color: expiry == TaskExpiryStatus.normal
                                 ? null
                                 : alertColor)),

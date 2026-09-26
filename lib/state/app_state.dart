@@ -131,8 +131,15 @@ class AppState extends ChangeNotifier {
         .toList();
   }
 
-  List<TaskRecord> get inboxTasks =>
-      store.tasks.where((task) => !task.archived && task.isInbox).toList();
+  List<TaskRecord> get inboxTasks => visibleInboxTasksOn(DateTime.now());
+
+  List<TaskRecord> visibleInboxTasksOn(DateTime date) => store.tasks
+      .where((task) =>
+          !task.archived &&
+          task.isInbox &&
+          (task.completedDates.isEmpty ||
+              task.completedDates.contains(dateKey(taskDateFor(task, date)))))
+      .toList();
 
   List<TaskRecord> get allTasksForSelectedGame {
     final characterIds = store.characters

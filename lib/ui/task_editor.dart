@@ -7,6 +7,61 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import 'widgets/common.dart';
 
+Future<DateTime?> _pickDateWithRelativeDays(
+  BuildContext context, {
+  required DateTime initialDate,
+}) {
+  final today = DateTime.now();
+  final todayUtc = DateTime.utc(today.year, today.month, today.day);
+  var selected = initialDate;
+  return showDialog<DateTime>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        final selectedUtc =
+            DateTime.utc(selected.year, selected.month, selected.day);
+        final days = selectedUtc.difference(todayUtc).inDays;
+        final relative = days == 0
+            ? '今天'
+            : days > 0
+                ? '$days 天后'
+                : '${-days} 天前';
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(8, 16, 8, 0),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('所选日期：$relative',
+                    style: Theme.of(context).textTheme.titleMedium),
+                CalendarDatePicker(
+                  initialDate: initialDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  currentDate: today,
+                  onDateChanged: (date) =>
+                      setDialogState(() => selected = date),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(selected),
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 Future<void> showTaskEditor(
   BuildContext context,
   AppState state, {
@@ -718,10 +773,8 @@ class _TaskEditorState extends State<_TaskEditor> {
     final now = DateTime.now();
     final editorGame =
         widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
-    final date = await showDatePicker(
+    final date = await _pickDateWithRelativeDays(
         context: context,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
         initialDate: dueDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => dueDate = date);
   }
@@ -730,10 +783,8 @@ class _TaskEditorState extends State<_TaskEditor> {
     final now = DateTime.now();
     final editorGame =
         widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
-    final date = await showDatePicker(
+    final date = await _pickDateWithRelativeDays(
         context: context,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100),
         initialDate: startDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => startDate = date);
   }
@@ -1312,11 +1363,9 @@ class _CharacterEditorState extends State<_CharacterEditor> {
   Future<void> _pickDate(GameMetadataField field) async {
     final controller = controllers[field.id]!;
     final initial = DateTime.tryParse(controller.text) ?? DateTime.now();
-    final value = await showDatePicker(
+    final value = await _pickDateWithRelativeDays(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
     if (value != null) setState(() => controller.text = dateKey(value));
   }
