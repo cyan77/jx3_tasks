@@ -774,7 +774,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     final editorGame =
         widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
     final date = await _pickDateWithRelativeDays(
-        context: context,
+        context,
         initialDate: dueDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => dueDate = date);
   }
@@ -784,7 +784,7 @@ class _TaskEditorState extends State<_TaskEditor> {
     final editorGame =
         widget.state.games.where((game) => game.id == editorGameId).firstOrNull;
     final date = await _pickDateWithRelativeDays(
-        context: context,
+        context,
         initialDate: startDate ?? editorGame?.taskDayAt(now) ?? now);
     if (date != null) setState(() => startDate = date);
   }
@@ -1364,7 +1364,7 @@ class _CharacterEditorState extends State<_CharacterEditor> {
     final controller = controllers[field.id]!;
     final initial = DateTime.tryParse(controller.text) ?? DateTime.now();
     final value = await _pickDateWithRelativeDays(
-      context: context,
+      context,
       initialDate: initial,
     );
     if (value != null) setState(() => controller.text = dateKey(value));
