@@ -472,6 +472,19 @@ class _InboxTaskCard extends StatelessWidget {
         : expiry == TaskExpiryStatus.normal
             ? scheme.outlineVariant
             : alertColor;
+    void handleAction(String value) {
+      if (value == 'complete') {
+        state.setTaskCompleted(task, completed: !completed);
+      } else if (value == 'edit') {
+        showTaskEditor(context, state, task: task);
+      } else if (value == 'select') {
+        onSelect();
+      } else if (value == 'archive') {
+        onArchive();
+      } else if (value == 'delete') {
+        onDelete();
+      }
+    }
     return Material(
       color: cardColor,
       shape: RoundedRectangleBorder(
@@ -495,19 +508,7 @@ class _InboxTaskCard extends StatelessWidget {
             const PopupMenuDivider(),
             desktopMenuItem('delete', Icons.delete_outline, '删除任务'),
           ],
-          (value) {
-            if (value == 'complete') {
-              state.setTaskCompleted(task, completed: !completed);
-            } else if (value == 'edit') {
-              showTaskEditor(context, state, task: task);
-            } else if (value == 'select') {
-              onSelect();
-            } else if (value == 'archive') {
-              onArchive();
-            } else if (value == 'delete') {
-              onDelete();
-            }
-          },
+          handleAction,
         ),
         onTap: selectionMode
             ? onSelect
@@ -577,9 +578,20 @@ class _InboxTaskCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
               if (!selectionMode)
-                const Icon(Icons.chevron_right, color: AppTheme.muted),
+                PopupMenuButton<String>(
+                  key: ValueKey('inbox-task-actions-${task.id}'),
+                  tooltip: '任务操作',
+                  onSelected: handleAction,
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                        value: 'edit', child: Text('编辑与分配')),
+                    const PopupMenuItem(
+                        value: 'archive', child: Text('归档任务')),
+                    const PopupMenuItem(
+                        value: 'delete', child: Text('删除任务')),
+                  ],
+                ),
             ],
           ),
         ),
