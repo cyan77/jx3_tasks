@@ -26,6 +26,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   AppState get state => widget.state;
+  final Set<int> _visitedTabs = {};
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    _visitedTabs.add(state.currentTab);
     final screens = [
       DashboardScreen(state: state),
       MatrixScreen(state: state),
@@ -61,7 +63,15 @@ class _HomeShellState extends State<HomeShell> {
                 children: [
                   if (wide) _SideRail(state: state),
                   Expanded(
-                    child: screens[state.currentTab],
+                    child: IndexedStack(
+                      index: state.currentTab,
+                      children: [
+                        for (var index = 0; index < screens.length; index++)
+                          _visitedTabs.contains(index)
+                              ? screens[index]
+                              : const SizedBox.shrink(),
+                      ],
+                    ),
                   ),
                 ],
               ),
