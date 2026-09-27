@@ -462,6 +462,8 @@ class _InboxTaskCard extends StatelessWidget {
       task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
       deadline,
     ];
+    final cycleStatus = taskCycleStatus(task, DateTime.now(),
+        dailyResetMinutes: state.gameForTask(task)?.dailyResetMinutes ?? 0);
     if (task.subtasks.isNotEmpty) {
       details.add('${task.subtasks.length} 个子任务');
     }
@@ -563,6 +565,12 @@ class _InboxTaskCard extends StatelessWidget {
                             color: expiry == TaskExpiryStatus.normal
                                 ? AppTheme.muted
                                 : alertColor)),
+                    if (cycleStatus != null) ...[
+                      const SizedBox(height: 3),
+                      Text(cycleStatus,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.muted)),
+                    ],
                     if (task.tags.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       TaskTags(tags: task.tags, compact: true),
