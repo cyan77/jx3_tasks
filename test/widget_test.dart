@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,6 +26,37 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('desktop right click opens an action menu at the pointer',
+      (tester) async {
+    String? selected;
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(platform: TargetPlatform.windows),
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => GestureDetector(
+            onSecondaryTapDown: (details) => showDesktopContextMenu(
+              context,
+              details.globalPosition,
+              [desktopMenuItem('edit', Icons.edit_outlined, '编辑任务')],
+              (value) => selected = value,
+            ),
+            child: const SizedBox(width: 180, height: 80, child: Text('任务')),
+          ),
+        ),
+      ),
+    ));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('任务')),
+      buttons: kSecondaryMouseButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('编辑任务'), findsOneWidget);
+    await tester.tap(find.text('编辑任务'));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, 'edit');
+  });
   test('migrates project data to a selected directory', () async {
     SharedPreferences.setMockInitialValues({});
     final directory = await Directory.systemTemp.createTemp('role-schedule-');
