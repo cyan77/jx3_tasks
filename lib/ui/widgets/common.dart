@@ -32,11 +32,16 @@ String? taskCycleStatus(TaskRecord task, DateTime moment,
       '下次刷新 ${refresh.month}月${refresh.day}日 ${twoDigits(refresh.hour)}:${twoDigits(refresh.minute)}';
   if (!showProgress) return refreshLabel;
   final date = taskDay;
+  final completions = task.isCountTask
+      ? task.countInRange(taskPeriodStart(task, date), taskPeriodEnd(task, date))
+      : task.isCompletedOn(date)
+          ? 1
+          : 0;
   final progress = task.hasQuantityTarget
-      ? '$period数量 ${task.quantityCompletedOn(date)}/${task.targetQuantity}'
-      : task.isCountTask
-          ? '$period已完成 ${task.countInRange(taskPeriodStart(task, date), taskPeriodEnd(task, date))}/${task.targetCount} 次'
-          : '$period已完成 ${task.isCompletedOn(date) ? 1 : 0}/1 次';
+      ? task.isCountTask
+          ? '$period次数 $completions/${task.targetCount} · 数量 ${task.quantityCompletedOn(date)}/${task.targetQuantity}'
+          : '$period数量 ${task.quantityCompletedOn(date)}/${task.targetQuantity}'
+      : '$period已完成 $completions/${task.isCountTask ? task.targetCount : 1} 次';
   return '$progress · $refreshLabel';
 }
 
