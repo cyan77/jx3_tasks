@@ -27,6 +27,29 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  test('周期进度和下次刷新遵循游戏日切时间', () {
+    final task = TaskRecord(
+      id: 'weekly-count',
+      templateId: 'weekly-count',
+      title: '每周任务',
+      characterId: 'character',
+      frequency: TaskFrequency.weeklyCount,
+      targetCount: 3,
+      createdAt: DateTime(2026, 9, 20),
+      completedDates: const ['2026-09-22', '2026-09-24'],
+    );
+    expect(
+      taskCycleStatus(task, DateTime(2026, 9, 28, 6, 59),
+          dailyResetMinutes: 7 * 60),
+      '本周已完成 2/3 次 · 下次刷新 9月28日 07:00',
+    );
+    expect(
+      taskCycleStatus(task, DateTime(2026, 9, 28, 7, 1),
+          dailyResetMinutes: 7 * 60),
+      '本周已完成 0/3 次 · 下次刷新 10月5日 07:00',
+    );
+  });
+
   testWidgets('page filters survive switching tabs', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore()
