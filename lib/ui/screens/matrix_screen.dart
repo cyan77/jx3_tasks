@@ -210,6 +210,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
                               .map((task) => task.id)
                               .toSet(),
                           expiry: _expiryFor(tasks),
+                          dailyResetMinutes: state
+                                  .gameForTask(tasks.first)
+                                  ?.dailyResetMinutes ??
+                              0,
                           selected: selectedTemplateIds.contains(templateId),
                           selectionMode: selectedCount > 0,
                           showSelectionButton: desktopSelection,
@@ -1164,6 +1168,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.completion,
     required this.completedTaskIds,
     required this.expiry,
+    required this.dailyResetMinutes,
     required this.selected,
     required this.selectionMode,
     required this.showSelectionButton,
@@ -1181,6 +1186,7 @@ class _TaskManagementTile extends StatelessWidget {
   final _TemplateCompletion completion;
   final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
+  final int dailyResetMinutes;
   final bool selected;
   final bool selectionMode;
   final bool showSelectionButton;
@@ -1214,6 +1220,8 @@ class _TaskManagementTile extends StatelessWidget {
         : expiry == TaskExpiryStatus.normal
             ? scheme.outlineVariant
             : alertColor.withValues(alpha: 0.65);
+    final refresh = taskCycleStatus(task, DateTime.now(),
+        dailyResetMinutes: dailyResetMinutes, showProgress: false);
     final details = <String>[
       task.hasConfiguredFrequency
           ? task.isCountTask
@@ -1224,6 +1232,7 @@ class _TaskManagementTile extends StatelessWidget {
       if (task.dueDate != null) dueLabel(task.dueDate),
       if (task.hasQuantityTarget)
         '数量 ${task.quantityCompletedOn(DateTime.now())}/${task.targetQuantity}',
+      if (refresh != null) refresh,
     ];
     void handleAction(String value) {
       if (value == 'select') onSelect();
