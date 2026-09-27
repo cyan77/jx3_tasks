@@ -419,8 +419,40 @@ class _CharacterCard extends StatelessWidget {
     final progress =
         state.progressFor(tasks, week, week.add(const Duration(days: 7)));
 
+    Future<void> handleAction(String value) async {
+      if (value == 'select') {
+        onToggle();
+      } else if (value == 'edit') {
+        await showCharacterEditor(context, state, character: character);
+      } else if (value == 'move-up') {
+        onMoveUp?.call();
+      } else if (value == 'move-down') {
+        onMoveDown?.call();
+      } else if (value == 'archive') {
+        await state.archiveCharacter(character);
+      } else if (value == 'delete') {
+        await _confirmDelete(context, state, character);
+      }
+    }
     return InkWell(
       onTap: batchMode ? onToggle : null,
+      onSecondaryTapDown: (details) => showDesktopContextMenu(
+        context,
+        details.globalPosition,
+        [
+          desktopMenuItem('edit', Icons.edit_outlined, '编辑角色'),
+          desktopMenuItem('select', Icons.library_add_check_outlined,
+              selected ? '取消选择' : '选择角色'),
+          desktopMenuItem('move-up', Icons.arrow_upward, '上移一个位置',
+              enabled: onMoveUp != null),
+          desktopMenuItem('move-down', Icons.arrow_downward, '下移一个位置',
+              enabled: onMoveDown != null),
+          desktopMenuItem('archive', Icons.archive_outlined, '归档角色'),
+          const PopupMenuDivider(),
+          desktopMenuItem('delete', Icons.delete_outline, '永久删除'),
+        ],
+        handleAction,
+      ),
       borderRadius: BorderRadius.circular(7),
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -466,20 +498,7 @@ class _CharacterCard extends StatelessWidget {
                 else
                   PopupMenuButton<String>(
                     padding: EdgeInsets.zero,
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        await showCharacterEditor(context, state,
-                            character: character);
-                      } else if (value == 'move-up') {
-                        onMoveUp?.call();
-                      } else if (value == 'move-down') {
-                        onMoveDown?.call();
-                      } else if (value == 'archive') {
-                        await state.archiveCharacter(character);
-                      } else if (value == 'delete') {
-                        await _confirmDelete(context, state, character);
-                      }
-                    },
+                    onSelected: handleAction,
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'edit', child: Text('编辑角色')),
                       PopupMenuItem(
