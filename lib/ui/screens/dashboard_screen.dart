@@ -677,7 +677,40 @@ class _TaskList extends StatelessWidget {
               : Theme.of(context).brightness == Brightness.dark
                   ? AppTheme.warningDark
                   : AppTheme.warning;
-          return Column(
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onSecondaryTapDown: (details) => showDesktopContextMenu(
+              context,
+              details.globalPosition,
+              [
+                desktopMenuItem('complete',
+                    checked ? Icons.undo_outlined : Icons.check_circle_outline,
+                    checked ? '取消完成' : '标记完成'),
+                if (task.isCountTask && !task.hasQuantityTarget)
+                  desktopMenuItem('count', Icons.numbers_outlined, '设置当前次数'),
+                if (canCompleteForMultipleCharacters)
+                  desktopMenuItem('group', Icons.group_outlined, '选择完成角色'),
+                const PopupMenuDivider(),
+                desktopMenuItem('edit', Icons.edit_outlined, '仅编辑当前角色'),
+                if (canCompleteForMultipleCharacters)
+                  desktopMenuItem('edit-all', Icons.library_books_outlined,
+                      '编辑所有已分配角色'),
+              ],
+              (value) {
+                if (value == 'complete') {
+                  state.setTaskCompleted(task,
+                      completed: !checked, date: date);
+                } else if (value == 'count') {
+                  _editTaskCount(context, state, task, count, date);
+                } else if (value == 'group') {
+                  _showMultiCharacterCompletion(context, state, task, date);
+                } else if (value == 'edit' || value == 'edit-all') {
+                  showTaskEditor(context, state,
+                      task: task, syncAll: value == 'edit-all');
+                }
+              },
+            ),
+            child: Column(
             children: [
               ListTile(
                 dense: true,
@@ -847,6 +880,7 @@ class _TaskList extends StatelessWidget {
                   ),
                 ),
             ],
+            ),
           );
         }).toList(),
       ),

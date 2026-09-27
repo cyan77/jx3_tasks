@@ -1225,10 +1225,38 @@ class _TaskManagementTile extends StatelessWidget {
       if (task.hasQuantityTarget)
         '数量 ${task.quantityCompletedOn(DateTime.now())}/${task.targetQuantity}',
     ];
+    void handleAction(String value) {
+      if (value == 'select') onSelect();
+      if (value == 'edit') onEdit();
+      if (value == 'inbox') onMoveToInbox();
+      if (value == 'archive') onArchiveChanged(true);
+      if (value == 'restore') onArchiveChanged(false);
+      if (value == 'delete') onDelete();
+    }
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: selectionMode ? onSelect : null,
       onLongPress: onSelect,
+      onSecondaryTapDown: (details) => showDesktopContextMenu(
+        context,
+        details.globalPosition,
+        [
+          desktopMenuItem('select', Icons.library_add_check_outlined,
+              selected ? '取消选择' : '选择任务'),
+          if (!task.archived)
+            desktopMenuItem('edit', Icons.edit_outlined, '编辑与管理分配'),
+          if (!task.archived)
+            desktopMenuItem('inbox', Icons.move_to_inbox_outlined, '移到收集箱'),
+          desktopMenuItem(
+            task.archived ? 'restore' : 'archive',
+            task.archived ? Icons.unarchive_outlined : Icons.archive_outlined,
+            task.archived ? '恢复任务' : '归档任务',
+          ),
+          const PopupMenuDivider(),
+          desktopMenuItem('delete', Icons.delete_outline, '删除任务'),
+        ],
+        handleAction,
+      ),
       child: Material(
         color: cardColor,
         shape: RoundedRectangleBorder(
@@ -1344,13 +1372,7 @@ class _TaskManagementTile extends StatelessWidget {
                   ),
                 PopupMenuButton<String>(
                   tooltip: '任务操作',
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'inbox') onMoveToInbox();
-                    if (value == 'archive') onArchiveChanged(true);
-                    if (value == 'restore') onArchiveChanged(false);
-                    if (value == 'delete') onDelete();
-                  },
+                  onSelected: handleAction,
                   itemBuilder: (_) => [
                     if (!task.archived)
                       const PopupMenuItem(

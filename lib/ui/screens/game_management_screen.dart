@@ -38,7 +38,34 @@ class GameManagementScreen extends StatelessWidget {
                     final characterCount = state.store.characters
                         .where((character) => character.gameId == game.id)
                         .length;
-                    return Container(
+                    void handleAction(String value) {
+                      if (value == 'switch') state.selectGame(game.id);
+                      if (value == 'edit') {
+                        showGameEditor(context, state, game: game);
+                      }
+                      if (value == 'delete') {
+                        _confirmDelete(context, state, game);
+                      }
+                    }
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onSecondaryTapDown: (details) => showDesktopContextMenu(
+                        context,
+                        details.globalPosition,
+                        [
+                          if (!selected)
+                            desktopMenuItem('switch', Icons.swap_horiz,
+                                '切换到此游戏'),
+                          desktopMenuItem('edit', Icons.edit_outlined, '编辑游戏'),
+                          if (state.games.length > 1) ...[
+                            const PopupMenuDivider(),
+                            desktopMenuItem(
+                                'delete', Icons.delete_outline, '删除游戏'),
+                          ],
+                        ],
+                        handleAction,
+                      ),
+                      child: Container(
                       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                       decoration: BoxDecoration(
                         border: Border.all(
@@ -71,14 +98,7 @@ class GameManagementScreen extends StatelessWidget {
                             ),
                           ),
                           PopupMenuButton<String>(
-                            onSelected: (value) async {
-                              if (value == 'edit') {
-                                await showGameEditor(context, state,
-                                    game: game);
-                              } else if (value == 'delete') {
-                                await _confirmDelete(context, state, game);
-                              }
-                            },
+                            onSelected: handleAction,
                             itemBuilder: (_) => [
                               const PopupMenuItem(
                                   value: 'edit', child: Text('编辑游戏')),
@@ -89,6 +109,7 @@ class GameManagementScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
                     );
                   },
                 ),

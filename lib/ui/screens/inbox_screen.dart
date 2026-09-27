@@ -76,6 +76,10 @@ class _InboxScreenState extends State<InboxScreen> {
                                   task.id,
                                   !selected,
                                 ),
+                                onArchive: () => _actOnSingle(
+                                    task.id, _archiveSelected),
+                                onDelete: () => _actOnSingle(
+                                    task.id, _deleteSelected),
                               );
                             },
                           ),
@@ -136,6 +140,16 @@ class _InboxScreenState extends State<InboxScreen> {
     setState(() {
       selected ? selectedTaskIds.add(taskId) : selectedTaskIds.remove(taskId);
     });
+  }
+
+  Future<void> _actOnSingle(
+      String taskId, Future<void> Function() action) async {
+    setState(() {
+      selectedTaskIds
+        ..clear()
+        ..add(taskId);
+    });
+    await action();
   }
 
   void _toggleAll(Set<String> visibleIds) {
@@ -412,6 +426,8 @@ class _InboxTaskCard extends StatelessWidget {
     required this.selected,
     required this.selectionMode,
     required this.onSelect,
+    required this.onArchive,
+    required this.onDelete,
   });
 
   final AppState state;
@@ -419,6 +435,8 @@ class _InboxTaskCard extends StatelessWidget {
   final bool selected;
   final bool selectionMode;
   final VoidCallback onSelect;
+  final VoidCallback onArchive;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +481,34 @@ class _InboxTaskCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onLongPress: onSelect,
+        onSecondaryTapDown: (details) => showDesktopContextMenu(
+          context,
+          details.globalPosition,
+          [
+            desktopMenuItem('complete',
+                completed ? Icons.undo_outlined : Icons.check_circle_outline,
+                completed ? '取消完成' : '标记完成'),
+            desktopMenuItem('edit', Icons.edit_outlined, '编辑与分配'),
+            desktopMenuItem('select', Icons.library_add_check_outlined,
+                selected ? '取消选择' : '选择任务'),
+            desktopMenuItem('archive', Icons.archive_outlined, '归档任务'),
+            const PopupMenuDivider(),
+            desktopMenuItem('delete', Icons.delete_outline, '删除任务'),
+          ],
+          (value) {
+            if (value == 'complete') {
+              state.setTaskCompleted(task, completed: !completed);
+            } else if (value == 'edit') {
+              showTaskEditor(context, state, task: task);
+            } else if (value == 'select') {
+              onSelect();
+            } else if (value == 'archive') {
+              onArchive();
+            } else if (value == 'delete') {
+              onDelete();
+            }
+          },
+        ),
         onTap: selectionMode
             ? onSelect
             : () => showTaskEditor(context, state, task: task),

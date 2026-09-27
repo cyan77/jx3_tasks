@@ -5,6 +5,50 @@ import 'package:flutter/material.dart';
 import '../../models/task_models.dart';
 import '../../theme/app_theme.dart';
 
+bool isDesktopPlatform(BuildContext context) => switch (Theme.of(context).platform) {
+      TargetPlatform.windows || TargetPlatform.macOS || TargetPlatform.linux =>
+        true,
+      _ => false,
+    };
+
+Future<void> showDesktopContextMenu(
+  BuildContext context,
+  Offset position,
+  List<PopupMenuEntry<String>> items,
+  ValueChanged<String> onSelected,
+) async {
+  if (!isDesktopPlatform(context)) return;
+  final size = MediaQuery.sizeOf(context);
+  final selected = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      position.dx,
+      position.dy,
+      size.width - position.dx,
+      size.height - position.dy,
+    ),
+    items: items,
+  );
+  if (selected != null && context.mounted) onSelected(selected);
+}
+
+PopupMenuItem<String> desktopMenuItem(
+  String value,
+  IconData icon,
+  String label, {
+  bool enabled = true,
+}) =>
+    PopupMenuItem<String>(
+      value: value,
+      enabled: enabled,
+      height: 42,
+      child: Row(children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 12),
+        Text(label),
+      ]),
+    );
+
 class PageHeader extends StatelessWidget {
   const PageHeader(
       {required this.title,
