@@ -2413,13 +2413,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    final navigationContainer = tester.widget<Container>(glassNavigation);
-    expect(
-      (navigationContainer.decoration! as BoxDecoration).borderRadius,
-      BorderRadius.circular(24),
-    );
     final navigationSurface = tester.widget<Container>(
       find.byKey(const ValueKey('glass-bottom-navigation-surface')),
+    );
+    expect(
+      (navigationSurface.decoration! as BoxDecoration).borderRadius,
+      BorderRadius.circular(24),
+    );
+    expect(
+      (navigationSurface.decoration! as BoxDecoration).boxShadow,
+      isNull,
     );
     expect(
       (navigationSurface.decoration! as BoxDecoration).color,
