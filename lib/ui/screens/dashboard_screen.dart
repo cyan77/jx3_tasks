@@ -50,7 +50,7 @@ class DashboardScreen extends StatelessWidget {
             .where((item) => item.id == state.selectedCharacterId)
             .firstOrNull ??
         visibleCharacters.first;
-    if (character.id != state.selectedCharacterId) {
+    if (state.currentTab == 0 && character.id != state.selectedCharacterId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (state.selectedCharacterId != character.id) {
           state.selectCharacter(character.id);

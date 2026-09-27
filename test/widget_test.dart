@@ -27,6 +27,53 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('page filters survive switching tabs', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [
+        Game(id: 'jx3', name: '剑网3'),
+        Game(id: 'other', name: '其他游戏'),
+      ];
+    final state = AppState(store)..setTab(1);
+    await tester.pumpWidget(AnimatedBuilder(
+      animation: state,
+      builder: (context, child) => MaterialApp(home: HomeShell(state: state)),
+    ));
+    await tester.tap(find.byKey(const ValueKey('task-filter-control-按游戏筛选')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('剑网3').last);
+    await tester.pumpAndSettle();
+
+    state.setTab(2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('calendar-game-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('其他游戏').last);
+    await tester.pumpAndSettle();
+
+    state.setTab(0);
+    await tester.pumpAndSettle();
+    state.setTab(1);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('task-filter-control-按游戏筛选')),
+        matching: find.text('剑网3'),
+      ),
+      findsOneWidget,
+    );
+    state.setTab(2);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('calendar-game-filter')),
+        matching: find.text('其他游戏'),
+      ),
+      findsOneWidget,
+    );
+    state.dispose();
+  });
+
   testWidgets('inbox task menu keeps long press available for selection',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
