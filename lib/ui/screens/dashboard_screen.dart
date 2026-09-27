@@ -835,7 +835,8 @@ class _TaskList extends StatelessWidget {
                     PopupMenuButton<String>(
                       key: ValueKey('today-task-actions-${task.id}'),
                       tooltip: '任务操作',
-                      icon: const Icon(Icons.more_vert, size: 19),
+                      icon: Icon(Icons.more_horiz, size: 24,
+                          color: Theme.of(context).colorScheme.onSurface),
                       onSelected: (value) {
                         if (value == 'single' || value == 'all') {
                           showTaskEditor(context, state,
