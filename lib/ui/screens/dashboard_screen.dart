@@ -766,7 +766,12 @@ class _TaskList extends StatelessWidget {
                   children: [
                     task.hasQuantityTarget
                         ? Text(
-                            '$count / ${task.targetQuantity} 数量 · ${task.frequency.label}',
+                            taskCycleStatus(task, DateTime.now(),
+                                    dailyResetMinutes: state
+                                            .gameForTask(task)
+                                            ?.dailyResetMinutes ??
+                                        0) ??
+                                _taskMeta(task, date),
                             style: TextStyle(
                                 fontSize: 11,
                                 color: expiringSoon || overdue
@@ -786,7 +791,12 @@ class _TaskList extends StatelessWidget {
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 2),
                                   child: Text(
-                                    '$count / ${task.targetCount} 行为次数 · ${task.frequency.label}',
+                                    taskCycleStatus(task, DateTime.now(),
+                                            dailyResetMinutes: state
+                                                    .gameForTask(task)
+                                                    ?.dailyResetMinutes ??
+                                                0) ??
+                                        _taskMeta(task, date),
                                     style: TextStyle(
                                         fontSize: 11,
                                         color: expiringSoon || overdue
@@ -801,6 +811,18 @@ class _TaskList extends StatelessWidget {
                                     color: expiringSoon || overdue
                                         ? alertColor
                                         : AppTheme.muted)),
+                    if (!task.hasQuantityTarget && !task.isCountTask &&
+                        task.frequency != TaskFrequency.once)
+                      Text(
+                        taskCycleStatus(task, DateTime.now(),
+                                dailyResetMinutes: state
+                                        .gameForTask(task)
+                                        ?.dailyResetMinutes ??
+                                    0) ??
+                            '',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.muted),
+                      ),
                     if (task.tags.isNotEmpty) ...[
                       const SizedBox(height: 5),
                       TaskTags(tags: task.tags, compact: true),
