@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
@@ -87,6 +90,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
       - name: Configure fixed Android release signing
         shell: bash
         env:
@@ -134,6 +140,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
 
       - name: Build macOS client
         run: flutter build macos --release
