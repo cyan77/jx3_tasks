@@ -27,6 +27,9 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   AppState get state => widget.state;
   final Set<int> _visitedTabs = {};
+  late final Future<String> _installedVersion = PackageInfo.fromPlatform()
+      .then((info) => info.version)
+      .catchError((_) => '');
 
   @override
   void initState() {
@@ -61,7 +64,8 @@ class _HomeShellState extends State<HomeShell> {
             body: SafeArea(
               child: Row(
                 children: [
-                  if (wide) _SideRail(state: state),
+                  if (wide)
+                    _SideRail(state: state, installedVersion: _installedVersion),
                   Expanded(
                     child: IndexedStack(
                       index: state.currentTab,
@@ -305,8 +309,9 @@ class _GlassBottomNavigation extends StatelessWidget {
 }
 
 class _SideRail extends StatelessWidget {
-  const _SideRail({required this.state});
+  const _SideRail({required this.state, required this.installedVersion});
   final AppState state;
+  final Future<String> installedVersion;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -356,6 +361,18 @@ class _SideRail extends StatelessWidget {
                 padding: EdgeInsets.only(left: 10),
                 child: Text('本地离线模式',
                     style: TextStyle(fontSize: 11, color: AppTheme.muted))),
+            Padding(
+              padding: const EdgeInsets.only(left: 10, top: 4),
+              child: FutureBuilder<String>(
+                future: installedVersion,
+                builder: (context, snapshot) => Text(
+                  snapshot.data?.isNotEmpty == true
+                      ? '版本 v${snapshot.data}'
+                      : '',
+                  style: const TextStyle(fontSize: 11, color: AppTheme.muted),
+                ),
+              ),
+            ),
           ],
         ),
       );
