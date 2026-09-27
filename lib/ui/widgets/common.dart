@@ -5,6 +5,41 @@ import 'package:flutter/material.dart';
 import '../../models/task_models.dart';
 import '../../theme/app_theme.dart';
 
+/// Uses the game's task day so the displayed boundary matches completion logic.
+String? taskCycleStatus(TaskRecord task, DateTime moment,
+    {int dailyResetMinutes = 0, bool showProgress = true}) {
+  if (!task.hasConfiguredFrequency || task.frequency == TaskFrequency.once) {
+    return null;
+  }
+  final taskDay = startOfDay(
+      moment.subtract(Duration(minutes: dailyResetMinutes)));
+  final period = switch (task.frequency) {
+    TaskFrequency.daily => '今日',
+    TaskFrequency.weekly || TaskFrequency.weeklyCount => '本周',
+    TaskFrequency.monthly || TaskFrequency.monthlyCount => '本月',
+    TaskFrequency.once => '',
+  };
+  final boundary = switch (task.frequency) {
+    TaskFrequency.daily => taskDay.add(const Duration(days: 1)),
+    TaskFrequency.weekly || TaskFrequency.weeklyCount =>
+      startOfWeek(taskDay).add(const Duration(days: 7)),
+    TaskFrequency.monthly || TaskFrequency.monthlyCount =>
+      DateTime(taskDay.year, taskDay.month + 1),
+    TaskFrequency.once => taskDay,
+  };
+  final refresh = boundary.add(Duration(minutes: dailyResetMinutes));
+  final refreshLabel =
+      '下次刷新 ${refresh.month}月${refresh.day}日 ${twoDigits(refresh.hour)}:${twoDigits(refresh.minute)}';
+  if (!showProgress) return refreshLabel;
+  final date = taskDay;
+  final progress = task.hasQuantityTarget
+      ? '$period数量 ${task.quantityCompletedOn(date)}/${task.targetQuantity}'
+      : task.isCountTask
+          ? '$period已完成 ${task.countInRange(taskPeriodStart(task, date), taskPeriodEnd(task, date))}/${task.targetCount} 次'
+          : '$period已完成 ${task.isCompletedOn(date) ? 1 : 0}/1 次';
+  return '$progress · $refreshLabel';
+}
+
 bool isDesktopPlatform(BuildContext context) => switch (Theme.of(context).platform) {
       TargetPlatform.windows || TargetPlatform.macOS || TargetPlatform.linux =>
         true,
