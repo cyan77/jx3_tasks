@@ -590,6 +590,8 @@ class _InboxTaskCard extends StatelessWidget {
                 PopupMenuButton<String>(
                   key: ValueKey('inbox-task-actions-${task.id}'),
                   tooltip: '任务操作',
+                  icon: Icon(Icons.more_horiz, size: 24,
+                      color: scheme.onSurface),
                   onSelected: handleAction,
                   itemBuilder: (_) => [
                     const PopupMenuItem(

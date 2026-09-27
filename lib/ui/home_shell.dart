@@ -275,28 +275,38 @@ class _GlassBottomNavigation extends StatelessWidget {
                   .withValues(alpha: 0.78),
               selectedIndex: state.currentTab,
               labelBehavior:
-                  NavigationDestinationLabelBehavior.onlyShowSelected,
+                  NavigationDestinationLabelBehavior.alwaysShow,
               onDestinationSelected: state.setTab,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                    icon: Icon(Icons.task_alt_outlined),
-                    selectedIcon: Icon(Icons.task_alt),
+                    icon: Icon(Icons.today_outlined, size: 23,
+                        color: scheme.onSurfaceVariant),
+                    selectedIcon: Icon(Icons.today, size: 23,
+                        color: scheme.primary),
                     label: '待办'),
                 NavigationDestination(
-                    icon: Icon(Icons.checklist_outlined),
-                    selectedIcon: Icon(Icons.checklist),
+                    icon: Icon(Icons.checklist_outlined, size: 23,
+                        color: scheme.onSurfaceVariant),
+                    selectedIcon: Icon(Icons.checklist, size: 23,
+                        color: scheme.primary),
                     label: '任务'),
                 NavigationDestination(
-                    icon: Icon(Icons.event_available_outlined),
-                    selectedIcon: Icon(Icons.event_available),
+                    icon: Icon(Icons.calendar_month_outlined, size: 23,
+                        color: scheme.onSurfaceVariant),
+                    selectedIcon: Icon(Icons.calendar_month, size: 23,
+                        color: scheme.primary),
                     label: '日历'),
                 NavigationDestination(
-                    icon: Icon(Icons.inbox_outlined),
-                    selectedIcon: Icon(Icons.inbox),
+                    icon: Icon(Icons.inbox_outlined, size: 23,
+                        color: scheme.onSurfaceVariant),
+                    selectedIcon: Icon(Icons.inbox, size: 23,
+                        color: scheme.primary),
                     label: '收集箱'),
                 NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings),
+                    icon: Icon(Icons.settings_outlined, size: 23,
+                        color: scheme.onSurfaceVariant),
+                    selectedIcon: Icon(Icons.settings, size: 23,
+                        color: scheme.primary),
                     label: '设置'),
               ],
               ),
@@ -332,7 +342,7 @@ class _SideRail extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: Theme.of(context).colorScheme.onSurface))),
             _RailItem(
-                icon: Icons.task_alt_outlined,
+                icon: Icons.today_outlined,
                 label: '待办',
                 index: 0,
                 state: state),
@@ -342,7 +352,7 @@ class _SideRail extends StatelessWidget {
                 index: 1,
                 state: state),
             _RailItem(
-                icon: Icons.event_available_outlined,
+                icon: Icons.calendar_month_outlined,
                 label: '日历 / 时间线',
                 index: 2,
                 state: state),
@@ -400,7 +410,10 @@ class _RailItem extends StatelessWidget {
         selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         leading: Icon(icon,
-            size: 19, color: selected ? AppTheme.accent : AppTheme.muted),
+            size: 22,
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant),
         title: Text(label,
             style: TextStyle(
                 fontSize: 13,
