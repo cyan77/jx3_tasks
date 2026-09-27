@@ -1376,11 +1376,13 @@ class _TaskManagementTile extends StatelessWidget {
                           ? Icons.check_circle
                           : Icons.library_add_check_outlined,
                       size: 20,
-                      color: selected ? scheme.primary : AppTheme.muted,
+                      color: selected ? scheme.primary : scheme.onSurfaceVariant,
                     ),
                   ),
                 PopupMenuButton<String>(
                   tooltip: '任务操作',
+                  icon: Icon(Icons.more_horiz, size: 24,
+                      color: scheme.onSurface),
                   onSelected: handleAction,
                   itemBuilder: (_) => [
                     if (!task.archived)
