@@ -185,16 +185,6 @@ class _GlassCreateButton extends StatelessWidget {
     )!;
     return Container(
       key: const ValueKey('glass-create-task-button'),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.20 : 0.09),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
@@ -203,6 +193,8 @@ class _GlassCreateButton extends StatelessWidget {
             onPressed: onPressed,
             elevation: 0,
             highlightElevation: 0,
+            hoverElevation: 0,
+            focusElevation: 0,
             backgroundColor:
                 glassColor.withValues(alpha: dark ? 0.84 : 0.90),
             foregroundColor: scheme.primary,
@@ -239,16 +231,6 @@ class _GlassBottomNavigation extends StatelessWidget {
       minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Container(
         key: const ValueKey('glass-bottom-navigation'),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.20 : 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
