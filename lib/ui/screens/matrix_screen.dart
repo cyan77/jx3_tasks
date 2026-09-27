@@ -1215,10 +1215,13 @@ class _TaskManagementTile extends StatelessWidget {
             ? scheme.outlineVariant
             : alertColor.withValues(alpha: 0.65);
     final details = <String>[
-      task.hasConfiguredFrequency ? task.frequency.label : '未设置周期',
+      task.hasConfiguredFrequency
+          ? task.isCountTask
+              ? '${task.frequency.label} ${task.targetCount} 次'
+              : task.frequency.label
+          : '未设置周期',
       if (task.startDate != null) '开始 ${dueLabel(task.startDate)}',
       if (task.dueDate != null) dueLabel(task.dueDate),
-      if (task.isCountTask) '行为目标 ${task.targetCount} 次',
       if (task.hasQuantityTarget)
         '数量 ${task.quantityCompletedOn(DateTime.now())}/${task.targetQuantity}',
     ];
