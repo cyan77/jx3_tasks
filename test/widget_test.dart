@@ -19,6 +19,7 @@ import 'package:jx3_tasks/app.dart';
 import 'package:jx3_tasks/ui/task_editor.dart';
 import 'package:jx3_tasks/ui/screens/matrix_screen.dart';
 import 'package:jx3_tasks/ui/screens/dashboard_screen.dart';
+import 'package:jx3_tasks/ui/screens/inbox_screen.dart';
 import 'package:jx3_tasks/ui/screens/calendar_screen.dart';
 import 'package:jx3_tasks/ui/screens/characters_screen.dart';
 import 'package:jx3_tasks/ui/screens/sync_screen.dart';
@@ -26,6 +27,41 @@ import 'package:jx3_tasks/ui/home_shell.dart';
 import 'package:jx3_tasks/ui/widgets/common.dart';
 
 void main() {
+  testWidgets('inbox task menu keeps long press available for selection',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '测试游戏')]
+      ..tasks = [
+        TaskRecord(
+          id: 'inbox-mobile',
+          templateId: 'inbox-mobile',
+          title: '手机收集箱任务',
+          characterId: '',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime.now(),
+          inboxGameId: 'game',
+        ),
+      ];
+    final state = AppState(store);
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(platform: TargetPlatform.android),
+      home: Scaffold(body: InboxScreen(state: state)),
+    ));
+    await tester.tap(find.byKey(
+        const ValueKey('inbox-task-actions-inbox-mobile')));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑与分配'), findsOneWidget);
+    expect(find.text('归档任务'), findsOneWidget);
+    expect(find.text('删除任务'), findsOneWidget);
+    await tester.tap(find.text('删除任务'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除任务？'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(state.inboxTasks, hasLength(1));
+    state.dispose();
+  });
   testWidgets('desktop right click opens an action menu at the pointer',
       (tester) async {
     String? selected;

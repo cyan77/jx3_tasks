@@ -695,6 +695,11 @@ class _TaskList extends StatelessWidget {
                 if (canCompleteForMultipleCharacters)
                   desktopMenuItem('edit-all', Icons.library_books_outlined,
                       '编辑所有已分配角色'),
+                desktopMenuItem('archive', Icons.archive_outlined,
+                    '归档任务（所有角色）'),
+                const PopupMenuDivider(),
+                desktopMenuItem('delete', Icons.delete_outline,
+                    '删除当前角色任务'),
               ],
               (value) {
                 if (value == 'complete') {
@@ -707,6 +712,11 @@ class _TaskList extends StatelessWidget {
                 } else if (value == 'edit' || value == 'edit-all') {
                   showTaskEditor(context, state,
                       task: task, syncAll: value == 'edit-all');
+                } else if (value == 'archive') {
+                  state.setTaskTemplatesArchived(
+                      {task.templateId}, archived: true);
+                } else if (value == 'delete') {
+                  _confirmDeleteCharacterTask(context, state, task);
                 }
               },
             ),
@@ -801,14 +811,20 @@ class _TaskList extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     PopupMenuButton<String>(
-                      tooltip: '编辑任务',
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      onSelected: (value) => showTaskEditor(
-                        context,
-                        state,
-                        task: task,
-                        syncAll: value == 'all',
-                      ),
+                      key: ValueKey('today-task-actions-${task.id}'),
+                      tooltip: '任务操作',
+                      icon: const Icon(Icons.more_vert, size: 19),
+                      onSelected: (value) {
+                        if (value == 'single' || value == 'all') {
+                          showTaskEditor(context, state,
+                              task: task, syncAll: value == 'all');
+                        } else if (value == 'archive') {
+                          state.setTaskTemplatesArchived(
+                              {task.templateId}, archived: true);
+                        } else if (value == 'delete') {
+                          _confirmDeleteCharacterTask(context, state, task);
+                        }
+                      },
                       itemBuilder: (_) => [
                         const PopupMenuItem(
                           value: 'single',
@@ -819,6 +835,15 @@ class _TaskList extends StatelessWidget {
                             value: 'all',
                             child: Text('编辑所有已分配角色'),
                           ),
+                        const PopupMenuItem(
+                          value: 'archive',
+                          child: Text('归档任务（所有角色）'),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('删除当前角色任务'),
+                        ),
                       ],
                     ),
                     if (canCompleteForMultipleCharacters)
@@ -885,6 +910,31 @@ class _TaskList extends StatelessWidget {
         }).toList(),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteCharacterTask(
+    BuildContext context,
+    AppState state,
+    TaskRecord task,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除当前角色任务？'),
+        content: const Text('仅删除这个角色的任务和完成记录，其他角色不受影响。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await state.deleteTask(task);
   }
 
   Future<void> _showMultiCharacterCompletion(
