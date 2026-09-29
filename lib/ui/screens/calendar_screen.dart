@@ -15,6 +15,8 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
+enum _CalendarView { month, week }
+
 class _CalendarScreenState extends State<CalendarScreen> {
   static const _allGames = '';
   String _gameFilterId = _allGames;
@@ -33,17 +35,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final now = DateTime.now();
     final calendarToday = filteredGame?.taskDayAt(now) ?? startOfDay(now);
     final month = state.focusedMonth;
-    final firstDay = DateTime(month.year, month.month, 1);
-    final days = DateTime(month.year, month.month + 1, 0).day;
-    final leading = firstDay.weekday - 1;
-    final compact = MediaQuery.sizeOf(context).width < 600;
+    final selectedDate = startOfDay(state.selectedCalendarDate);
+    final weekStart = selectedDate.subtract(
+      Duration(days: selectedDate.weekday - DateTime.monday),
+    );
+    final view =
+        state.calendarWeekView ? _CalendarView.week : _CalendarView.month;
     final scheme = Theme.of(context).colorScheme;
     final filterFill =
         Color.lerp(scheme.surface, scheme.primaryContainer, 0.42)!;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -119,7 +123,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         child: Row(children: [
                           Expanded(
                             child: Text(
-                              filteredGame?.name ?? (compact ? '游戏' : '全部游戏'),
+                              filteredGame?.name ?? '全部游戏',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -148,28 +152,89 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ),
         Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 2),
+          child: Row(
+            children: [
+              SegmentedButton<_CalendarView>(
+                key: const ValueKey('calendar-view-toggle'),
+                segments: const [
+                  ButtonSegment(
+                    value: _CalendarView.month,
+                    label: Text('月'),
+                  ),
+                  ButtonSegment(
+                    value: _CalendarView.week,
+                    label: Text('周'),
+                  ),
+                ],
+                selected: {view},
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  padding: WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                  ),
+                  textStyle: WidgetStatePropertyAll(
+                    TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                onSelectionChanged: (value) {
+                  state.setCalendarWeekView(value.first == _CalendarView.week);
+                  setState(() {});
+                },
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => state.selectCalendarDate(calendarToday),
+                child: Text(view == _CalendarView.month ? '回到本月' : '回到本周'),
+              ),
+            ],
+          ),
+        ),
+        Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
             children: [
               IconButton(
-                  onPressed: () =>
-                      state.setMonth(DateTime(month.year, month.month - 1)),
-                  icon: const Icon(Icons.chevron_left, size: 20)),
-              Text('${month.year}年 ${month.month}月',
+                onPressed: () {
+                  if (view == _CalendarView.month) {
+                    state.setMonth(DateTime(month.year, month.month - 1));
+                  } else {
+                    state.selectCalendarDate(
+                        selectedDate.subtract(const Duration(days: 7)));
+                  }
+                },
+                icon: const Icon(Icons.chevron_left, size: 20),
+              ),
+              Expanded(
+                child: Text(
+                  view == _CalendarView.month
+                      ? '${month.year}年 ${month.month}月'
+                      : _weekLabel(weekStart),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               IconButton(
-                  onPressed: () =>
-                      state.setMonth(DateTime(month.year, month.month + 1)),
-                  icon: const Icon(Icons.chevron_right, size: 20)),
-              const Spacer(),
-              TextButton(
-                  onPressed: () => state.selectCalendarDate(calendarToday),
-                  child: const Text('回到本月')),
+                onPressed: () {
+                  if (view == _CalendarView.month) {
+                    state.setMonth(DateTime(month.year, month.month + 1));
+                  } else {
+                    state.selectCalendarDate(
+                        selectedDate.add(const Duration(days: 7)));
+                  }
+                },
+                icon: const Icon(Icons.chevron_right, size: 20),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -179,13 +244,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: Column(
                   children: [
                     _CalendarGrid(
-                        state: state,
-                        tasks: tasks,
-                        today: calendarToday,
-                        year: month.year,
-                        month: month.month,
-                        days: days,
-                        leading: leading),
+                      state: state,
+                      tasks: tasks,
+                      today: calendarToday,
+                      selectedDate: selectedDate,
+                      month: month,
+                      weekStart: weekStart,
+                      view: view,
+                    ),
                     const SizedBox(height: 18),
                     _DayTasks(
                         state: state,
@@ -205,112 +271,375 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 class _CalendarGrid extends StatelessWidget {
-  const _CalendarGrid(
-      {required this.state,
-      required this.tasks,
-      required this.today,
-      required this.year,
-      required this.month,
-      required this.days,
-      required this.leading});
+  const _CalendarGrid({
+    required this.state,
+    required this.tasks,
+    required this.today,
+    required this.selectedDate,
+    required this.month,
+    required this.weekStart,
+    required this.view,
+  });
   final AppState state;
   final List<TaskRecord> tasks;
   final DateTime today;
-  final int year;
-  final int month;
-  final int days;
-  final int leading;
+  final DateTime selectedDate;
+  final DateTime month;
+  final DateTime weekStart;
+  final _CalendarView view;
+
+  @override
+  Widget build(BuildContext context) {
+    return view == _CalendarView.month
+        ? _CalendarMonthGrid(
+            state: state,
+            tasks: tasks,
+            today: today,
+            selectedDate: selectedDate,
+            month: month,
+          )
+        : _CalendarWeekGrid(
+            state: state,
+            tasks: tasks,
+            today: today,
+            selectedDate: selectedDate,
+            weekStart: weekStart,
+          );
+  }
+}
+
+class _CalendarMonthGrid extends StatelessWidget {
+  const _CalendarMonthGrid({
+    required this.state,
+    required this.tasks,
+    required this.today,
+    required this.selectedDate,
+    required this.month,
+  });
+  final AppState state;
+  final List<TaskRecord> tasks;
+  final DateTime today;
+  final DateTime selectedDate;
+  final DateTime month;
 
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 600;
-    final cells = <Widget>[];
+    final firstDay = DateTime(month.year, month.month, 1);
+    final leading = firstDay.weekday - DateTime.monday;
+    final days = DateTime(month.year, month.month + 1, 0).day;
     const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
-    for (final day in weekdays) {
-      cells.add(Container(
-          alignment: Alignment.center,
-          padding: EdgeInsets.only(bottom: compact ? 5 : 8),
-          child: Text(day,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.muted,
-                  fontWeight: FontWeight.w600))));
-    }
-    for (var i = 0; i < leading; i++) {
-      cells.add(const SizedBox());
-    }
-    for (var day = 1; day <= days; day++) {
-      final date = DateTime(year, month, day);
-      final dateTasks =
-          tasks.where((task) => state.isTaskScheduledOn(task, date)).toList();
-      final done = tasks.where((task) => task.isDoneOn(date)).length;
-      final isToday = dateKey(date) == dateKey(today);
-      final isSelected = dateKey(date) == dateKey(state.selectedCalendarDate);
-      cells.add(InkWell(
-        onTap: () => state.selectCalendarDate(date),
-        child: Container(
-            padding: EdgeInsets.all(compact ? 6 : 8),
-            decoration: BoxDecoration(
-                border: Border.all(
-                    color: isSelected
-                        ? AppTheme.accent
-                        : Theme.of(context).colorScheme.outlineVariant,
-                    width: isSelected ? 2 : 1),
-                color: isSelected || isToday
-                    ? Theme.of(context).colorScheme.primaryContainer
-                    : Theme.of(context).colorScheme.surface),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('$day',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isToday || isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: isToday || isSelected
-                          ? AppTheme.accent
-                          : Theme.of(context).colorScheme.onSurface)),
-              const Spacer(),
-              if (compact && (done > 0 || dateTasks.isNotEmpty))
-                Row(children: [
-                  if (done > 0)
-                    Container(
-                        width: 5,
-                        height: 5,
-                        decoration: const BoxDecoration(
-                            color: AppTheme.accent, shape: BoxShape.circle)),
-                  if (done > 0 && dateTasks.isNotEmpty)
-                    const SizedBox(width: 3),
-                  if (dateTasks.isNotEmpty)
-                    Container(
-                        width: 5,
-                        height: 5,
-                        decoration: const BoxDecoration(
-                            color: AppTheme.muted, shape: BoxShape.circle)),
-                ]),
-              if (!compact && done > 0)
-                Text('$done 项完成',
-                    style:
-                        const TextStyle(fontSize: 10, color: AppTheme.accent)),
-              if (!compact)
-                ...dateTasks.take(2).map((task) => Text(
-                    _calendarGridLabel(state, task),
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(fontSize: 10, color: AppTheme.muted)))
-            ])),
-      ));
-    }
-    return LayoutBuilder(builder: (context, constraints) {
-      final cellWidth = constraints.maxWidth / 7;
-      final cellHeight = compact ? 58.0 : 86.0;
-      return GridView.count(
-          crossAxisCount: 7,
+
+    return Column(
+      children: [
+        Row(
+          children: weekdays
+              .map((day) => Expanded(
+                    child: Center(
+                      child: Text(
+                        day,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 5),
+        GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: cellWidth / cellHeight,
-          children: cells);
-    });
+          itemCount: leading + days,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisExtent: compact ? 50 : 56,
+          ),
+          itemBuilder: (context, index) {
+            if (index < leading) return const SizedBox();
+            final date = DateTime(month.year, month.month, index - leading + 1);
+            return _CalendarMonthDay(
+              state: state,
+              tasks: tasks,
+              date: date,
+              today: today,
+              selectedDate: selectedDate,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarMonthDay extends StatelessWidget {
+  const _CalendarMonthDay({
+    required this.state,
+    required this.tasks,
+    required this.date,
+    required this.today,
+    required this.selectedDate,
+  });
+  final AppState state;
+  final List<TaskRecord> tasks;
+  final DateTime date;
+  final DateTime today;
+  final DateTime selectedDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isToday = dateKey(date) == dateKey(today);
+    final isSelected = dateKey(date) == dateKey(selectedDate);
+    final hasDeadline = _hasDeadlineOn(tasks, date);
+    final textColor = isSelected
+        ? scheme.onPrimary
+        : isToday
+            ? scheme.primary
+            : scheme.onSurface;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(26),
+      onTap: () => state.selectCalendarDate(date),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? scheme.primary : Colors.transparent,
+              shape: BoxShape.circle,
+              border: isToday && !isSelected
+                  ? Border.all(color: scheme.primary, width: 1.5)
+                  : null,
+            ),
+            child: Text(
+              '${date.day}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight:
+                    isToday || isSelected ? FontWeight.w700 : FontWeight.w400,
+                color: textColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          SizedBox(
+            height: 5,
+            child: hasDeadline
+                ? Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: isSelected ? scheme.primary : AppTheme.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarWeekGrid extends StatelessWidget {
+  const _CalendarWeekGrid({
+    required this.state,
+    required this.tasks,
+    required this.today,
+    required this.selectedDate,
+    required this.weekStart,
+  });
+  final AppState state;
+  final List<TaskRecord> tasks;
+  final DateTime today;
+  final DateTime selectedDate;
+  final DateTime weekStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+    final dates = List.generate(
+      7,
+      (index) => weekStart.add(Duration(days: index)),
+    );
+    return Column(
+      children: [
+        Row(
+          children: weekdays
+              .map((day) => Expanded(
+                    child: Center(
+                      child: Text(
+                        day,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 7),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: dates.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisExtent: compact ? 108 : 132,
+            crossAxisSpacing: 6,
+          ),
+          itemBuilder: (context, index) => _CalendarWeekDay(
+            state: state,
+            tasks: tasks,
+            date: dates[index],
+            today: today,
+            selectedDate: selectedDate,
+            compact: compact,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CalendarWeekDay extends StatelessWidget {
+  const _CalendarWeekDay({
+    required this.state,
+    required this.tasks,
+    required this.date,
+    required this.today,
+    required this.selectedDate,
+    required this.compact,
+  });
+  final AppState state;
+  final List<TaskRecord> tasks;
+  final DateTime date;
+  final DateTime today;
+  final DateTime selectedDate;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dateTasks =
+        tasks.where((task) => state.isTaskScheduledOn(task, date)).toList();
+    final isToday = dateKey(date) == dateKey(today);
+    final isSelected = dateKey(date) == dateKey(selectedDate);
+    final hasDeadline = _hasDeadlineOn(tasks, date);
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => state.selectCalendarDate(date),
+      child: Container(
+        padding: EdgeInsets.all(compact ? 6 : 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? scheme.primaryContainer
+              : isToday
+                  ? scheme.surfaceContainerHighest
+                  : scheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected || isToday
+                ? scheme.primary.withValues(alpha: isSelected ? 0.75 : 0.4)
+                : scheme.outlineVariant,
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 19,
+              width: double.infinity,
+              child: Stack(
+                children: [
+                  Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontSize: compact ? 13 : 15,
+                      fontWeight: isToday || isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: isSelected ? scheme.primary : scheme.onSurface,
+                    ),
+                  ),
+                  if (hasDeadline)
+                    Positioned(
+                      top: 7,
+                      right: 0,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: compact
+                  ? dateTasks.isEmpty
+                      ? const SizedBox()
+                      : Center(
+                          child: Text(
+                            '${dateTasks.length} 项',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (dateTasks.isEmpty)
+                          const Text(
+                            '无任务',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ...dateTasks.take(3).map(
+                              (task) => Text(
+                                _calendarGridLabel(state, task),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.muted,
+                                ),
+                              ),
+                            ),
+                        if (dateTasks.length > 3)
+                          Text(
+                            '+${dateTasks.length - 3} 项',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -535,6 +864,22 @@ class _Upcoming extends StatelessWidget {
       ],
     );
   }
+}
+
+String _weekLabel(DateTime weekStart) {
+  final weekEnd = weekStart.add(const Duration(days: 6));
+  if (weekStart.year == weekEnd.year && weekStart.month == weekEnd.month) {
+    return '${weekStart.month}月${weekStart.day}日–${weekEnd.day}日';
+  }
+  if (weekStart.year == weekEnd.year) {
+    return '${weekStart.month}月${weekStart.day}日–${weekEnd.month}月${weekEnd.day}日';
+  }
+  return '${weekStart.year}/${weekStart.month}/${weekStart.day}–${weekEnd.year}/${weekEnd.month}/${weekEnd.day}';
+}
+
+bool _hasDeadlineOn(List<TaskRecord> tasks, DateTime date) {
+  return tasks.any((task) =>
+      task.dueDate != null && dateKey(task.dueDate!) == dateKey(date));
 }
 
 int _compareCalendarTasks(AppState state, TaskRecord a, TaskRecord b) {

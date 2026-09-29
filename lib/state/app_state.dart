@@ -58,6 +58,7 @@ class AppState extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.light;
   DateTime focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selectedCalendarDate = startOfDay(DateTime.now());
+  bool calendarWeekView = true;
 
   List<Game> get games => store.games;
   Game? get selectedGame =>
@@ -196,6 +197,12 @@ class AppState extends ChangeNotifier {
   void selectCalendarDate(DateTime date) {
     selectedCalendarDate = startOfDay(date);
     focusedMonth = DateTime(date.year, date.month);
+    notifyListeners();
+  }
+
+  void setCalendarWeekView(bool value) {
+    if (calendarWeekView == value) return;
+    calendarWeekView = value;
     notifyListeners();
   }
 

@@ -75,7 +75,25 @@ class DashboardScreen extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             PageHeader(
                 title: '今日待办',
-                subtitle: '${_dateText(today)} · ${character.name}',
+                subtitleWidget: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${_dateText(today)} · '),
+                      TextSpan(
+                        text: character.name,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.muted,
+                  ),
+                ),
                 action: OutlinedButton.icon(
                     onPressed: () => showTaskEditor(
                           context,
@@ -487,6 +505,39 @@ class _CharacterStrip extends StatefulWidget {
 
 class _CharacterStripState extends State<_CharacterStrip> {
   final ScrollController _controller = ScrollController();
+  String? _positionedCharacterId;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleSelectedCharacterPosition();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CharacterStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state.selectedCharacterId != _positionedCharacterId) {
+      _scheduleSelectedCharacterPosition();
+    }
+  }
+
+  void _scheduleSelectedCharacterPosition() {
+    final selectedId = widget.state.selectedCharacterId;
+    if (selectedId == null || selectedId == _positionedCharacterId) return;
+    _positionedCharacterId = selectedId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      final index = widget.characters.indexWhere(
+        (character) => character.id == selectedId,
+      );
+      if (index < 0) return;
+      final position = _controller.position;
+      final targetOffset = (index * 120.0)
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      _controller.jumpTo(targetOffset);
+    });
+  }
 
   @override
   void dispose() {
@@ -516,6 +567,7 @@ class _CharacterStripState extends State<_CharacterStrip> {
         child: SizedBox(
           height: 65,
           child: ListView.separated(
+            key: const ValueKey('home-character-strip'),
             controller: _controller,
             scrollDirection: Axis.horizontal,
             itemCount: widget.characters.length + 1,

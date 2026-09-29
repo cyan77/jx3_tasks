@@ -93,11 +93,13 @@ class PageHeader extends StatelessWidget {
   const PageHeader(
       {required this.title,
       this.subtitle,
+      this.subtitleWidget,
       this.titleAction,
       this.action,
       super.key});
   final String title;
   final String? subtitle;
+  final Widget? subtitleWidget;
   final Widget? titleAction;
   final Widget? action;
 
@@ -125,16 +127,17 @@ class PageHeader extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (subtitle != null) ...[
+                if (subtitle != null || subtitleWidget != null) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle!,
-                    textAlign: TextAlign.left,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.muted,
-                    ),
-                  ),
+                  subtitleWidget ??
+                      Text(
+                        subtitle!,
+                        textAlign: TextAlign.left,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.muted,
+                        ),
+                      ),
                 ],
               ],
             );

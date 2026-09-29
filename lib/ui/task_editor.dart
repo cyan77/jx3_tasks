@@ -162,7 +162,9 @@ class _TaskEditorState extends State<_TaskEditor> {
   }
 
   String get saveLabel {
-    if (widget.createInInbox) return '放入收集箱';
+    if (widget.createInInbox) {
+      return selected.isEmpty ? '放入收集箱' : '创建并分配';
+    }
     if (isInboxEditing && selected.isNotEmpty) return '分配并移出收集箱';
     if (isEditing) return '保存修改';
     if (!assignExisting && selected.isEmpty) return '放入收集箱';
@@ -367,8 +369,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                           style: const TextStyle(
                               fontSize: 12, color: Color(0xffb94a48))),
                     ],
-                    if (!widget.createInInbox &&
-                        (!isEditing || widget.syncAll || isInboxEditing)) ...[
+                    if (!isEditing || widget.syncAll || isInboxEditing) ...[
                       const SizedBox(height: 18),
                       const Text('关联角色',
                           style: TextStyle(
@@ -627,12 +628,13 @@ class _TaskEditorState extends State<_TaskEditor> {
                             child: const Text('清除截止日期'),
                           ),
                         ),
-                      if (isInboxEditing && selected.isNotEmpty) ...[
+                      if ((widget.createInInbox || isInboxEditing) &&
+                          selected.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
-                            frequencyConfigured
-                                ? '保存后会分配给所选角色，并移出收集箱。'
-                                : '分配给角色前需要先设置周期。',
+                            widget.createInInbox && !frequencyConfigured
+                                ? '将按一次性任务创建并移出收集箱；如需其它周期请先打开“设置周期”。'
+                                : '保存后会分配给所选角色，并移出收集箱。',
                             style: const TextStyle(
                                 fontSize: 12, color: AppTheme.muted)),
                       ],
@@ -850,19 +852,35 @@ class _TaskEditorState extends State<_TaskEditor> {
       ..addAll(tags);
     tagController.clear();
     if (widget.createInInbox) {
-      await widget.state.addInboxTask(
-        title: title,
-        gameId: editorGameId,
-        frequency: frequencyConfigured ? frequency : null,
-        startDate: startDate,
-        dueDate: dueDate,
-        targetCount: targetCount,
-        targetQuantity: targetQuantity,
-        weeklyDays: weeklyDays.toList()..sort(),
-        subtasks: _subtasks(),
-        tags: tags,
-        note: noteController.text.trim(),
-      );
+      if (selected.isEmpty) {
+        await widget.state.addInboxTask(
+          title: title,
+          gameId: editorGameId,
+          frequency: frequencyConfigured ? frequency : null,
+          startDate: startDate,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          targetQuantity: targetQuantity,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          tags: tags,
+          note: noteController.text.trim(),
+        );
+      } else {
+        await widget.state.addTask(
+          title: title,
+          characterIds: Set.of(selected).toList(),
+          frequency: frequencyConfigured ? frequency : TaskFrequency.once,
+          startDate: startDate,
+          dueDate: dueDate,
+          targetCount: targetCount,
+          targetQuantity: targetQuantity,
+          weeklyDays: weeklyDays.toList()..sort(),
+          subtasks: _subtasks(),
+          tags: tags,
+          note: noteController.text.trim(),
+        );
+      }
     } else if (isInboxEditing) {
       if (selected.isEmpty) {
         await widget.state.updateInboxTask(

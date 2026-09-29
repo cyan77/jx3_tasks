@@ -249,6 +249,62 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('new inbox tasks can be assigned directly to a character',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const [
+        Character(
+          id: 'character',
+          gameId: 'game',
+          account: '',
+          name: '角色',
+          occupation: '',
+          color: 0xff2f7d72,
+        ),
+      ]
+      ..tasks = [];
+    final state = AppState(store);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showTaskEditor(
+              context,
+              state,
+              createInInbox: true,
+            ),
+            child: const Text('打开收集箱编辑器'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开收集箱编辑器'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('关联角色'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, '直接分配的任务');
+    await tester.tap(find.widgetWithText(FilterChip, '角色'));
+    await tester.pump();
+    expect(find.text('创建并分配'), findsOneWidget);
+    final saveButton = find.ancestor(
+      of: find.text('创建并分配'),
+      matching: find.byType(FilledButton),
+    );
+    expect(saveButton, findsOneWidget);
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+
+    expect(state.inboxTasks, isEmpty);
+    expect(state.tasks, hasLength(1));
+    expect(state.tasks.single.characterId, 'character');
+    state.dispose();
+  });
+
   testWidgets('shared dropdown menus open below their full-width field',
       (tester) async {
     String selected = 'game-jx3';
@@ -763,6 +819,29 @@ void main() {
 
     expect(find.text('手机日历任务'), findsNWidgets(2));
     expect(find.text('手机端隐藏的子任务'), findsNothing);
+    expect(find.text('回到本周'), findsOneWidget);
+
+    final viewToggle = find.byKey(const ValueKey('calendar-view-toggle'));
+    await tester.tap(find.descendant(of: viewToggle, matching: find.text('周')));
+    await tester.pumpAndSettle();
+    expect(find.text('回到本周'), findsOneWidget);
+    await tester.tap(find.descendant(of: viewToggle, matching: find.text('月')));
+    await tester.pumpAndSettle();
+    expect(find.text('回到本月'), findsOneWidget);
+    expect(state.calendarWeekView, isFalse);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: state,
+            builder: (context, child) => CalendarScreen(state: state),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('回到本月'), findsOneWidget);
     state.dispose();
   });
 
@@ -2385,6 +2464,63 @@ void main() {
 
     expect(find.text('1 个角色 · 2 个任务'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('home character strip restores the selected character position',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final characters = [
+      for (var index = 0; index < 4; index++)
+        Character(
+          id: 'character-$index',
+          gameId: 'game-jx3',
+          account: '',
+          name: '角色$index',
+          occupation: '',
+          color: 0xff2f8f83,
+        ),
+    ];
+    final store = LocalStore()
+      ..games = const [Game(id: 'game-jx3', name: '剑网3')]
+      ..characters = characters
+      ..tasks = [
+        for (var index = 0; index < characters.length; index++)
+          TaskRecord(
+            id: 'task-$index',
+            templateId: 'task-$index',
+            title: '任务$index',
+            characterId: 'character-$index',
+            frequency: TaskFrequency.daily,
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          ),
+      ];
+    final state = AppState(store)..selectCharacter('character-2');
+
+    await tester.pumpWidget(
+      AnimatedBuilder(
+        animation: state,
+        builder: (context, child) => MaterialApp(home: HomeShell(state: state)),
+      ),
+    );
+    await tester.pump();
+
+    ListView strip() => tester.widget<ListView>(
+          find.byKey(const ValueKey('home-character-strip')),
+        );
+    expect(strip().controller!.offset, closeTo(240, 0.1));
+
+    state.setTab(1);
+    await tester.pump();
+    state.setTab(0);
+    await tester.pump();
+    expect(strip().controller!.offset, closeTo(240, 0.1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    state.dispose();
   });
 
   testWidgets('home shell fits a narrow phone width', (tester) async {
