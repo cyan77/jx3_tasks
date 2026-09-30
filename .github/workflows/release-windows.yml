@@ -224,6 +224,19 @@ jobs:
           cp release-input/macos/角色日程-macOS.dmg release-assets/RoleSchedule-macOS.dmg
           cp release-input/macos/角色日程-macOS.pkg release-assets/RoleSchedule-macOS.pkg
 
+      - name: Prepare release title and notes
+        id: release_meta
+        shell: bash
+        run: |
+          notes="docs/releases/${{ github.ref_name }}.md"
+          title="$(sed -n 's/^# //p' "$notes" | head -n 1)"
+          if [[ -z "$title" ]]; then
+            echo "Release notes must start with a level-one heading." >&2
+            exit 1
+          fi
+          echo "title=${{ github.ref_name }} $title" >> "$GITHUB_OUTPUT"
+          sed '0,/^# /{/^# /d;}' "$notes" > release-body.md
+
       # GitHub strips non-ASCII characters from the actual release asset name.
       # Remove the superseded assets before re-uploading stable ASCII filenames.
       - name: Remove existing release assets
@@ -243,7 +256,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: ${{ github.ref_name }}
+          name: ${{ steps.release_meta.outputs.title }}
           files: release-assets/*
           generate_release_notes: false
-          body_path: docs/releases/${{ github.ref_name }}.md
+          body_path: release-body.md
