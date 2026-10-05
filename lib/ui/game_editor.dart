@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/task_models.dart';
 import '../state/app_state.dart';
+import '../theme/tag_colors.dart';
 import 'widgets/common.dart';
 
 Future<void> showGameEditor(
@@ -27,6 +28,7 @@ class _GameEditorState extends State<_GameEditor> {
   final controller = TextEditingController();
   late TimeOfDay resetTime;
   late List<GameMetadataField> fields;
+  late int gameColor;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _GameEditorState extends State<_GameEditor> {
     final minutes = widget.game?.dailyResetMinutes ?? 0;
     resetTime = TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
     fields = [...?widget.game?.metadataFields];
+    gameColor = widget.game?.color ?? 0xff2f7d72;
   }
 
   @override
@@ -53,6 +56,43 @@ class _GameEditorState extends State<_GameEditor> {
                     labelText: '游戏名称',
                     hintText: '例如：剑网3、崩坏：星穹铁道',
                   ),
+                ),
+                const SizedBox(height: 14),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('游戏配色'),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('自动配色'),
+                      selected: !List.generate(TagColors.names.length,
+                              TagColors.colorAt).contains(gameColor),
+                      onSelected: (_) => setState(() => gameColor = 0xff2f7d72),
+                    ),
+                    for (var index = 0; index < TagColors.names.length; index++)
+                      ChoiceChip(
+                        label: Text(TagColors.names[index]),
+                        labelStyle: TextStyle(color: TagColors.forLabel('',
+                            Theme.of(context).brightness,
+                            color: TagColors.colorAt(index)).foreground),
+                        backgroundColor: TagColors.forLabel('',
+                            Theme.of(context).brightness,
+                            color: TagColors.colorAt(index)).background,
+                        selectedColor: TagColors.forLabel('',
+                            Theme.of(context).brightness,
+                            color: TagColors.colorAt(index)).background,
+                        checkmarkColor: TagColors.forLabel('',
+                            Theme.of(context).brightness,
+                            color: TagColors.colorAt(index)).foreground,
+                        selected: gameColor == TagColors.colorAt(index),
+                        onSelected: (_) => setState(
+                            () => gameColor = TagColors.colorAt(index)),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 ListTile(
@@ -240,9 +280,11 @@ class _GameEditorState extends State<_GameEditor> {
     final minutes = resetTime.hour * 60 + resetTime.minute;
     if (widget.game == null) {
       await widget.state.addGame(name,
+          color: gameColor,
           dailyResetMinutes: minutes, metadataFields: fields);
     } else {
       await widget.state.updateGame(widget.game!, name,
+          color: gameColor,
           dailyResetMinutes: minutes, metadataFields: fields);
     }
     if (mounted) Navigator.pop(context);

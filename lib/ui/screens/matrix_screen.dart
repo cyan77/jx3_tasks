@@ -4,6 +4,7 @@ import '../../models/task_expiry.dart';
 import '../../models/task_models.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/tag_colors.dart';
 import '../task_editor.dart';
 import '../widgets/common.dart';
 
@@ -175,6 +176,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
               selectedTemplateIds.clear();
             }),
             onReset: _hasActiveFilters ? _resetFilters : null,
+            onRefresh: () => _changeFilters(selectedTemplateIds.clear),
           ),
         ),
       ),
@@ -216,6 +218,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                           tasks: tasks,
                           characters: _charactersFor(tasks),
                           gameName: _gameNameFor(tasks),
+                          gameColor: state.gameForTask(tasks.first)?.color,
                           completion: _completionFor(tasks),
                           completedTaskIds: tasks
                               .where((task) => task.isCompletedOn(
@@ -725,6 +728,7 @@ class _FilterBar extends StatelessWidget {
     required this.onCompletionChanged,
     required this.onArchiveChanged,
     required this.onReset,
+    required this.onRefresh,
   });
 
   static const inboxValue = '__inbox__';
@@ -741,6 +745,7 @@ class _FilterBar extends StatelessWidget {
   final ValueChanged<_CompletionFilter> onCompletionChanged;
   final ValueChanged<_ArchiveFilter> onArchiveChanged;
   final VoidCallback? onReset;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -829,15 +834,25 @@ class _FilterBar extends StatelessWidget {
               },
             )),
           ]),
-          if (onReset != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: TextButton.icon(
-                onPressed: onReset,
-                icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
-                label: const Text('清除筛选'),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Wrap(
+              spacing: 6,
+              children: [
+                if (onReset != null)
+                  TextButton.icon(
+                    onPressed: onReset,
+                    icon: const Icon(Icons.filter_alt_off_outlined, size: 15),
+                    label: const Text('清除筛选'),
+                  ),
+                TextButton.icon(
+                  onPressed: onRefresh,
+                  icon: const Icon(Icons.refresh, size: 15),
+                  label: const Text('重新筛选'),
+                ),
+              ],
             ),
+          ),
         ],
       );
 }
@@ -909,6 +924,19 @@ class _TagFilterMenu extends StatelessWidget {
                           .map((tag) => FilterChip(
                                 key: ValueKey('task-tag-filter-$tag'),
                                 label: Text('#$tag'),
+                                labelStyle: TextStyle(
+                                  color: TagColors.forLabel(tag, scheme.brightness)
+                                      .foreground,
+                                ),
+                                backgroundColor:
+                                    TagColors.forLabel(tag, scheme.brightness)
+                                        .background,
+                                selectedColor:
+                                    TagColors.forLabel(tag, scheme.brightness)
+                                        .background,
+                                checkmarkColor:
+                                    TagColors.forLabel(tag, scheme.brightness)
+                                        .foreground,
                                 selected: selected.contains(tag),
                                 onSelected: (_) => onToggleTag(tag),
                               ))
@@ -924,14 +952,15 @@ class _TagFilterMenu extends StatelessWidget {
           color: selected.isEmpty
               ? fill.withValues(alpha: 0.96)
               : scheme.primaryContainer,
-          shape: CircleBorder(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
             side: BorderSide(
               color: scheme.primary.withValues(alpha: 0.24),
             ),
           ),
           child: InkWell(
             key: const ValueKey('task-tag-filter-button'),
-            customBorder: const CircleBorder(),
+            borderRadius: BorderRadius.circular(12),
             onTap: onToggleExpanded,
             child: SizedBox(
               width: 48,
@@ -1192,6 +1221,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.tasks,
     required this.characters,
     required this.gameName,
+    required this.gameColor,
     required this.completion,
     required this.completedTaskIds,
     required this.expiry,
@@ -1211,6 +1241,7 @@ class _TaskManagementTile extends StatelessWidget {
   final List<TaskRecord> tasks;
   final List<Character> characters;
   final String gameName;
+  final int? gameColor;
   final _TemplateCompletion completion;
   final Set<String> completedTaskIds;
   final TaskExpiryStatus expiry;
@@ -1325,6 +1356,20 @@ class _TaskManagementTile extends StatelessWidget {
                             ? null
                             : completion == _TemplateCompletion.complete,
                         visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: const CircleBorder(),
+                        fillColor:
+                            const WidgetStatePropertyAll(Colors.transparent),
+                        checkColor: scheme.primary,
+                        side: WidgetStateBorderSide.resolveWith((states) {
+                          final color = states.contains(WidgetState.disabled)
+                              ? scheme.onSurfaceVariant.withValues(alpha: 0.38)
+                              : completion == _TemplateCompletion.incomplete ||
+                                      completion == _TemplateCompletion.unassigned
+                                  ? scheme.onSurfaceVariant
+                                  : scheme.primary;
+                          return BorderSide(color: color, width: 1.5);
+                        }),
                         onChanged: selectionMode
                             ? null
                             : (_) => onSetAllCompleted(
@@ -1357,6 +1402,8 @@ class _TaskManagementTile extends StatelessWidget {
                       _StatusChip(
                         icon: Icons.sports_esports_outlined,
                         label: gameName,
+                        colorful: true,
+                        color: gameColor,
                       ),
                       _CompletionChip(
                         completion: completion,
@@ -1373,10 +1420,11 @@ class _TaskManagementTile extends StatelessWidget {
                       ...task.tags.map((tag) => _StatusChip(
                             icon: Icons.sell_outlined,
                             label: tag,
+                            colorful: true,
                           )),
                       Text(details.join(' · '),
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.muted)),
+                          style: TextStyle(
+                              fontSize: 12, color: scheme.onSurfaceVariant)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1432,10 +1480,10 @@ class _TaskManagementTile extends StatelessWidget {
                       color: selected ? scheme.primary : scheme.onSurfaceVariant,
                     ),
                   ),
+                if (showSelectionButton) const SizedBox(width: 6),
                 PopupMenuButton<String>(
                   tooltip: '任务操作',
-                  icon: Icon(Icons.more_horiz, size: 24,
-                      color: scheme.onSurface),
+                  child: const ActionIconSurface(icon: Icons.more_horiz),
                   onSelected: handleAction,
                   itemBuilder: (_) => [
                     if (!task.archived)
@@ -1505,24 +1553,36 @@ class _CharacterChip extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.icon, required this.label});
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    this.colorful = false,
+    this.color,
+  });
   final IconData icon;
   final String label;
+  final bool colorful;
+  final int? color;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final colors = TagColors.forLabel(label, scheme.brightness, color: color);
+    final foreground = colorful ? colors.foreground : AppTheme.muted;
+    return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          color: colorful ? colors.background : scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: AppTheme.muted),
+          Icon(icon, size: 14, color: foreground),
           const SizedBox(width: 5),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+              style: TextStyle(fontSize: 11, color: foreground)),
         ]),
       );
+  }
 }
 
 class _CompletionChip extends StatelessWidget {

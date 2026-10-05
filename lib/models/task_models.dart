@@ -90,13 +90,14 @@ class Game {
 
   Game copyWith({
     String? name,
+    int? color,
     int? dailyResetMinutes,
     List<GameMetadataField>? metadataFields,
   }) =>
       Game(
         id: id,
         name: name ?? this.name,
-        color: color,
+        color: color ?? this.color,
         dailyResetMinutes: dailyResetMinutes ?? this.dailyResetMinutes,
         metadataFields: metadataFields ?? this.metadataFields,
       );

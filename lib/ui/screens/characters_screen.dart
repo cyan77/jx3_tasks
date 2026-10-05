@@ -498,6 +498,7 @@ class _CharacterCard extends StatelessWidget {
                 else
                   PopupMenuButton<String>(
                     padding: EdgeInsets.zero,
+                    child: const ActionIconSurface(icon: Icons.more_horiz),
                     onSelected: handleAction,
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'edit', child: Text('编辑角色')),

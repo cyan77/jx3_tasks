@@ -921,11 +921,10 @@ void main() {
     expect(find.text('已完成'), findsOneWidget);
     expect(find.text('收集箱 · 未分配角色'), findsOneWidget);
     // Editing completion keeps the task visible until the filter is reapplied.
-    await tester.tap(statusFilter);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('未完成').last);
+    await tester.tap(find.text('重新筛选'));
     await tester.pumpAndSettle();
     expect(checkbox, findsNothing);
+    expect(find.text('未完成'), findsOneWidget);
     await tester.tap(find.text('清除筛选'));
     await tester.pumpAndSettle();
     expect(tester.widget<Checkbox>(checkbox).value, isTrue);

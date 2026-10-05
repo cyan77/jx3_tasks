@@ -9,7 +9,7 @@ class AppTheme {
   static const warning = Color(0xffb56a18);
   static const warningDark = Color(0xffffbd69);
 
-  static ThemeData get light => ThemeData(
+  static ThemeData get light => _withActionStyles(ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
@@ -135,7 +135,7 @@ class AppTheme {
             color: ink,
           ),
         ),
-      );
+      ));
 
   static ThemeData get dark {
     const darkSurface = Color(0xff171d1b);
@@ -162,7 +162,7 @@ class AppTheme {
       onSurface: darkText,
       onSurfaceVariant: darkMuted,
     );
-    return ThemeData(
+    return _withActionStyles(ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkSurface,
@@ -285,6 +285,43 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: darkText,
         ),
+      ),
+    ));
+  }
+
+  static ThemeData _withActionStyles(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return theme.copyWith(
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
+          iconSize: const WidgetStatePropertyAll(20),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          )),
+          side: WidgetStatePropertyAll(BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.65),
+          )),
+          backgroundColor: WidgetStatePropertyAll(
+            scheme.surfaceContainerLow.withValues(alpha: 0.65),
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.disabled)
+                  ? scheme.onSurfaceVariant.withValues(alpha: 0.38)
+                  : scheme.onSurfaceVariant),
+          overlayColor: WidgetStatePropertyAll(
+            scheme.primary.withValues(alpha: 0.08),
+          ),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        textStyle: TextStyle(fontSize: 11, color: scheme.onSurface),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
     );
   }

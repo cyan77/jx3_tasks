@@ -98,6 +98,7 @@ class GameManagementScreen extends StatelessWidget {
                             ),
                           ),
                           PopupMenuButton<String>(
+                            child: const ActionIconSurface(icon: Icons.more_horiz),
                             onSelected: handleAction,
                             itemBuilder: (_) => [
                               const PopupMenuItem(

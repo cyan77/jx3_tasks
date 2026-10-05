@@ -5,6 +5,30 @@ import 'package:flutter/material.dart';
 import '../../models/task_models.dart';
 import '../../theme/app_theme.dart';
 
+/// Matching surface for menu triggers that do not use IconButtonTheme.
+class ActionIconSurface extends StatelessWidget {
+  const ActionIconSurface({required this.icon, super.key});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+    );
+  }
+}
+
 /// Uses the game's task day so the displayed boundary matches completion logic.
 String? taskCycleStatus(TaskRecord task, DateTime moment,
     {int dailyResetMinutes = 0, bool showProgress = true}) {

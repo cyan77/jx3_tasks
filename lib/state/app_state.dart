@@ -1448,6 +1448,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> addGame(
     String name, {
+    int? color,
     int dailyResetMinutes = 0,
     List<GameMetadataField> metadataFields = const [],
   }) async {
@@ -1456,7 +1457,7 @@ class AppState extends ChangeNotifier {
       name: name,
       dailyResetMinutes: dailyResetMinutes,
       metadataFields: metadataFields,
-      color: const [
+      color: color ?? const [
         0xff3c8c72,
         0xff66a892,
         0xff7fae9e,
@@ -1473,6 +1474,7 @@ class AppState extends ChangeNotifier {
   Future<void> updateGame(
     Game game,
     String name, {
+    int? color,
     required int dailyResetMinutes,
     List<GameMetadataField>? metadataFields,
   }) async {
@@ -1480,6 +1482,7 @@ class AppState extends ChangeNotifier {
     if (index < 0) return;
     store.games[index] = game.copyWith(
       name: name,
+      color: color,
       dailyResetMinutes: dailyResetMinutes,
       metadataFields: metadataFields,
     );

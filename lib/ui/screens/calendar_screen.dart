@@ -766,7 +766,7 @@ class _InteractiveTaskTile extends StatelessWidget {
                 ),
               PopupMenuButton<String>(
                 tooltip: '编辑任务',
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                child: const ActionIconSurface(icon: Icons.edit_outlined),
                 onSelected: (value) => showTaskEditor(
                   context,
                   state,
