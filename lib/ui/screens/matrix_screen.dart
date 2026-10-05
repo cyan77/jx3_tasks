@@ -949,15 +949,7 @@ class _TagFilterMenu extends StatelessWidget {
                 ),
         ),
         Material(
-          color: selected.isEmpty
-              ? fill.withValues(alpha: 0.96)
-              : scheme.primaryContainer,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: scheme.primary.withValues(alpha: 0.24),
-            ),
-          ),
+          color: Colors.transparent,
           child: InkWell(
             key: const ValueKey('task-tag-filter-button'),
             borderRadius: BorderRadius.circular(12),
@@ -972,8 +964,10 @@ class _TagFilterMenu extends StatelessWidget {
                     expanded ? Icons.close : Icons.sell_outlined,
                     size: 21,
                     color: onToggleExpanded == null
-                        ? AppTheme.muted
-                        : scheme.onSurfaceVariant,
+                        ? scheme.onSurfaceVariant.withValues(alpha: 0.38)
+                        : selected.isNotEmpty || expanded
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
                   ),
                   if (selected.isNotEmpty)
                     Positioned(
@@ -1474,8 +1468,8 @@ class _TaskManagementTile extends StatelessWidget {
                     onPressed: onSelect,
                     icon: Icon(
                       selected
-                          ? Icons.check_circle
-                          : Icons.library_add_check_outlined,
+                          ? Icons.task_alt
+                          : Icons.check_circle_outline,
                       size: 20,
                       color: selected ? scheme.primary : scheme.onSurfaceVariant,
                     ),

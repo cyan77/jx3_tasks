@@ -296,22 +296,16 @@ class AppTheme {
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
           iconSize: const WidgetStatePropertyAll(20),
-          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          )),
-          side: WidgetStatePropertyAll(BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.65),
-          )),
-          backgroundColor: WidgetStatePropertyAll(
-            scheme.surfaceContainerLow.withValues(alpha: 0.65),
-          ),
+          side: const WidgetStatePropertyAll(BorderSide.none),
+          backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
           foregroundColor: WidgetStateProperty.resolveWith((states) =>
               states.contains(WidgetState.disabled)
                   ? scheme.onSurfaceVariant.withValues(alpha: 0.38)
-                  : scheme.onSurfaceVariant),
-          overlayColor: WidgetStatePropertyAll(
-            scheme.primary.withValues(alpha: 0.08),
-          ),
+                  : states.contains(WidgetState.hovered) ||
+                          states.contains(WidgetState.pressed)
+                      ? scheme.primary
+                      : scheme.onSurfaceVariant),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         ),
       ),
       tooltipTheme: TooltipThemeData(
