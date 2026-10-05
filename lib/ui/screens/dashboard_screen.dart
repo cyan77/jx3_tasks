@@ -293,6 +293,9 @@ class _HomeGameSelector extends StatelessWidget {
                             ? '本地和云端都有改动，点击处理'
                             : '发现更新的云端备份，点击恢复',
                         visualDensity: VisualDensity.compact,
+                        color: scheme.brightness == Brightness.dark
+                            ? AppTheme.warningDark
+                            : AppTheme.warning,
                         onPressed: state.restoreBusy || state.syncBusy
                             ? null
                             : () => _restoreNewerBackup(context),
@@ -526,13 +529,22 @@ class _CharacterStripState extends State<_CharacterStrip> {
     if (selectedId == null || selectedId == _positionedCharacterId) return;
     _positionedCharacterId = selectedId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_controller.hasClients) return;
+      if (!mounted ||
+          !_controller.hasClients ||
+          widget.state.selectedCharacterId != selectedId) return;
       final index = widget.characters.indexWhere(
         (character) => character.id == selectedId,
       );
       if (index < 0) return;
       final position = _controller.position;
-      final targetOffset = (index * 120.0)
+      final cardStart = index * 120.0;
+      final cardEnd = cardStart + 112.0;
+      final visibleStart = position.pixels;
+      final visibleEnd = visibleStart + position.viewportDimension;
+      if (cardStart >= visibleStart && cardEnd <= visibleEnd) return;
+      final targetOffset = (cardStart < visibleStart
+              ? cardStart
+              : cardEnd - position.viewportDimension)
           .clamp(position.minScrollExtent, position.maxScrollExtent)
           .toDouble();
       _controller.jumpTo(targetOffset);

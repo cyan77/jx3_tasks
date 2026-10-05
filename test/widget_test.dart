@@ -874,6 +874,150 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('unassigned task can be completed without assigning characters',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = const []
+      ..tasks = [
+        TaskRecord(
+          id: 'inbox',
+          templateId: 'inbox',
+          title: '一起完成的任务',
+          characterId: '',
+          inboxGameId: 'game',
+          frequency: TaskFrequency.once,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    final state = AppState(store);
+    addTearDown(state.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: state,
+            builder: (_, __) => MatrixScreen(state: state),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final checkbox = find.byKey(const ValueKey('complete-all-inbox'));
+    final statusFilter = find.byKey(
+      const ValueKey('task-filter-control-按完成状态筛选'),
+    );
+    await tester.tap(statusFilter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('未完成').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+    expect(store.tasks.single.isCompletedOn(DateTime.now()), isTrue);
+    expect(store.tasks.single.isInbox, isTrue);
+    expect(find.text('已完成'), findsOneWidget);
+    expect(find.text('收集箱 · 未分配角色'), findsOneWidget);
+    // Editing completion keeps the task visible until the filter is reapplied.
+    await tester.tap(statusFilter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('未完成').last);
+    await tester.pumpAndSettle();
+    expect(checkbox, findsNothing);
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+    expect(store.tasks.single.completedDates, isEmpty);
+    await state.setTaskTemplatesArchived({'inbox'}, archived: true);
+    await tester.pumpAndSettle();
+    expect(checkbox, findsOneWidget);
+    final archiveFilter = find.byKey(
+      const ValueKey('task-filter-control-按归档状态筛选'),
+    );
+    await tester.tap(archiveFilter);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('未归档').last);
+    await tester.pumpAndSettle();
+    expect(checkbox, findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('task title checkbox completes and clears all assigned characters',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final now = DateTime.now();
+    final store = LocalStore()
+      ..games = const [Game(id: 'game', name: '游戏')]
+      ..characters = [
+        for (final id in ['one', 'two'])
+          Character(
+            id: id,
+            gameId: 'game',
+            account: '',
+            name: id,
+            occupation: '',
+            color: 0xff3c8c72,
+          ),
+      ]
+      ..tasks = [
+        for (final id in ['one', 'two'])
+          TaskRecord(
+            id: 'shared-$id',
+            templateId: 'shared',
+            title: '所有角色任务',
+            characterId: id,
+            frequency: TaskFrequency.once,
+            createdAt: now,
+            completedDates: id == 'one' ? [dateKey(now)] : [],
+          ),
+        TaskRecord(
+          id: 'other',
+          templateId: 'other',
+          title: '其他任务',
+          characterId: 'one',
+          frequency: TaskFrequency.once,
+          createdAt: now,
+        ),
+      ];
+    final state = AppState(store);
+    addTearDown(state.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: AnimatedBuilder(
+            animation: state,
+            builder: (_, __) => MatrixScreen(state: state),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final checkbox = find.byKey(const ValueKey('complete-all-shared'));
+    expect(tester.widget<Checkbox>(checkbox).value, isNull);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+    expect(store.tasks.take(2).every((task) => task.isCompletedOn(now)), isTrue);
+    expect(store.tasks.last.isCompletedOn(now), isFalse);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+    expect(store.tasks.take(2).every((task) => !task.isCompletedOn(now)), isTrue);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+    await tester.tap(find.byKey(const ValueKey('select-task-shared')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('all tasks page supports selecting multiple task templates',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -923,7 +1067,7 @@ void main() {
     expect(find.text('新建任务'), findsOneWidget);
     expect(find.text('任务一'), findsOneWidget);
     expect(find.text('任务二'), findsOneWidget);
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.byType(Checkbox), findsNWidgets(2));
     expect(find.text('批量分配'), findsNothing);
     expect(find.text('点击任务右上角的选择按钮进行多选管理'), findsOneWidget);
     expect(find.byKey(const ValueKey('select-task-task-1')), findsOneWidget);
@@ -2511,13 +2655,27 @@ void main() {
     ListView strip() => tester.widget<ListView>(
           find.byKey(const ValueKey('home-character-strip')),
         );
-    expect(strip().controller!.offset, closeTo(240, 0.1));
+    final selectedOffset =
+        352.0 - strip().controller!.position.viewportDimension;
+    expect(strip().controller!.offset, closeTo(selectedOffset, 0.1));
+
+    state.selectCharacter('character-1');
+    await tester.pump();
+    expect(strip().controller!.offset, closeTo(selectedOffset, 0.1));
+
+    state.selectCharacter('character-0');
+    await tester.pump();
+    expect(strip().controller!.offset, closeTo(0, 0.1));
+
+    state.selectCharacter('character-2');
+    await tester.pump();
+    expect(strip().controller!.offset, closeTo(selectedOffset, 0.1));
 
     state.setTab(1);
     await tester.pump();
     state.setTab(0);
     await tester.pump();
-    expect(strip().controller!.offset, closeTo(240, 0.1));
+    expect(strip().controller!.offset, closeTo(selectedOffset, 0.1));
 
     await tester.pumpWidget(const SizedBox.shrink());
     state.dispose();

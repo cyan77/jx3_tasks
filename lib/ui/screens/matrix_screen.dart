@@ -40,6 +40,12 @@ class _MatrixScreenState extends State<MatrixScreen> {
   bool tagMenuExpanded = false;
   _CompletionFilter completionFilter = _CompletionFilter.all;
   _ArchiveFilter archiveFilter = _ArchiveFilter.active;
+  List<String>? _filteredTemplateIds;
+
+  void _changeFilters(VoidCallback update) => setState(() {
+        update();
+        _filteredTemplateIds = null;
+      });
 
   AppState get state => widget.state;
 
@@ -54,26 +60,33 @@ class _MatrixScreenState extends State<MatrixScreen> {
     }
     final availableTags =
         state.store.tasks.expand((task) => task.tags).toSet().toList()..sort();
-    tagFilters.removeWhere((tag) => !availableTags.contains(tag));
     selectedTemplateIds.removeWhere((id) => !templates.containsKey(id));
-    final visibleTemplates = templates.values.where((tasks) {
-      if (!_matchesGame(tasks) ||
-          !_matchesCharacter(tasks) ||
-          !_matchesTag(tasks) ||
-          !_matchesCompletion(tasks) ||
-          !_matchesArchive(tasks)) {
-        return false;
-      }
-      if (query.isEmpty) return true;
-      final normalized = query.toLowerCase();
-      final characterNames = _charactersFor(tasks)
-          .map((character) => character.name.toLowerCase());
-      return tasks.first.title.toLowerCase().contains(normalized) ||
-          tasks.any((task) =>
-              task.tags.any((tag) => tag.toLowerCase().contains(normalized))) ||
-          characterNames.any((name) => name.contains(normalized));
-    }).toList()
-      ..sort((a, b) => a.first.title.compareTo(b.first.title));
+    if (_filteredTemplateIds == null) {
+      final matches = templates.values.where((tasks) {
+        if (!_matchesGame(tasks) ||
+            !_matchesCharacter(tasks) ||
+            !_matchesTag(tasks) ||
+            !_matchesCompletion(tasks) ||
+            !_matchesArchive(tasks)) {
+          return false;
+        }
+        if (query.isEmpty) return true;
+        final normalized = query.toLowerCase();
+        final characterNames = _charactersFor(tasks)
+            .map((character) => character.name.toLowerCase());
+        return tasks.first.title.toLowerCase().contains(normalized) ||
+            tasks.any((task) =>
+                task.tags.any((tag) => tag.toLowerCase().contains(normalized))) ||
+            characterNames.any((name) => name.contains(normalized));
+      }).toList()
+        ..sort((a, b) => a.first.title.compareTo(b.first.title));
+      _filteredTemplateIds =
+          matches.map((tasks) => tasks.first.templateId).toList();
+    }
+    final visibleTemplates = [
+      for (final id in _filteredTemplateIds!)
+        if (templates.containsKey(id)) templates[id]!,
+    ];
     final visibleIds =
         visibleTemplates.map((tasks) => tasks.first.templateId).toSet();
     final selectedCount = selectedTemplateIds.length;
@@ -92,7 +105,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
                   child: TextField(
                     controller: searchController,
                     focusNode: searchFocusNode,
-                    onChanged: (value) => setState(() => query = value.trim()),
+                    onChanged: (value) =>
+                        _changeFilters(() => query = value.trim()),
                     decoration: InputDecoration(
                       hintText: '搜索任务或角色',
                       prefixIcon: const Icon(Icons.search, size: 18),
@@ -138,7 +152,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
             characterId: characterFilterId,
             completion: completionFilter,
             archive: archiveFilter,
-            onGameChanged: (value) => setState(() {
+            onGameChanged: (value) => _changeFilters(() {
               gameFilterId = value;
               selectedTemplateIds.clear();
               if (characterFilterId != null &&
@@ -148,15 +162,15 @@ class _MatrixScreenState extends State<MatrixScreen> {
                 characterFilterId = null;
               }
             }),
-            onCharacterChanged: (value) => setState(() {
+            onCharacterChanged: (value) => _changeFilters(() {
               characterFilterId = value;
               selectedTemplateIds.clear();
             }),
-            onCompletionChanged: (value) => setState(() {
+            onCompletionChanged: (value) => _changeFilters(() {
               completionFilter = value;
               selectedTemplateIds.clear();
             }),
-            onArchiveChanged: (value) => setState(() {
+            onArchiveChanged: (value) => _changeFilters(() {
               archiveFilter = value;
               selectedTemplateIds.clear();
             }),
@@ -226,6 +240,14 @@ class _MatrixScreenState extends State<MatrixScreen> {
                             completed:
                                 !task.isCompletedOn(state.taskDateFor(task)),
                           ),
+                          onSetAllCompleted: (completed) async {
+                            for (final task in tasks) {
+                              await state.setTaskCompleted(
+                                task,
+                                completed: completed,
+                              );
+                            }
+                          },
                           onEdit: () => showTaskEditor(
                             context,
                             state,
@@ -260,7 +282,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
                             : () => setState(
                                   () => tagMenuExpanded = !tagMenuExpanded,
                                 ),
-                        onToggleTag: (tag) => setState(() {
+                        onToggleTag: (tag) => _changeFilters(() {
                           tagFilters.contains(tag)
                               ? tagFilters.remove(tag)
                               : tagFilters.add(tag);
@@ -367,12 +389,16 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   _TemplateCompletion _completionFor(List<TaskRecord> tasks) {
     final assigned = tasks.where((task) => !task.isInbox).toList();
-    if (assigned.isEmpty) return _TemplateCompletion.unassigned;
-    final completed = assigned
+    final completionTasks = assigned.isEmpty ? tasks : assigned;
+    final completed = completionTasks
         .where((task) => task.isCompletedOn(state.taskDateFor(task)))
         .length;
-    if (completed == 0) return _TemplateCompletion.incomplete;
-    if (completed == assigned.length) return _TemplateCompletion.complete;
+    if (completed == 0) {
+      return assigned.isEmpty
+          ? _TemplateCompletion.unassigned
+          : _TemplateCompletion.incomplete;
+    }
+    if (completed == completionTasks.length) return _TemplateCompletion.complete;
     return _TemplateCompletion.partial;
   }
 
@@ -411,7 +437,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
     return switch (completionFilter) {
       _CompletionFilter.all => true,
       _CompletionFilter.incomplete =>
-        completion == _TemplateCompletion.incomplete,
+        completion == _TemplateCompletion.incomplete ||
+            completion == _TemplateCompletion.unassigned,
       _CompletionFilter.partial => completion == _TemplateCompletion.partial,
       _CompletionFilter.complete => completion == _TemplateCompletion.complete,
       _CompletionFilter.expiringSoon =>
@@ -427,7 +454,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
         _ArchiveFilter.all => true,
       };
 
-  void _resetFilters() => setState(() {
+  void _resetFilters() => _changeFilters(() {
         gameFilterId = null;
         characterFilterId = null;
         tagFilters.clear();
@@ -671,7 +698,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
   void _closeSearch() {
     searchController.clear();
     searchFocusNode.unfocus();
-    setState(() {
+    _changeFilters(() {
       query = '';
       searchExpanded = false;
     });
@@ -1174,6 +1201,7 @@ class _TaskManagementTile extends StatelessWidget {
     required this.showSelectionButton,
     required this.onSelect,
     required this.onToggleTask,
+    required this.onSetAllCompleted,
     required this.onEdit,
     required this.onMoveToInbox,
     required this.onArchiveChanged,
@@ -1192,6 +1220,7 @@ class _TaskManagementTile extends StatelessWidget {
   final bool showSelectionButton;
   final VoidCallback onSelect;
   final ValueChanged<TaskRecord> onToggleTask;
+  final ValueChanged<bool> onSetAllCompleted;
   final VoidCallback onEdit;
   final VoidCallback onMoveToInbox;
   final ValueChanged<bool> onArchiveChanged;
@@ -1201,7 +1230,8 @@ class _TaskManagementTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final task = tasks.first;
     final assignedTasks = tasks.where((item) => !item.isInbox).toList();
-    final completedCount = assignedTasks
+    final completionTasks = assignedTasks.isEmpty ? tasks : assignedTasks;
+    final completedCount = completionTasks
         .where((item) => completedTaskIds.contains(item.id))
         .length;
     final scheme = Theme.of(context).colorScheme;
@@ -1280,6 +1310,29 @@ class _TaskManagementTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
+                    Tooltip(
+                      message: task.isInbox
+                          ? completion == _TemplateCompletion.complete
+                              ? '取消完成'
+                              : '完成任务'
+                          : completion == _TemplateCompletion.complete
+                              ? '取消所有角色完成'
+                              : '完成所有角色',
+                      child: Checkbox(
+                        key: ValueKey('complete-all-${task.templateId}'),
+                        tristate: true,
+                        value: completion == _TemplateCompletion.partial
+                            ? null
+                            : completion == _TemplateCompletion.complete,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: selectionMode
+                            ? null
+                            : (_) => onSetAllCompleted(
+                                  completion != _TemplateCompletion.complete,
+                                ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     if (selected) ...[
                       Icon(
                         Icons.check_circle,
@@ -1308,7 +1361,7 @@ class _TaskManagementTile extends StatelessWidget {
                       _CompletionChip(
                         completion: completion,
                         completedCount: completedCount,
-                        totalCount: assignedTasks.length,
+                        totalCount: completionTasks.length,
                       ),
                       if (expiry != TaskExpiryStatus.normal)
                         _ExpiryChip(expiry: expiry),
