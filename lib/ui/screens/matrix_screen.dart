@@ -1508,7 +1508,7 @@ class _TaskManagementTile extends StatelessWidget {
   }
 }
 
-class _CharacterChip extends StatelessWidget {
+class _CharacterChip extends StatefulWidget {
   const _CharacterChip({
     required this.character,
     required this.task,
@@ -1521,21 +1521,38 @@ class _CharacterChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  State<_CharacterChip> createState() => _CharacterChipState();
+}
+
+class _CharacterChipState extends State<_CharacterChip> {
+  bool _hovered = false;
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final character = widget.character;
+    final task = widget.task;
+    final completed = widget.completed;
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
       key: ValueKey('task-character-${task.id}'),
-      onTap: onTap,
+      onTap: widget.onTap,
+      onHover: (value) => setState(() => _hovered = value),
+      onFocusChange: (value) => setState(() => _focused = value),
       borderRadius: BorderRadius.circular(10),
       hoverColor: Colors.transparent,
+      focusColor: Colors.transparent,
       highlightColor: Colors.transparent,
       splashFactory: NoSplash.splashFactory,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Container(
+        child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
         constraints: const BoxConstraints(minHeight: 32, minWidth: 72),
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: Color.lerp(Theme.of(context).colorScheme.surface,
-              Theme.of(context).colorScheme.primaryContainer, 0.24),
+          color: Color.lerp(scheme.surface, scheme.primaryContainer,
+              _hovered || _focused ? 0.65 : 0.24),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1557,6 +1574,7 @@ class _CharacterChip extends StatelessWidget {
           ],
         ]),
       )));
+  }
 }
 
 class _StatusChip extends StatelessWidget {
