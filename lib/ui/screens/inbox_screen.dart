@@ -559,12 +559,9 @@ class _InboxTaskCard extends StatelessWidget {
                                 ? null
                                 : alertColor)),
                     const SizedBox(height: 4),
-                    Text(details.join(' · '),
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: expiry == TaskExpiryStatus.normal
-                                ? AppTheme.muted
-                                : alertColor)),
+                    TaskMetaText(details.join(' · '),
+                      deadlineColor: expiry == TaskExpiryStatus.normal
+                          ? null : alertColor),
                     if (cycleStatus != null) ...[
                       const SizedBox(height: 3),
                       Text(cycleStatus,

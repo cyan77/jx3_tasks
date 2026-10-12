@@ -7,8 +7,13 @@ import '../../theme/app_theme.dart';
 
 /// Unframed menu icon with a generous hit area.
 class ActionIconSurface extends StatelessWidget {
-  const ActionIconSurface({required this.icon, super.key});
+  const ActionIconSurface({
+    required this.icon,
+    this.alignment = Alignment.center,
+    super.key,
+  });
   final IconData icon;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +21,7 @@ class ActionIconSurface extends StatelessWidget {
     return Container(
       width: 40,
       height: 40,
-      alignment: Alignment.center,
+      alignment: alignment,
       child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
     );
   }
@@ -501,4 +506,40 @@ class AppDropdownField<T> extends StatelessWidget {
 String dueLabel(DateTime? date) {
   if (date == null) return '';
   return '${date.month}/${date.day} 截止';
+}
+
+/// Compact, unframed frequency and deadline details shared by task pages.
+class TaskMetaText extends StatelessWidget {
+  const TaskMetaText(this.text, {this.deadlineColor, super.key});
+  final String text;
+  final Color? deadlineColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 3,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: text.split(' · ').where((part) => part.isNotEmpty).map((part) {
+        final isDeadline = part.contains('截止') || part.contains('逾期') ||
+            part.contains('过期');
+        final isFrequency = part == '未设置周期' ||
+            TaskFrequency.values.any((frequency) => part.startsWith(frequency.label));
+        final icon = isDeadline ? Icons.event_outlined
+            : isFrequency ? Icons.schedule_outlined
+            : part.startsWith('开始 ') ? Icons.event_outlined : null;
+        final color = isDeadline
+            ? deadlineColor ?? scheme.onSurfaceVariant : scheme.onSurfaceVariant;
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 3),
+          ],
+          Flexible(child: Text(part, style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w400, color: color))),
+        ]);
+      }).toList(),
+    );
+  }
 }

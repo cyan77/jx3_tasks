@@ -829,18 +829,15 @@ class _TaskList extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     task.hasQuantityTarget
-                        ? Text(
+                        ? TaskMetaText(
                             taskCycleStatus(task, DateTime.now(),
                                     dailyResetMinutes: state
                                             .gameForTask(task)
                                             ?.dailyResetMinutes ??
                                         0) ??
                                 _taskMeta(task, date),
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: expiringSoon || overdue
-                                    ? alertColor
-                                    : AppTheme.muted))
+                            deadlineColor: expiringSoon || overdue
+                                ? alertColor : null)
                         : task.isCountTask
                             ? InkWell(
                                 borderRadius: BorderRadius.circular(4),
@@ -854,27 +851,21 @@ class _TaskList extends StatelessWidget {
                                 child: Padding(
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 2),
-                                  child: Text(
+                                  child: TaskMetaText(
                                     taskCycleStatus(task, DateTime.now(),
                                             dailyResetMinutes: state
                                                     .gameForTask(task)
                                                     ?.dailyResetMinutes ??
                                                 0) ??
                                         _taskMeta(task, date),
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: expiringSoon || overdue
-                                            ? alertColor
-                                            : AppTheme.muted),
+                                    deadlineColor: expiringSoon || overdue
+                                        ? alertColor : null,
                                   ),
                                 ),
                               )
-                            : Text(_taskMeta(task, date),
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: expiringSoon || overdue
-                                        ? alertColor
-                                        : AppTheme.muted)),
+                            : TaskMetaText(_taskMeta(task, date),
+                                deadlineColor: expiringSoon || overdue
+                                    ? alertColor : null),
                     if (!task.hasQuantityTarget && !task.isCountTask &&
                         task.frequency != TaskFrequency.once)
                       Text(

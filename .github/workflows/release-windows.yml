@@ -160,9 +160,14 @@ jobs:
 
       - name: Package macOS client as PKG
         run: |
+          bash -n macos/installer/scripts/postinstall
+          node --test test/macos_restart_test.cjs
+          osascript -l JavaScript macos/installer/scripts/restart-app.js /nonexistent/RoleSchedule.app
+          chmod +x macos/installer/scripts/postinstall
           pkgbuild \
             --component build/macos/Build/Products/Release/角色日程.app \
             --install-location /Applications \
+            --scripts macos/installer/scripts \
             角色日程-macOS.pkg
 
       - name: Upload workflow artifact

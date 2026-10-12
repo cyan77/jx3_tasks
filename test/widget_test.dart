@@ -1396,6 +1396,31 @@ void main() {
     await tester.pump();
 
     expect(find.text('已完成 1/2'), findsOneWidget);
+    final completionFilter = find.byKey(
+      const ValueKey('task-filter-control-按完成状态筛选'),
+    );
+    await tester.tap(completionFilter);
+    await tester.pumpAndSettle();
+    expect(find.text('部分完成'), findsNothing);
+    await tester.tap(find.text('未完成').last);
+    await tester.pumpAndSettle();
+    expect(find.text('共享任务'), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-character-task-1')), findsNothing);
+    expect(find.byKey(const ValueKey('task-character-task-2')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('task-character-task-2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('task-character-task-2')), findsOneWidget);
+    await tester.tap(find.text('重新筛选'));
+    await tester.pumpAndSettle();
+    expect(find.text('共享任务'), findsNothing);
+
+    await tester.tap(find.text('清除筛选'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('task-character-task-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-character-task-2')), findsOneWidget);
+    await state.setTaskCompleted(store.tasks[1], completed: false);
+    await tester.pumpAndSettle();
     final characterTwoControl = find.ancestor(
       of: find.text('角色二'),
       matching: find.byType(InkWell),

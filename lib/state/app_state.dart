@@ -59,6 +59,7 @@ class AppState extends ChangeNotifier {
   DateTime focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selectedCalendarDate = startOfDay(DateTime.now());
   bool calendarWeekView = true;
+  bool calendarMultiColumn = true;
 
   List<Game> get games => store.games;
   Game? get selectedGame =>

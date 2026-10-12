@@ -1,0 +1,19 @@
+#!/bin/bash
+# Reopen an already-running client in the console user's GUI session.
+set -u
+if [[ "${3:-/}" != "/" ]]; then
+  exit 0
+fi
+console_user=$(/usr/bin/stat -f '%Su' /dev/console)
+console_uid=$(/usr/bin/stat -f '%u' /dev/console)
+if [[ "$console_user" == "root" || "$console_user" == "loginwindow" || "$console_uid" -lt 501 ]]; then
+  exit 0
+fi
+script_dir=$(cd "$(dirname "$0")" && pwd)
+app_path="/Applications/角色日程.app"
+if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -u "$console_user" \
+  /usr/bin/osascript -l JavaScript "$script_dir/restart-app.js" "$app_path"; then
+  echo "Role Schedule was installed, but could not be reopened automatically." >&2
+fi
+# A launch failure must not misreport the successful installation as failed.
+exit 0

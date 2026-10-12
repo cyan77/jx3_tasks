@@ -11,7 +11,6 @@ import '../widgets/common.dart';
 enum _CompletionFilter {
   all,
   incomplete,
-  partial,
   complete,
   expiringSoon,
   overdue,
@@ -42,6 +41,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
   _CompletionFilter completionFilter = _CompletionFilter.all;
   _ArchiveFilter archiveFilter = _ArchiveFilter.active;
   List<String>? _filteredTemplateIds;
+  Set<String> _unfinishedTaskIdsAtFilter = {};
 
   void _changeFilters(VoidCallback update) => setState(() {
         update();
@@ -63,6 +63,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
         state.store.tasks.expand((task) => task.tags).toSet().toList()..sort();
     selectedTemplateIds.removeWhere((id) => !templates.containsKey(id));
     if (_filteredTemplateIds == null) {
+      _unfinishedTaskIdsAtFilter = state.store.tasks
+          .where((task) => !task.isCompletedOn(state.taskDateFor(task)))
+          .map((task) => task.id)
+          .toSet();
       final matches = templates.values.where((tasks) {
         if (!_matchesGame(tasks) ||
             !_matchesCharacter(tasks) ||
@@ -216,7 +220,12 @@ class _MatrixScreenState extends State<MatrixScreen> {
                         final templateId = tasks.first.templateId;
                         return _TaskManagementTile(
                           tasks: tasks,
-                          characters: _charactersFor(tasks),
+                          characters: _charactersFor(tasks).where((character) =>
+                              completionFilter != _CompletionFilter.incomplete ||
+                              tasks.any((task) =>
+                                  task.characterId == character.id &&
+                                  _unfinishedTaskIdsAtFilter.contains(task.id)))
+                              .toList(),
                           gameName: _gameNameFor(tasks),
                           gameColor: state.gameForTask(tasks.first)?.color,
                           completion: _completionFor(tasks),
@@ -441,8 +450,8 @@ class _MatrixScreenState extends State<MatrixScreen> {
       _CompletionFilter.all => true,
       _CompletionFilter.incomplete =>
         completion == _TemplateCompletion.incomplete ||
+            completion == _TemplateCompletion.partial ||
             completion == _TemplateCompletion.unassigned,
-      _CompletionFilter.partial => completion == _TemplateCompletion.partial,
       _CompletionFilter.complete => completion == _TemplateCompletion.complete,
       _CompletionFilter.expiringSoon =>
         _expiryFor(tasks) == TaskExpiryStatus.expiringSoon,
@@ -803,8 +812,6 @@ class _FilterBar extends StatelessWidget {
                     value: _CompletionFilter.all, child: Text('全部状态')),
                 DropdownMenuItem(
                     value: _CompletionFilter.incomplete, child: Text('未完成')),
-                DropdownMenuItem(
-                    value: _CompletionFilter.partial, child: Text('部分完成')),
                 DropdownMenuItem(
                     value: _CompletionFilter.complete, child: Text('已完成')),
                 DropdownMenuItem(
@@ -1374,7 +1381,7 @@ class _TaskManagementTile extends StatelessWidget {
                     const SizedBox(width: 4),
                     if (selected) ...[
                       Icon(
-                        Icons.check_circle,
+                        Icons.check_box_outlined,
                         key: ValueKey('selected-task-${task.templateId}'),
                         size: 19,
                         color: scheme.primary,
@@ -1416,9 +1423,9 @@ class _TaskManagementTile extends StatelessWidget {
                             label: tag,
                             colorful: true,
                           )),
-                      Text(details.join(' · '),
-                          style: TextStyle(
-                              fontSize: 12, color: scheme.onSurfaceVariant)),
+                      TaskMetaText(details.join(' · '),
+                        deadlineColor: expiry == TaskExpiryStatus.normal
+                            ? null : alertColor),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -1468,8 +1475,8 @@ class _TaskManagementTile extends StatelessWidget {
                     onPressed: onSelect,
                     icon: Icon(
                       selected
-                          ? Icons.task_alt
-                          : Icons.check_circle_outline,
+                          ? Icons.check_box_outlined
+                          : Icons.check_box_outline_blank,
                       size: 20,
                       color: selected ? scheme.primary : scheme.onSurfaceVariant,
                     ),
@@ -1517,25 +1524,28 @@ class _CharacterChip extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
       key: ValueKey('task-character-${task.id}'),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 40, minWidth: 72),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Container(
+        constraints: const BoxConstraints(minHeight: 32, minWidth: 72),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(6),
+          color: Color.lerp(Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.primaryContainer, 0.24),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(
             completed
                 ? Icons.check_circle_outline
                 : Icons.radio_button_unchecked,
-            size: 18,
+            size: 16,
             color: completed
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(character.name, style: const TextStyle(fontSize: 12)),
           if (character.archived) ...[
             const SizedBox(width: 4),
@@ -1543,7 +1553,7 @@ class _CharacterChip extends StatelessWidget {
                 style: TextStyle(fontSize: 9, color: AppTheme.muted)),
           ],
         ]),
-      ));
+      )));
 }
 
 class _StatusChip extends StatelessWidget {

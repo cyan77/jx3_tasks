@@ -6,6 +6,7 @@ import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../task_editor.dart';
 import '../widgets/common.dart';
+import '../../theme/tag_colors.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({required this.state, super.key});
@@ -252,7 +253,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       weekStart: weekStart,
                       view: view,
                     ),
-                    const SizedBox(height: 18),
+                    if (MediaQuery.sizeOf(context).width >= 800)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 8),
+                          child: SegmentedButton<bool>(
+                            key: const ValueKey('calendar-layout-toggle'),
+                            segments: const [
+                              ButtonSegment(value: false,
+                                icon: Icon(Icons.view_agenda_outlined, size: 16),
+                                label: Text('一列')),
+                              ButtonSegment(value: true,
+                                icon: Icon(Icons.view_column_outlined, size: 16),
+                                label: Text('多列')),
+                            ],
+                            selected: {state.calendarMultiColumn},
+                            showSelectedIcon: false,
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                              textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
+                            ),
+                            onSelectionChanged: (value) => setState(() {
+                              state.calendarMultiColumn = value.first;
+                            }),
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 18),
                     _DayTasks(
                         state: state,
                         tasks: tasks,
@@ -393,7 +422,6 @@ class _CalendarMonthDay extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isToday = dateKey(date) == dateKey(today);
     final isSelected = dateKey(date) == dateKey(selectedDate);
-    final hasDeadline = _hasDeadlineOn(tasks, date);
     final textColor = isSelected
         ? scheme.onPrimary
         : isToday
@@ -431,16 +459,7 @@ class _CalendarMonthDay extends StatelessWidget {
           const SizedBox(height: 3),
           SizedBox(
             height: 5,
-            child: hasDeadline
-                ? Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: isSelected ? scheme.primary : AppTheme.accent,
-                      shape: BoxShape.circle,
-                    ),
-                  )
-                : null,
+            child: _CalendarGameDots(state: state, tasks: tasks, date: date),
           ),
         ],
       ),
@@ -577,13 +596,8 @@ class _CalendarWeekDay extends StatelessWidget {
                     Positioned(
                       top: 7,
                       right: 0,
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.accent,
-                          shape: BoxShape.circle,
-                        ),
+                      child: _CalendarGameDots(
+                        state: state, tasks: tasks, date: date,
                       ),
                     ),
                 ],
@@ -664,12 +678,15 @@ class _DayTasks extends StatelessWidget {
         if (visibleTasks.isEmpty)
           const Text('当天没有任务',
               style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-        ...visibleTasks.map((task) => _InteractiveTaskTile(
+        _CalendarTaskColumns(
+          multiColumn: state.calendarMultiColumn,
+          children: visibleTasks.map((task) => _InteractiveTaskTile(
               state: state,
               task: task,
               date: date,
               showSubtasks: true,
-            )),
+            )).toList(),
+        ),
       ],
     );
   }
@@ -699,8 +716,10 @@ class _InteractiveTaskTile extends StatelessWidget {
     final character = state.store.characters
         .where((item) => item.id == task.characterId)
         .firstOrNull;
-    final game =
-        state.games.where((item) => item.id == character?.gameId).firstOrNull;
+    final game = state.gameForTask(task);
+    final scheme = Theme.of(context).colorScheme;
+    final gameColors = TagColors.forLabel(game?.name ?? '', scheme.brightness,
+        color: game?.color);
     final checked = task.isCompletedOn(date);
     final expiry = taskExpiryStatus(task, state.taskDateFor(task));
     final alertColor = expiry == TaskExpiryStatus.overdue
@@ -709,9 +728,6 @@ class _InteractiveTaskTile extends StatelessWidget {
             ? AppTheme.warningDark
             : AppTheme.warning;
     final details = [
-      if (game != null) game.name,
-      if (character != null) character.name,
-      task.frequency.label,
       if (task.hasQuantityTarget)
         '${task.quantityCompletedOn(date)}/${task.targetQuantity} 数量',
       if (task.isCountTask)
@@ -743,8 +759,37 @@ class _InteractiveTaskTile extends StatelessWidget {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(details.join(' · '),
-                  style: const TextStyle(fontSize: 11, color: AppTheme.muted)),
+              const SizedBox(height: 2),
+              Wrap(
+                spacing: 6,
+                runSpacing: 3,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (game != null)
+                    _CalendarDetailLabel(
+                      icon: Icons.sports_esports_outlined,
+                      label: game.name,
+                      foreground: gameColors.foreground,
+                      background: Color.lerp(
+                        scheme.surface, gameColors.background, 0.45),
+                    ),
+                  if (character != null)
+                    _CalendarDetailLabel(
+                      icon: Icons.person_outline,
+                      label: character.name,
+                      foreground: scheme.onSurface,
+                    ),
+                  _CalendarDetailLabel(
+                    icon: Icons.schedule_outlined,
+                    label: task.frequency.label,
+                    foreground: scheme.onSurfaceVariant,
+                  ),
+                  if (details.isNotEmpty)
+                    Text(details.join(' · '), style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant,
+                    )),
+                ],
+              ),
               if (task.tags.isNotEmpty) ...[
                 const SizedBox(height: 5),
                 TaskTags(tags: task.tags, compact: true),
@@ -755,18 +800,25 @@ class _InteractiveTaskTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (showDueDate)
-                Text(
-                  _deadlineLabel(state, task),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: expiry == TaskExpiryStatus.normal
-                        ? AppTheme.muted
-                        : alertColor,
-                  ),
+                _CalendarDetailLabel(
+                  icon: Icons.event_outlined,
+                  label: _deadlineLabel(state, task),
+                  foreground: expiry == TaskExpiryStatus.normal
+                      ? scheme.onSurfaceVariant
+                      : alertColor,
+                  background: expiry == TaskExpiryStatus.normal
+                      ? null
+                      : alertColor.withValues(alpha: 0.06),
                 ),
               PopupMenuButton<String>(
                 tooltip: '编辑任务',
-                child: const ActionIconSurface(icon: Icons.edit_outlined),
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: ActionIconSurface(
+                    icon: Icons.edit_outlined,
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
                 onSelected: (value) => showTaskEditor(
                   context,
                   state,
@@ -855,12 +907,15 @@ class _Upcoming extends StatelessWidget {
         if (visibleTasks.isEmpty)
           const Text('暂无设置截止日期的任务',
               style: TextStyle(fontSize: 12, color: AppTheme.muted)),
-        ...visibleTasks.map((task) => _InteractiveTaskTile(
+        _CalendarTaskColumns(
+          multiColumn: state.calendarMultiColumn,
+          children: visibleTasks.map((task) => _InteractiveTaskTile(
               state: state,
               task: task,
               date: task.dueDate!,
               showDueDate: true,
-            )),
+            )).toList(),
+        ),
       ],
     );
   }
@@ -875,6 +930,97 @@ String _weekLabel(DateTime weekStart) {
     return '${weekStart.month}月${weekStart.day}日–${weekEnd.month}月${weekEnd.day}日';
   }
   return '${weekStart.year}/${weekStart.month}/${weekStart.day}–${weekEnd.year}/${weekEnd.month}/${weekEnd.day}';
+}
+
+class _CalendarTaskColumns extends StatelessWidget {
+  const _CalendarTaskColumns({required this.children, required this.multiColumn});
+  final List<Widget> children;
+  final bool multiColumn;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final desktop = MediaQuery.sizeOf(context).width >= 800;
+      final columns = !desktop || !multiColumn ? 1
+          : (constraints.maxWidth / 400).floor().clamp(1, 3);
+      if (columns == 1) return Column(children: children);
+      const gap = 18.0;
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+      return Wrap(
+        key: const ValueKey('calendar-task-columns'),
+        spacing: gap,
+        runSpacing: 8,
+        children: children.map((child) => Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.65)),
+          ),
+          child: child,
+        )).toList(),
+      );
+    },
+  );
+}
+
+class _CalendarDetailLabel extends StatelessWidget {
+  const _CalendarDetailLabel({required this.icon, required this.label,
+    required this.foreground, this.background});
+  final IconData icon;
+  final String label;
+  final Color foreground;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: background == null ? 0 : 5, vertical: 2),
+    decoration: BoxDecoration(color: background,
+      borderRadius: BorderRadius.circular(4)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: foreground),
+      const SizedBox(width: 3),
+      Flexible(child: Text(label, style: TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w400, color: foreground))),
+    ]),
+  );
+}
+
+class _CalendarGameDots extends StatelessWidget {
+  const _CalendarGameDots({required this.state, required this.tasks,
+    required this.date});
+  final AppState state;
+  final List<TaskRecord> tasks;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final games = <String, Game>{};
+    for (final task in tasks) {
+      if (task.dueDate == null || dateKey(task.dueDate!) != dateKey(date)) continue;
+      final game = state.gameForTask(task);
+      if (game != null) games[game.id] = game;
+    }
+    if (games.isEmpty) return const SizedBox.shrink();
+    return Tooltip(
+      message: games.values.map((game) => game.name).join('、'),
+      child: Row(mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: games.values.take(3).map((game) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: Container(
+            key: ValueKey('calendar-game-dot-${dateKey(date)}-${game.id}'),
+            width: 5, height: 5,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              color: TagColors.forLabel(game.name, Theme.of(context).brightness,
+                color: game.color).foreground),
+          ),
+        )).toList(),
+      ),
+    );
+  }
 }
 
 bool _hasDeadlineOn(List<TaskRecord> tasks, DateTime date) {
