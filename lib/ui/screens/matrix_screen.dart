@@ -1525,6 +1525,9 @@ class _CharacterChip extends StatelessWidget {
       key: ValueKey('task-character-${task.id}'),
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
+      hoverColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      splashFactory: NoSplash.splashFactory,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Container(
