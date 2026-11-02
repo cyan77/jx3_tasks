@@ -178,7 +178,7 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-class _HomeGameSelector extends StatelessWidget {
+class _HomeGameSelector extends StatelessWidget with _SyncActions {
   const _HomeGameSelector({required this.state});
 
   final AppState state;
@@ -380,6 +380,11 @@ class _HomeGameSelector extends StatelessWidget {
     );
   }
 
+}
+
+mixin _SyncActions {
+  AppState get state;
+
   Future<void> _sync(BuildContext context) async {
     if (!state.isSyncConfigured) {
       await Navigator.of(context).push(
@@ -435,6 +440,52 @@ class _HomeGameSelector extends StatelessWidget {
         SnackBar(content: Text('恢复失败：$error')),
       );
     }
+  }
+}
+
+class SidebarSyncStatus extends StatelessWidget with _SyncActions {
+  const SidebarSyncStatus({required this.state, super.key});
+  @override
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final last = state.lastSyncAt?.toLocal();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        IconButton(
+          tooltip: state.isSyncConfigured ? '立即同步' : '配置同步',
+          onPressed: state.restoreBusy ? null : () => _sync(context),
+          icon: state.syncBusy
+              ? const SizedBox(width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(state.isSyncConfigured ? Icons.cloud_sync_outlined
+                  : Icons.cloud_off_outlined, size: 20),
+        ),
+        Expanded(child: Text(state.syncBusy ? '同步中' :
+            state.isSyncConfigured ? '云端同步' : '配置同步',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant))),
+        if (state.newerRemoteBackup != null)
+          IconButton(
+            tooltip: state.hasSyncConflict ? '本地和云端都有改动，点击处理'
+                : '发现更新的云端备份，点击恢复',
+            color: scheme.brightness == Brightness.dark
+                ? AppTheme.warningDark : AppTheme.warning,
+            onPressed: state.restoreBusy || state.syncBusy ? null
+                : () => _restoreNewerBackup(context),
+            icon: state.restoreBusy
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.restore, size: 20),
+          ),
+      ]),
+      Padding(padding: const EdgeInsets.only(left: 10, bottom: 10),
+        child: Text(last == null ? '暂无成功同步记录'
+            : '上次成功 ${twoDigits(last.month)}/${twoDigits(last.day)} '
+              '${twoDigits(last.hour)}:${twoDigits(last.minute)}',
+          style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant))),
+    ]);
   }
 }
 

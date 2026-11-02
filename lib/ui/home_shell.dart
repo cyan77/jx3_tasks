@@ -349,6 +349,7 @@ class _SideRail extends StatelessWidget {
                 index: 4,
                 state: state),
             const Spacer(),
+            SidebarSyncStatus(state: state),
             const Padding(
                 padding: EdgeInsets.only(left: 10),
                 child: Text('本地离线模式',

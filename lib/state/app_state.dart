@@ -123,7 +123,7 @@ class AppState extends ChangeNotifier {
         dailyResetMinutes: gameForTask(task)?.dailyResetMinutes ?? 0,
       );
   List<Character> get characters => store.characters
-      .where((item) => item.gameId == selectedGameId && !item.archived)
+      .where((item) => item.gameId == selectedGameId && !item.archived && !item.disabled)
       .toList();
   List<TaskRecord> get tasks {
     final characterIds = characters.map((item) => item.id).toSet();
@@ -221,7 +221,7 @@ class AppState extends ChangeNotifier {
   List<TaskRecord> calendarTasks({String? gameId}) {
     final characterIds = store.characters
         .where((character) =>
-            !character.archived &&
+            !character.archived && !character.disabled &&
             (gameId == null || character.gameId == gameId))
         .map((character) => character.id)
         .toSet();
@@ -313,7 +313,29 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  int automaticArchiveRevision = 0;
+
+  Future<void> archiveCompletedOnceTasks({DateTime? moment}) async {
+    final now = moment ?? DateTime.now();
+    var changed = false;
+    for (var index = 0; index < store.tasks.length; index++) {
+      final task = store.tasks[index];
+      final day = taskDateFor(task, now);
+      if (task.archived || task.frequency != TaskFrequency.once ||
+          !task.isCompletedOn(day) || task.completedDates.isEmpty) continue;
+      final dates = task.completedDates.map(DateTime.tryParse).toList();
+      if (dates.any((date) => date == null || !date.isBefore(day))) continue;
+      store.tasks[index] = task.copyWith(archived: true);
+      changed = true;
+    }
+    if (changed) {
+      automaticArchiveRevision++;
+      await _saveDataChange();
+    }
+  }
+
   void _scheduleTaskDayRefresh() {
+
     _taskDayTimer?.cancel();
     if (!_taskDayClockStarted || games.isEmpty) return;
     final now = DateTime.now();
@@ -332,6 +354,7 @@ class AppState extends ChangeNotifier {
     _taskDayTimer = Timer(
       nextReset!.difference(now) + const Duration(seconds: 1),
       () {
+        archiveCompletedOnceTasks();
         notifyListeners();
         _scheduleTaskDayRefresh();
       },
@@ -340,11 +363,13 @@ class AppState extends ChangeNotifier {
 
   void startTaskDayClock() {
     _taskDayClockStarted = true;
+    archiveCompletedOnceTasks();
     _scheduleTaskDayRefresh();
   }
 
   void refreshTaskDayClock() {
     if (!_taskDayClockStarted) return;
+    archiveCompletedOnceTasks();
     notifyListeners();
     _scheduleTaskDayRefresh();
   }
@@ -1598,6 +1623,16 @@ class AppState extends ChangeNotifier {
     store.characters.removeWhere((item) => item.id == character.id);
     store.tasks.removeWhere((task) => task.characterId == character.id);
     if (selectedCharacterId == character.id) {
+      selectedCharacterId = characters.firstOrNull?.id;
+    }
+    await _saveDataChange();
+  }
+
+  Future<void> setCharacterDisabled(Character character, bool disabled) async {
+    final index = store.characters.indexWhere((item) => item.id == character.id);
+    if (index < 0) return;
+    store.characters[index] = store.characters[index].copyWith(disabled: disabled);
+    if (selectedCharacterId == character.id && disabled) {
       selectedCharacterId = characters.firstOrNull?.id;
     }
     await _saveDataChange();

@@ -41,6 +41,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
   _CompletionFilter completionFilter = _CompletionFilter.all;
   _ArchiveFilter archiveFilter = _ArchiveFilter.active;
   List<String>? _filteredTemplateIds;
+  int _archiveRevision = -1;
   Set<String> _unfinishedTaskIdsAtFilter = {};
 
   void _changeFilters(VoidCallback update) => setState(() {
@@ -52,6 +53,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_archiveRevision != state.automaticArchiveRevision) {
+      _archiveRevision = state.automaticArchiveRevision;
+      _filteredTemplateIds = null;
+    }
     final screenWidth = MediaQuery.sizeOf(context).width;
     final desktopSelection = screenWidth >= 800;
     final compactHeader = screenWidth < 560;

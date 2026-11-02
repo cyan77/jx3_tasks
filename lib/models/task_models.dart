@@ -140,6 +140,7 @@ class Character {
     required this.occupation,
     required this.color,
     this.archived = false,
+    this.disabled = false,
     this.metadataValues = const {},
   });
 
@@ -150,6 +151,7 @@ class Character {
   final String occupation;
   final int color;
   final bool archived;
+  final bool disabled;
   final Map<String, String> metadataValues;
 
   String metadataSummary(Game game) => game.metadataFields
@@ -172,6 +174,7 @@ class Character {
     String? name,
     String? occupation,
     bool? archived,
+    bool? disabled,
     Map<String, String>? metadataValues,
   }) =>
       Character(
@@ -182,6 +185,7 @@ class Character {
         occupation: occupation ?? this.occupation,
         color: color,
         archived: archived ?? this.archived,
+        disabled: disabled ?? this.disabled,
         metadataValues: metadataValues ?? this.metadataValues,
       );
 
@@ -193,6 +197,7 @@ class Character {
         'occupation': occupation,
         'color': color,
         'archived': archived,
+        'disabled': disabled,
         'metadataValues': metadataValues,
       };
 
@@ -204,6 +209,7 @@ class Character {
         occupation: json['occupation'] as String? ?? '未分类',
         color: json['color'] as int? ?? 0xff2f7d72,
         archived: json['archived'] as bool? ?? false,
+        disabled: json['disabled'] as bool? ?? false,
         metadataValues: Map<String, String>.from(
             json['metadataValues'] as Map? ?? const {}),
       );

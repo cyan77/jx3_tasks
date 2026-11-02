@@ -493,6 +493,15 @@ class _CharacterCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (!batchMode)
+                  Tooltip(
+                    message: character.disabled ? '启用角色' : '禁用角色',
+                    child: Switch.adaptive(
+                      value: !character.disabled,
+                      onChanged: (enabled) => state.setCharacterDisabled(
+                        character, !enabled),
+                    ),
+                  ),
                 if (batchMode)
                   Checkbox(value: selected, onChanged: (_) => onToggle())
                 else
