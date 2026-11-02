@@ -3016,7 +3016,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('上次成功 09/14 20:35'), findsOneWidget);
+    expect(find.text('上次成功 09/14 20:35'), findsNWidgets(2));
+    expect(find.descendant(of: find.byType(SidebarSyncStatus),
+        matching: find.text('上次成功 09/14 20:35')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

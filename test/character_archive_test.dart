@@ -9,7 +9,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore()
       ..games = const [Game(id: 'g', name: '游戏')]
-      ..characters = const [Character(id: 'c', gameId: 'g', account: '',
+      ..characters = [const Character(id: 'c', gameId: 'g', account: '',
         name: '角色', occupation: '', color: 0xff3c8c72)]
       ..tasks = [TaskRecord(id: 't', templateId: 't', title: '任务',
         characterId: 'c', frequency: TaskFrequency.once, createdAt: DateTime.now())];
