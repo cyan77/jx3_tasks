@@ -248,7 +248,7 @@ class _TaskEditorState extends State<_TaskEditor> {
 
   List<Character> get editorCharacters => widget.state.store.characters
       .where((character) =>
-          !character.archived && character.gameId == editorGameId)
+          !character.archived && !character.disabled && character.gameId == editorGameId)
       .toList();
 
   List<Character> get availableCharacters {

@@ -61,7 +61,10 @@ class _MatrixScreenState extends State<MatrixScreen> {
     final desktopSelection = screenWidth >= 800;
     final compactHeader = screenWidth < 560;
     final templates = <String, List<TaskRecord>>{};
+    final disabledIds = state.store.characters
+        .where((character) => character.disabled).map((character) => character.id).toSet();
     for (final task in state.store.tasks) {
+      if (!task.isInbox && disabledIds.contains(task.characterId)) continue;
       templates.putIfAbsent(task.templateId, () => []).add(task);
     }
     final availableTags =
@@ -373,13 +376,14 @@ class _MatrixScreenState extends State<MatrixScreen> {
   List<Character> _charactersFor(List<TaskRecord> tasks) {
     final ids = tasks.map((task) => task.characterId).toSet();
     return state.store.characters
-        .where((character) => ids.contains(character.id))
+        .where((character) => !character.disabled && ids.contains(character.id))
         .toList();
   }
 
   List<Character> get _filterCharacters => state.store.characters
       .where((character) =>
-          gameFilterId == null || character.gameId == gameFilterId)
+          !character.disabled &&
+          (gameFilterId == null || character.gameId == gameFilterId))
       .toList();
 
   bool get _hasActiveFilters =>
@@ -556,7 +560,7 @@ class _MatrixScreenState extends State<MatrixScreen> {
   Future<Set<String>?> _showCharacterAssignmentDialog(String gameId) async {
     final selected = <String>{};
     final characters = state.store.characters.where((character) {
-      if (character.archived || character.gameId != gameId) return false;
+      if (character.archived || character.disabled || character.gameId != gameId) return false;
       return selectedTemplateIds.any((templateId) => !state.store.tasks.any(
             (task) =>
                 task.templateId == templateId &&

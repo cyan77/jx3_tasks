@@ -145,7 +145,7 @@ class AppState extends ChangeNotifier {
 
   List<TaskRecord> get allTasksForSelectedGame {
     final characterIds = store.characters
-        .where((character) => character.gameId == selectedGameId)
+        .where((character) => !character.disabled && character.gameId == selectedGameId)
         .map((character) => character.id)
         .toSet();
     return store.tasks
@@ -1138,7 +1138,7 @@ class AppState extends ChangeNotifier {
     if (!source.isInbox || characterIds.isEmpty) return;
     final gameId = source.inboxGameId;
     final validCharacterIds = store.characters
-        .where((character) => !character.archived && character.gameId == gameId)
+        .where((character) => !character.archived && !character.disabled && character.gameId == gameId)
         .map((character) => character.id)
         .where(characterIds.contains)
         .toList();
@@ -1281,7 +1281,7 @@ class AppState extends ChangeNotifier {
         .toSet();
     final gameId = gameForTask(source)?.id;
     final validCharacterIds = store.characters
-        .where((character) => !character.archived && character.gameId == gameId)
+        .where((character) => !character.archived && !character.disabled && character.gameId == gameId)
         .map((character) => character.id)
         .where((id) =>
             characterIds.contains(id) && !existingCharacterIds.contains(id))
@@ -1632,6 +1632,27 @@ class AppState extends ChangeNotifier {
     final index = store.characters.indexWhere((item) => item.id == character.id);
     if (index < 0) return;
     store.characters[index] = store.characters[index].copyWith(disabled: disabled);
+    if (disabled) {
+      final removed = store.tasks
+          .where((task) => task.characterId == character.id).toList();
+      store.tasks.removeWhere((task) => task.characterId == character.id);
+      for (final source in removed) {
+        if (store.tasks.any((task) => task.templateId == source.templateId)) continue;
+        // Keep the task definition when its last assignment is removed.
+        store.tasks.add(TaskRecord.fromJson({
+          ...source.toJson(),
+          'characterId': '',
+          'inboxGameId': character.gameId,
+          'inboxFrequencySet': true,
+          'completedDates': <String>[],
+          'quantityProgress': <String, int>{},
+          'subtasks': source.subtasks.map((subtask) => {
+            ...subtask.toJson(), 'completedDates': <String>[],
+          }).toList(),
+        }));
+      }
+    }
+    automaticArchiveRevision++;
     if (selectedCharacterId == character.id && disabled) {
       selectedCharacterId = characters.firstOrNull?.id;
     }

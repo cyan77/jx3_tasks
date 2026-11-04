@@ -216,7 +216,7 @@ class _InboxScreenState extends State<InboxScreen> {
   ) {
     final selected = <String>{};
     final characters = state.store.characters.where((character) {
-      if (character.archived || character.gameId != gameId) return false;
+      if (character.archived || character.disabled || character.gameId != gameId) return false;
       return templateIds.any((templateId) => !state.store.tasks.any(
             (task) =>
                 task.templateId == templateId &&
